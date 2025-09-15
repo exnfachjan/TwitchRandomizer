@@ -1,0 +1,124 @@
+name: TwitchRandomizer
+main: me.exnfachjan.twitchRandomizer.TwitchRandomizer
+version: 1.0.0
+api-version: "1.20"
+
+commands:
+  randomevent:
+    description: Führt ein zufälliges Event aus
+    usage: /randomevent [by:<name>]
+    permission: twitchrandomizer.randomevent
+
+  timer:
+    description: Timer steuern
+    usage: /timer <start|stop|resume|reset>
+    permission: twitchrandomizer.timer
+
+  reset:
+    description: "Server/Welten zurücksetzen (mit Bestätigung)"
+    usage: "/reset confirm"
+    permission: "twitchrandomizer.reset"
+    permission-message: "You don't have permission."
+
+  trconfig:
+    description: Konfigurationsbefehl
+    usage: /trconfig ...
+    permission: twitchrandomizer.config
+
+  twitchqueue:
+    description: Verwalte die Twitch-Queue
+    usage: /twitchqueue add <Anzahl> [Name]
+    permission: twitchrandomizer.queue
+    aliases: [queue]
+
+  queue:
+    description: Alias für twitchqueue (separat registriert)
+    usage: /queue add <Anzahl> [Name]
+    permission: twitchrandomizer.queue
+    # optional: keine Aliases nötig
+
+  trgui:
+    description: Öffnet das TwitchRandomizer GUI
+    usage: /trgui
+    permission: twitchrandomizer.gui.open
+
+  gui:
+    description: Öffnet das TwitchRandomizer GUI (Shortcut)
+    usage: /gui
+    permission: twitchrandomizer.gui.open
+
+  cleardeath:
+    description: Setzt den Deathcounter auf 0
+    usage: /cleardeath
+    permission: twitchrandomizer.death.clear
+
+  zmd:
+    description: ZMD Hilfscommand
+    usage: /zmd reset
+    permission: twitchrandomizer.zmd
+
+permissions:
+  # Commands
+  twitchrandomizer.randomevent:
+    default: op
+  twitchrandomizer.timer:
+    default: op
+  twitchrandomizer.reset:
+    default: op
+  twitchrandomizer.reset.force:
+    default: op
+  twitchrandomizer.config:
+    default: op
+  twitchrandomizer.queue:
+    default: op
+  twitchrandomizer.death.clear:
+    default: op
+  twitchrandomizer.zmd:
+    default: op
+
+  # GUI Super-Node
+  twitchrandomizer.gui:
+    description: Vollzugriff auf das GUI (öffnen + alle Aktionen)
+    default: op
+    children:
+      twitchrandomizer.gui.open: true
+      twitchrandomizer.gui.use: true
+      twitchrandomizer.admin.*: true
+      twitchrandomizer.timer.*: true
+
+  # Granulare GUI-Nodes
+  twitchrandomizer.gui.open:
+    description: GUI öffnen (z. B. /trgui, /gui)
+    default: op
+  twitchrandomizer.gui.use:
+    description: GUI bedienen/navigieren
+    default: op
+
+  twitchrandomizer.admin.*:
+    description: Alle Admin-Aktionen im GUI
+    default: op
+    children:
+      twitchrandomizer.admin.save: true
+      twitchrandomizer.admin.edit: true
+      twitchrandomizer.admin.twitch: true
+
+  twitchrandomizer.admin.save:
+    default: op
+  twitchrandomizer.admin.edit:
+    default: op
+  twitchrandomizer.admin.twitch:
+    default: op
+
+  # Timer granular
+  twitchrandomizer.timer.*:
+    default: op
+    children:
+      twitchrandomizer.timer.start: true
+      twitchrandomizer.timer.stop: true
+      twitchrandomizer.timer.reset: true
+  twitchrandomizer.timer.start:
+    default: op
+  twitchrandomizer.timer.stop:
+    default: op
+  twitchrandomizer.timer.reset:
+    default: op

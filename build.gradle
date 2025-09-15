@@ -1,0 +1,77 @@
+plugins {
+    id 'java'
+    id("xyz.jpenilla.run-paper") version "2.3.1"
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'me.exnfachjan'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+    maven {
+        name = "papermc-repo"
+        url = "https://repo.papermc.io/repository/maven-public/"
+    }
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    compileOnly "io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT"
+
+    // Twitch4J (JitPack)
+    implementation "com.github.twitch4j:twitch4j:1.25.0"
+    implementation "com.github.twitch4j:twitch4j-auth:1.25.0"
+    implementation "com.github.twitch4j:twitch4j-common:1.25.0" // <- wichtig für OAuth2Credential
+}
+
+def targetJavaVersion = 21
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    sourceCompatibility = javaVersion
+    targetCompatibility = javaVersion
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        options.release.set(targetJavaVersion)
+    }
+}
+
+// Plugin-Resources (plugin.yml)
+processResources {
+    def props = [version: version]
+    inputs.properties props
+    filteringCharset 'UTF-8'
+    filesMatching('plugin.yml') {
+        expand props
+    }
+}
+
+// Shadow: Erzeuge ein Fat-JAR und nutze es beim Run-Server
+tasks.named('shadowJar') {
+    archiveClassifier.set('')
+    //minimize()
+    //relocate 'com.github.twitch4j', 'me.exnfachjan.shaded.twitch4j'
+    //relocate 'com.github.philippheuer', 'me.exnfachjan.shaded.philippheuer'
+    // Wichtig: slf4j NICHT relocaten, Paper bringt das selbst mit.
+}
+
+tasks.named('jar') {
+    enabled = false
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('shadowJar')
+}
+
+// run-paper soll das Shadow-JAR als Plugin laden
+tasks.named('runServer') {
+    minecraftVersion("1.21.8")
+    // füge das shadowJar dem Plugins-Ordner des Test-Servers hinzu
+    pluginJars.from(tasks.named('shadowJar'))
+}

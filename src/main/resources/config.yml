@@ -1,0 +1,97 @@
+twitch:
+  # Twitch-Channel (Broadcaster)
+  channel: "XXXXX"
+
+  # OAuth Access Token im Format "oauth:xxxxxxxx..."
+  # Benötigt mind.:
+  # - chat:read                 (Chat / !test)
+  # - user:read:subscriptions   (Sub-Events)
+  # - channel:read:subscriptions (Sub-Events)
+  # - bits:read                 (Bits-Events)
+  # Den Token kannst du hier direkt erstellen: https://twitchtokengenerator.com/quick/1KRFjxyoNE
+  oauth_token: "oauth:XXXXXXX"
+
+
+  # Cooldown zwischen den Events (Sekunden) - Persönliche empfehlung 30 Sekunden
+  trigger_interval_seconds: 30.0
+
+  # Debug: Ermöglicht des Testen der Events. Debug muss aktiv sein, damit sim_gift und sim_giftbomb funktionieren.
+  # ACHTUNG: Bei aktivem Debug werden KEINE echten Twitch-Events verarbeitet!
+  debug: true
+
+  # Aktive Auslöser
+  triggers:
+
+    bits:
+      enabled: true
+      bits_per_trigger: 500
+
+    subscriptions:
+      enabled: true
+
+    chat_test:
+      enabled: true
+
+      # NEU: Simulierte Geschenk-Subs (nur aktiv, wenn twitch.debug=true)
+    sim_gift:
+      enabled: true           # !gift
+
+    sim_giftbomb:
+      enabled: true           # !giftbomb [N]
+      default_count: 5         # Standardanzahl, wenn N fehlt
+
+# Einstellungen für Reset-Verhalten sowie Fallback-Server (BungeeCord)
+reset:
+  confirm_window_seconds: 30
+  randomize_seed: true
+  fallback_server: "lobby"
+  transfer_wait_ticks: 60
+
+challenge:
+  # Wenn true: Stirbt ein Spieler, ist die Challenge vorbei -> alle werden Spectator.
+  # Wenn false: kein Auto-Spectator, normales Respawn-Spiel möglich.
+  auto_spectator_on_death: true
+
+# Event-Gewichtungen (müssen NICHT exakt 100 ergeben; werden normalisiert)
+events:
+  weights:
+    spawn_mobs: 35
+    potion: 15
+    give_item: 20
+    clear_inventory: 4
+    teleport: 5
+    damage_half_heart: 10
+    fire: 10
+    inv_shuffle: 8
+    hot_potato: 7
+    no_crafting: 6
+    safe_creepers: 5
+    floor_is_lava: 7
+    nasa_call: 5
+    slippery_ground: 6
+    hell_is_calling: 6
+
+  settings:
+    no_crafting:
+      min_seconds: 5
+      max_seconds: 15
+    hot_potato:
+      duration_seconds: 10
+      # explode | damage | effects
+      mode: explode
+      explosion_power: 2.0
+    safe_creepers:
+      count: 3
+      radius: 6
+      lifetime_seconds: 8
+      powered: true
+    floor_is_lava:
+      min_seconds: 10
+      max_seconds: 180
+    slippery_ground:
+      min_seconds: 10
+      max_seconds: 180
+
+language:
+  mode: auto    # auto = Clientsprache; manual = per-Spieler (GUI oder extern)
+  default: en   # Fallback: de oder en
