@@ -1,8 +1,11 @@
 package me.exnfachjan.twitchRandomizer.twitch;
 
 import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
+import me.exnfachjan.twitchRandomizer.command.RandomEventCommand;
+import me.exnfachjan.twitchRandomizer.events.RandomEvents;
 import me.exnfachjan.twitchRandomizer.timer.TimerManager;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -13,18 +16,9 @@ import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
 import com.github.twitch4j.chat.events.channel.CheerEvent;
 import com.github.twitch4j.chat.events.channel.SubscriptionEvent;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class TwitchIntegrationManager {
@@ -170,7 +164,6 @@ public class TwitchIntegrationManager {
             String trimmed = msg.trim();
             String lower = trimmed.toLowerCase(Locale.ROOT);
 
-            // WICHTIG: Flags live aus der Config lesen -> Änderungen greifen sofort
             boolean chatTestEnabledNow = plugin.getConfig().getBoolean(
                     "twitch.triggers.chat_test.enabled",
                     plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false)
@@ -217,9 +210,7 @@ public class TwitchIntegrationManager {
         saveQueueAsync();
     }
 
-    // Config live anwenden (Reconnect, wenn Channel/Token geändert oder nicht verbunden)
     public void applyConfig() {
-        // Flags/Interval aktualisieren (auch ohne Reconnect wirksam)
         this.subsEnabled        = plugin.getConfig().getBoolean("twitch.triggers.subscriptions.enabled", true);
         this.chatTriggerEnabled = plugin.getConfig().getBoolean("twitch.triggers.chat_test.enabled",
                 plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false));
@@ -234,12 +225,10 @@ public class TwitchIntegrationManager {
         if (seconds < 0.05) seconds = 0.05;
         this.gapTicks = Math.max(1, (int) Math.round(seconds * 20.0));
 
-        // WICHTIG: Debug-Sim-Flags live übernehmen
         this.simGiftEnabled = plugin.getConfig().getBoolean("twitch.triggers.sim_gift.enabled", false);
         this.simGiftBombEnabled = plugin.getConfig().getBoolean("twitch.triggers.sim_giftbomb.enabled", false);
         this.simGiftBombDefaultCount = Math.max(1, plugin.getConfig().getInt("twitch.triggers.sim_giftbomb.default_count", 5));
 
-        // Reconnect erforderlich?
         String newChannel = plugin.getConfig().getString("twitch.channel", "");
         String newTokenRaw = plugin.getConfig().getString("twitch.oauth_token", "");
         String newToken = normalizeToken(newTokenRaw);
@@ -250,7 +239,6 @@ public class TwitchIntegrationManager {
             needRestart = true;
         } else if (twitchClient != null) {
             if (!haveCreds) {
-                // keine gültigen Credentials mehr -> trennen
                 stop();
                 return;
             }
@@ -266,8 +254,6 @@ public class TwitchIntegrationManager {
         }
     }
 
-    /* ===== Helpers ===== */
-
     private boolean isTimerRunning() {
         try {
             if (plugin instanceof TwitchRandomizer t) {
@@ -278,120 +264,57 @@ public class TwitchIntegrationManager {
         return false;
     }
 
-    // Display-Name aus IRC-Tags; dann Login (IRC); dann EventUser-Login
-    private String resolveAuthorFromChat(ChannelMessageEvent event) {
-        try {
-            String display = (event.getMessageEvent() != null)
-                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
-                    : null;
-            if (display != null && !display.isBlank()) return display;
-
-            if (event.getMessageEvent() != null) {
-                String loginFromIrc = event.getMessageEvent().getUserName();
-                if (loginFromIrc != null && !loginFromIrc.isBlank()) return loginFromIrc;
-            }
-
-            if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
-                return event.getUser().getName();
-            }
-        } catch (Throwable ignored) {}
-
-        if (debug) plugin.getLogger().warning("[Twitch] Konnte Autor nicht ermitteln – fallback 'unknown'.");
-        return "unknown";
-    }
-
-    // Für Cheers (ähnlich wie Chat)
-    private String resolveAuthorFromCheer(CheerEvent event) {
-        try {
-            String display = (event.getMessageEvent() != null)
-                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
-                    : null;
-            if (display != null && !display.isBlank()) return display;
-
-            if (event.getMessageEvent() != null) {
-                String loginFromIrc = event.getMessageEvent().getUserName();
-                if (loginFromIrc != null && !loginFromIrc.isBlank()) return loginFromIrc;
-            }
-
-            if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
-                return event.getUser().getName();
-            }
-        } catch (Throwable ignored) {}
-
-        if (debug) plugin.getLogger().warning("[Twitch] Konnte Cheer-User nicht ermitteln – fallback 'unknown'.");
-        return "unknown";
-    }
-
-    private String resolveUserFromSubscription(SubscriptionEvent event) {
-        try {
-            String display = (event.getMessageEvent() != null)
-                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
-                    : null;
-            if (display != null && !display.isBlank()) return display;
-
-            if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
-                return event.getUser().getName();
-            }
-        } catch (Throwable ignored) {}
-
-        if (debug) plugin.getLogger().warning("[Twitch] Konnte Sub-User nicht ermitteln – fallback 'unknown'.");
-        return "unknown";
-    }
-
-    // Anonyme Cheers robust erkennen
-    private boolean isLikelyAnonymousCheer(CheerEvent event, String user) {
-        if (event.getUser() == null) return true;
-        String low = user == null ? "" : user.toLowerCase(Locale.ROOT);
-        if (low.isBlank()) return true;
-        if (low.contains("anonymous")) return true;
-        try {
-            String display = (event.getMessageEvent() != null)
-                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
-                    : null;
-            if (display != null && display.toLowerCase(Locale.ROOT).contains("anonymous")) return true;
-        } catch (Throwable ignored) {}
-        return false;
-    }
-
-    // Token-Handhabung
-    private String normalizeToken(String raw) {
-        if (raw == null) return "";
-        String t = raw.trim();
-        if (t.length() >= 2 && ((t.startsWith("\"") && t.endsWith("\"")) || (t.startsWith("'") && t.endsWith("'")))) {
-            t = t.substring(1, t.length() - 1).trim();
-        }
-        if (t.toLowerCase(Locale.ROOT).startsWith("oauth:")) {
-            t = t.substring("oauth:".length());
-        }
-        return t;
-    }
-
-    private OAuth2Credential buildCredential(String raw) {
-        String token = normalizeToken(raw);
-        return new OAuth2Credential("twitch", token);
-    }
-
-    private void enqueue(String cmd) {
-        commandQueue.offer(cmd);
-        if (debug) plugin.getLogger().info("[Twitch] Enqueue: " + cmd + " (queue=" + commandQueue.size() + ")");
-        saveQueueAsync();
-    }
-
-    public void enqueueMultiple(int count, String byUserNullable) {
-        if (count <= 0) return;
-        String base = (byUserNullable != null && !byUserNullable.isBlank())
-                ? "randomevent " + byUserNullable.trim()
-                : "randomevent";
-        for (int i = 0; i < count; i++) {
-            commandQueue.offer(base);
-        }
-        if (debug) plugin.getLogger().info("[Twitch] EnqueueMultiple: +" + count + " as '" + base + "' (queue=" + commandQueue.size() + ")");
-        saveQueueAsync();
-    }
-
+    // PATCH: Dynamische Event-Filterung wie im Command, blockiert Queue wenn kein Event (auch temporär) möglich!
     private void startQueueWorker() {
         this.queueWorker = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!isTimerRunning()) return;
+
+            try {
+                RandomEventCommand randomEventExecutor = null;
+                RandomEvents randomEvents = null;
+                List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+
+                if (plugin instanceof TwitchRandomizer tr) {
+                    randomEventExecutor = tr.getRandomEventExecutor();
+                    if (randomEventExecutor != null) {
+                        randomEvents = randomEventExecutor.events;
+                    }
+                }
+                int[] weights = randomEventExecutor != null ? randomEventExecutor.getWeights() : null;
+
+                if (weights == null || weights.length == 0) {
+                    if (debug) plugin.getLogger().info("[Twitch] Queue pausiert – keine Event-Gewichte geladen.");
+                    return;
+                }
+
+                int[] weightsForPick = Arrays.copyOf(weights, weights.length);
+
+                // Dynamisches Filtering wie im Command:
+                boolean anyGroundActive = false;
+                boolean noCraftingActive = false;
+                if (randomEvents != null && !players.isEmpty()) {
+                    for (Player player : players) {
+                        if (randomEvents.isAnyGroundEventActive(player)) anyGroundActive = true;
+                        if (randomEvents.isNoCraftingActive(player)) noCraftingActive = true;
+                    }
+                }
+                if (anyGroundActive) {
+                    weightsForPick[11] = 0; // floor_is_lava
+                    weightsForPick[13] = 0; // slippery_ground
+                }
+                if (noCraftingActive) {
+                    weightsForPick[9] = 0; // no_crafting
+                }
+
+                int pickable = Arrays.stream(weightsForPick).sum();
+                if (pickable <= 0) {
+                    if (debug) plugin.getLogger().info("[Twitch] Queue pausiert – keine auslösbaren Events (alle deaktiviert oder geblockt).");
+                    return;
+                }
+            } catch (Throwable t) {
+                plugin.getLogger().warning("[Twitch] Fehler beim Queue-Event-Check: " + t.getMessage());
+                return;
+            }
 
             if (ticksSinceLastDispatch < gapTicks) ticksSinceLastDispatch++;
             else cooledAndReady = true;
@@ -411,7 +334,104 @@ public class TwitchIntegrationManager {
         }, 1L, 1L);
     }
 
-    /* ===== Persistenz ===== */
+    private String resolveAuthorFromChat(ChannelMessageEvent event) {
+        try {
+            String display = (event.getMessageEvent() != null)
+                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
+                    : null;
+            if (display != null && !display.isBlank()) return display;
+            if (event.getMessageEvent() != null) {
+                String loginFromIrc = event.getMessageEvent().getUserName();
+                if (loginFromIrc != null && !loginFromIrc.isBlank()) return loginFromIrc;
+            }
+            if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
+                return event.getUser().getName();
+            }
+        } catch (Throwable ignored) {}
+        if (debug) plugin.getLogger().warning("[Twitch] Konnte Autor nicht ermitteln – fallback 'unknown'.");
+        return "unknown";
+    }
+
+    private String resolveAuthorFromCheer(CheerEvent event) {
+        try {
+            String display = (event.getMessageEvent() != null)
+                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
+                    : null;
+            if (display != null && !display.isBlank()) return display;
+            if (event.getMessageEvent() != null) {
+                String loginFromIrc = event.getMessageEvent().getUserName();
+                if (loginFromIrc != null && !loginFromIrc.isBlank()) return loginFromIrc;
+            }
+            if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
+                return event.getUser().getName();
+            }
+        } catch (Throwable ignored) {}
+        if (debug) plugin.getLogger().warning("[Twitch] Konnte Cheer-User nicht ermitteln – fallback 'unknown'.");
+        return "unknown";
+    }
+
+    private String resolveUserFromSubscription(SubscriptionEvent event) {
+        try {
+            String display = (event.getMessageEvent() != null)
+                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
+                    : null;
+            if (display != null && !display.isBlank()) return display;
+            if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
+                return event.getUser().getName();
+            }
+        } catch (Throwable ignored) {}
+        if (debug) plugin.getLogger().warning("[Twitch] Konnte Sub-User nicht ermitteln – fallback 'unknown'.");
+        return "unknown";
+    }
+
+    private boolean isLikelyAnonymousCheer(CheerEvent event, String user) {
+        if (event.getUser() == null) return true;
+        String low = user == null ? "" : user.toLowerCase(Locale.ROOT);
+        if (low.isBlank()) return true;
+        if (low.contains("anonymous")) return true;
+        try {
+            String display = (event.getMessageEvent() != null)
+                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
+                    : null;
+            if (display != null && display.toLowerCase(Locale.ROOT).contains("anonymous")) return true;
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    private String normalizeToken(String raw) {
+        if (raw == null) return "";
+        String t = raw.trim();
+        if (t.length() >= 2 && ((t.startsWith("\"") && t.endsWith("\"")) || (t.startsWith("'") && t.endsWith("'")))) {
+            t = t.substring(1, t.length() - 1).trim();
+        }
+        if (t.toLowerCase(Locale.ROOT).startsWith("oauth:")) {
+            t = t.substring("oauth:".length());
+        }
+        return t;
+    }
+
+    private OAuth2Credential buildCredential(String raw) {
+        String token = normalizeToken(raw);
+        return new OAuth2Credential("twitch", token);
+    }
+
+    public void enqueue(String cmd) {
+        commandQueue.offer(cmd);
+        if (debug) plugin.getLogger().info("[Twitch] Enqueue: " + cmd + " (queue=" + commandQueue.size() + ")");
+        saveQueueAsync();
+    }
+
+    public void enqueueMultiple(int count, String byUserNullable) {
+        if (count <= 0) return;
+        String base = (byUserNullable != null && !byUserNullable.isBlank())
+                ? "randomevent " + byUserNullable.trim()
+                : "randomevent";
+        for (int i = 0; i < count; i++) {
+            commandQueue.offer(base);
+        }
+        if (debug) plugin.getLogger().info("[Twitch] EnqueueMultiple: +" + count + " as '" + base + "' (queue=" + commandQueue.size() + ")");
+        saveQueueAsync();
+    }
 
     private void loadQueue() {
         try {
@@ -453,9 +473,9 @@ public class TwitchIntegrationManager {
         });
     }
 
-    /* ===== Public API ===== */
-
-    public int getQueueSize() { return commandQueue.size(); }
+    public int getQueueSize() {
+        return commandQueue.size();
+    }
 
     public int getTicksUntilNextDispatch() {
         return cooledAndReady ? 0 : Math.max(0, gapTicks - ticksSinceLastDispatch);

@@ -156,6 +156,7 @@ public class Messages {
         de.put("title.reset.line2", "Bitte später erneut verbinden");
         de.put("bossbar.floor_is_lava", "Der Boden ist Lava");
         de.put("bossbar.slippery_ground", "Achtung Rutschgefahr");
+        de.put("bossbar.no_crafting", "Crafting blockiert");
 
         en.clear();
         en.put("commands.saved_and_reconfigured", "&aConfiguration saved and (re)configured.");
@@ -283,6 +284,7 @@ public class Messages {
         en.put("title.reset.line2", "Please reconnect later");
         en.put("bossbar.floor_is_lava", "The Floor is Lava");
         en.put("bossbar.slippery_ground", "Caution Slippery");
+        en.put("bossbar.no_crafting", "Crafting Blocked");
     }
 
     // Re-reads mode/default + loads per-player overrides (texts stay embedded)

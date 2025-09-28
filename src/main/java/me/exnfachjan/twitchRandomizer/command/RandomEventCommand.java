@@ -1,7 +1,6 @@
 package me.exnfachjan.twitchRandomizer.command;
 
 import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
-import me.exnfachjan.twitchRandomizer.i18n.Messages;
 import me.exnfachjan.twitchRandomizer.events.RandomEvents;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -9,18 +8,15 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
-import org.bukkit.block.Block;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class RandomEventCommand implements CommandExecutor {
 
     private final TwitchRandomizer plugin;
     private final Random rng = new Random();
-    private final RandomEvents events;
+    public final RandomEvents events;
 
-    // Öffentlich, damit GUI/Weights darauf zugreifen können
     public static final List<String> EVENT_KEYS_ORDER = List.of(
             "spawn_mobs",
             "potion",
@@ -45,7 +41,6 @@ public class RandomEventCommand implements CommandExecutor {
     public RandomEventCommand(TwitchRandomizer plugin) {
         this.plugin = plugin;
         this.events = new RandomEvents(plugin);
-        // Listener für Craft/Explosion etc.
         plugin.getServer().getPluginManager().registerEvents(this.events, plugin);
         this.weights = loadWeightsFromConfig();
     }
@@ -55,9 +50,12 @@ public class RandomEventCommand implements CommandExecutor {
         plugin.getLogger().info("RandomEvent-Gewichte neu geladen.");
     }
 
+    public int[] getWeights() {
+        return this.weights;
+    }
+
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        // "by:<name>" oder "<name>"
         String byUser = null;
         if (args.length >= 1) {
             String first = args[0] != null ? args[0].trim() : "";
@@ -71,17 +69,43 @@ public class RandomEventCommand implements CommandExecutor {
             }
         }
 
-        List<Player> players = Bukkit.getOnlinePlayers().stream().collect(Collectors.toList());
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
         if (players.isEmpty()) {
             sender.sendMessage("No players online – skipping event.");
             return true;
         }
 
-        int event = pickWeightedIndex(this.weights, this.lastIndex);
+        int[] weightsForPick = Arrays.copyOf(this.weights, this.weights.length);
+
+        // Dynamische Blockaden (z.B. Boden-Events/Crafting)
+        boolean anyGroundActive = false;
+        boolean noCraftingActive = false;
+        for (Player player : players) {
+            if (events.isAnyGroundEventActive(player)) anyGroundActive = true;
+            if (events.isNoCraftingActive(player)) noCraftingActive = true;
+        }
+        if (anyGroundActive) {
+            weightsForPick[11] = 0; // floor_is_lava
+            weightsForPick[13] = 0; // slippery_ground
+        }
+        if (noCraftingActive) {
+            weightsForPick[9] = 0; // no_crafting
+        }
+
+        // --- PATCH: Nur Events mit Gewicht > 0 dürfen gepickt werden! ---
+        List<Integer> validIndices = new ArrayList<>();
+        for (int i = 0; i < weightsForPick.length; i++) {
+            if (weightsForPick[i] > 0) validIndices.add(i);
+        }
+        if (validIndices.isEmpty()) {
+            sender.sendMessage("Keine aktiven Events verfügbar!");
+            return true;
+        }
+
+        int event = validIndices.get(rng.nextInt(validIndices.size()));
         this.lastIndex = event;
 
         for (Player player : players) {
-            // Alle Events werden jetzt in RandomEvents behandelt, immer mit Twitch-Username-Parameter
             switch (event) {
                 case 0 -> events.triggerSpawnMobs(player, byUser);
                 case 1 -> events.triggerPotion(player, byUser);
@@ -112,41 +136,8 @@ public class RandomEventCommand implements CommandExecutor {
         }
         int sum = Arrays.stream(w).sum();
         if (sum <= 0) {
-            plugin.getLogger().warning("Keine positiven Event-Gewichte gefunden – setze Standardgewicht 1 für alle.");
-            Arrays.fill(w, 1);
+            plugin.getLogger().warning("Keine positiven Event-Gewichte gefunden – Events sind deaktiviert.");
         }
         return w;
-    }
-
-    private int pickWeightedIndex(int[] weights, Integer avoidIndex) {
-        long total = 0L;
-        final int antiDupingDelta = 1;
-        for (int i = 0; i < weights.length; i++) {
-            int w = weights[i];
-            if (avoidIndex != null && i == avoidIndex) w = Math.max(0, w - antiDupingDelta);
-            total += w;
-        }
-        if (total <= 0) total = Arrays.stream(weights).sum();
-        long r = nextLongBounded(total);
-        long acc = 0L;
-        for (int i = 0; i < weights.length; i++) {
-            int w = weights[i];
-            if (avoidIndex != null && i == avoidIndex) w = Math.max(0, w - antiDupingDelta);
-            acc += w;
-            if (r < acc) return i;
-        }
-        return weights.length - 1;
-    }
-
-    private long nextLongBounded(long bound) {
-        long r = rng.nextLong();
-        long m = bound - 1;
-        if ((bound & m) == 0L) return r & m;
-        long u = r >>> 1;
-        while (u + m - (u % bound) < 0L) {
-            r = rng.nextLong();
-            u = r >>> 1;
-        }
-        return u % bound;
     }
 }
