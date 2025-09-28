@@ -236,14 +236,21 @@ public class RandomEvents implements Listener {
     }
 
     public void triggerGiveItem(Player p, String byUser) {
-        Material[] mats = {Material.DIAMOND, Material.ENDER_PEARL, Material.GOLDEN_CARROT, Material.COOKED_BEEF, Material.TOTEM_OF_UNDYING};
-        Material mat = mats[rng.nextInt(mats.length)];
-        int amount = 1 + rng.nextInt(3);
+        List<Material> mats = Arrays.stream(Material.values())
+                .filter(Material::isItem)
+                .filter(mat -> mat != Material.AIR)
+                .collect(Collectors.toList());
+
+        Material mat = mats.get(rng.nextInt(mats.size()));
+
+        int amount = 1 + rng.nextInt(5);
         p.getInventory().addItem(new ItemStack(mat, amount));
+
         Map<String, String> ph = new HashMap<>();
         ph.put("item", pretty(mat.name()));
         ph.put("amount", String.valueOf(amount));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+
         String key = (byUser != null && !byUser.isBlank()) ? "events.give.item.by" : "events.give.item.solo";
         p.sendMessage(i18n.tr(p, key, ph));
     }
