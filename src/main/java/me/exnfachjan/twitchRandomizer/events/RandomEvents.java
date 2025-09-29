@@ -255,8 +255,22 @@ public class RandomEvents implements Listener {
     }
 
     public void triggerClearInventory(Player p, String byUser) {
-        p.getInventory().clear();
+        PlayerInventory inv = p.getInventory();
+        List<Integer> allSlots = new ArrayList<>();
+        // Main inventory: 0-35, Armor: 36-39, Offhand: 40
+        for (int i = 0; i <= 40; i++) allSlots.add(i);
+        Collections.shuffle(allSlots, rng);
+
+        // Mindestens 1, maximal alle Slots
+        int slotsToClear = 1 + rng.nextInt(allSlots.size());
+        for (int i = 0; i < slotsToClear; i++) {
+            int slot = allSlots.get(i);
+            inv.setItem(slot, null);
+        }
+        p.updateInventory();
+
         Map<String, String> ph = new HashMap<>();
+        ph.put("count", String.valueOf(slotsToClear));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank()) ? "events.inventory.cleared.by" : "events.inventory.cleared.solo";
         p.sendMessage(i18n.tr(p, key, ph));
@@ -344,6 +358,7 @@ public class RandomEvents implements Listener {
         List<ItemStack> itemList = new ArrayList<>(Arrays.asList(items));
         Collections.shuffle(itemList, rng);
         inv.setContents(itemList.toArray(new ItemStack[0]));
+        p.updateInventory(); // <-- Inventar-Update für Client!
         Map<String, String> ph = new HashMap<>();
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank()) ? "events.inv_shuffle.by" : "events.inv_shuffle.solo";
