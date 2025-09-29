@@ -66,7 +66,6 @@ public class RandomEvents implements Listener {
     public boolean isAnyGroundEventActive(Player p) {
         return isLavaActive(p) || isSlipperyActive(p);
     }
-    // Für TIM: Muss public sein!
     public boolean isNoCraftingActive(Player p) {
         Long until = noCraftUntil.get(p.getUniqueId());
         return until != null && System.currentTimeMillis() <= until;
@@ -264,11 +263,38 @@ public class RandomEvents implements Listener {
     }
 
     public void triggerTeleport(Player p, String byUser) {
+        Random rng = new Random();
+        // 0,001% Wahrscheinlichkeit für Advanced End
+        if (rng.nextInt(100_000) == 0) {
+            World endWorld = Bukkit.getWorld("world_the_end");
+            if (endWorld != null) {
+                int x = 1000 + rng.nextInt(500);
+                int z = 1000 + rng.nextInt(500);
+                int y = 70; // Sichere Y-Koordinate fürs End (kannst du anpassen)
+                setAirCube(endWorld, x, y, z);
+                Location tpLoc = new Location(endWorld, x + 0.5, y, z + 0.5);
+                p.teleport(tpLoc);
+                Map<String, String> ph = new HashMap<>();
+                ph.put("x", String.valueOf(x));
+                ph.put("y", String.valueOf(y));
+                ph.put("z", String.valueOf(z));
+                if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+                String key = (byUser != null && !byUser.isBlank()) ? "events.teleport.advanced_end.by" : "events.teleport.advanced_end.solo";
+                p.sendMessage(i18n.tr(p, key, ph));
+                return;
+            }
+            // Falls kein End, normaler Teleport unten
+        }
+
         World w = p.getWorld();
         int x = rng.nextInt(3000) - 1500;
         int z = rng.nextInt(3000) - 1500;
-        int y = w.getHighestBlockYAt(x, z) + 2;
-        p.teleport(new Location(w, x + 0.5, y, z + 0.5));
+        int y = p.getLocation().getBlockY(); // Immer exakt das aktuelle Y-Level!
+
+        // 3x3x3 Air Cube erstellen
+        setAirCube(w, x, y, z);
+        Location tpLoc = new Location(w, x + 0.5, y, z + 0.5);
+        p.teleport(tpLoc);
         Map<String, String> ph = new HashMap<>();
         ph.put("x", String.valueOf(x));
         ph.put("y", String.valueOf(y));
@@ -276,6 +302,21 @@ public class RandomEvents implements Listener {
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank()) ? "events.teleport.random.by" : "events.teleport.random.solo";
         p.sendMessage(i18n.tr(p, key, ph));
+    }
+
+    // Hilfsfunktion: Macht einen 3x3x3 Air Cube um die Zielkoordinate
+    private void setAirCube(World w, int centerX, int centerY, int centerZ) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    int bx = centerX + dx;
+                    int by = centerY + dy;
+                    int bz = centerZ + dz;
+                    if (by < w.getMinHeight() || by > w.getMaxHeight()) continue;
+                    w.getBlockAt(bx, by, bz).setType(org.bukkit.Material.AIR, false);
+                }
+            }
+        }
     }
 
     public void triggerDamageHalfHeart(Player p, String byUser) {

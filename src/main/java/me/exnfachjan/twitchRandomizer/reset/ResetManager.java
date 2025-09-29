@@ -53,6 +53,17 @@ public class ResetManager {
                     if (source.exists() && source.isDirectory()) {
                         FileUtils.copyDirectory(source, target);
                         plugin.getLogger().info("[Reset] Copied pregenerated world to " + name);
+
+                        // PATCH: Sicherstellen, dass playerdata/ existiert
+                        File playerDataDir = new File(target, "playerdata");
+                        if (!playerDataDir.exists()) {
+                            boolean created = playerDataDir.mkdirs();
+                            if (created) {
+                                plugin.getLogger().info("[Reset] Created missing playerdata directory for " + name);
+                            } else {
+                                plugin.getLogger().warning("[Reset] Could not create playerdata directory for " + name);
+                            }
+                        }
                     } else {
                         plugin.getLogger().warning("[Reset] Pregenerated world does not exist: " + source.getName());
                     }

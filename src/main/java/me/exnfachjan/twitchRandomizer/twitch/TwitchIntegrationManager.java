@@ -8,6 +8,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.event.Listener;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 import com.github.philippheuer.credentialmanager.domain.OAuth2Credential;
 import com.github.twitch4j.TwitchClient;
@@ -63,9 +68,42 @@ public class TwitchIntegrationManager {
     // Persistenz
     private final File queueFile;
 
+    // PATCH: Spieler im Deathscreen merken
+    private final Set<UUID> deathScreenPlayers = new HashSet<>();
+
     public TwitchIntegrationManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.queueFile = new File(plugin.getDataFolder(), "queue.txt");
+        // Listener für Deathscreen
+        Bukkit.getPluginManager().registerEvents(new Listener() {
+            @EventHandler
+            public void onPlayerDeath(PlayerDeathEvent event) {
+                Player player = event.getEntity();
+                deathScreenPlayers.add(player.getUniqueId());
+            }
+            @EventHandler
+            public void onPlayerRespawn(PlayerRespawnEvent event) {
+                Player player = event.getPlayer();
+                deathScreenPlayers.remove(player.getUniqueId());
+            }
+            @EventHandler
+            public void onPlayerQuit(PlayerQuitEvent event) {
+                deathScreenPlayers.remove(event.getPlayer().getUniqueId());
+            }
+        }, plugin);
+    }
+
+    private boolean isAnyPlayerInDeathScreen() {
+        if (deathScreenPlayers.isEmpty()) return false;
+        Iterator<UUID> it = deathScreenPlayers.iterator();
+        while (it.hasNext()) {
+            UUID uuid = it.next();
+            Player p = Bukkit.getPlayer(uuid);
+            if (p == null || !p.isDead()) {
+                it.remove();
+            }
+        }
+        return !deathScreenPlayers.isEmpty();
     }
 
     public void start(String channel, String oauthToken, boolean legacyChatTriggerFlag) {
@@ -264,9 +302,15 @@ public class TwitchIntegrationManager {
         return false;
     }
 
-    // PATCH: Dynamische Event-Filterung wie im Command, blockiert Queue wenn kein Event (auch temporär) möglich!
+    // PATCH: Deathscreen-Pause
     private void startQueueWorker() {
         this.queueWorker = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            // NEU: Pausiere, wenn jemand im Deathscreen ist!
+            if (isAnyPlayerInDeathScreen()) {
+                if (debug) plugin.getLogger().info("[Twitch] Queue pausiert – Spieler im Deathscreen.");
+                return;
+            }
+
             if (!isTimerRunning()) return;
 
             try {
@@ -457,21 +501,33 @@ public class TwitchIntegrationManager {
     }
 
     private void saveQueueAsync() {
+        // PATCH: Save synchron synchronously if plugin is disabled
+        if (!plugin.isEnabled()) {
+            saveQueueSync();
+            return;
+        }
         java.util.List<String> snapshot = new ArrayList<>(commandQueue);
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            try {
-                if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
-                try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(queueFile, false), StandardCharsets.UTF_8))) {
-                    for (String s : snapshot) {
-                        bw.write(s);
-                        bw.newLine();
-                    }
-                }
-            } catch (Exception e) {
-                plugin.getLogger().warning("Konnte Queue nicht speichern: " + e.getMessage());
-            }
-        });
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> saveQueueSync(snapshot));
     }
+
+    private void saveQueueSync() {
+        saveQueueSync(new ArrayList<>(commandQueue));
+    }
+
+    private void saveQueueSync(java.util.List<String> snapshot) {
+        try {
+            if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
+            try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(queueFile, false), StandardCharsets.UTF_8))) {
+                for (String s : snapshot) {
+                    bw.write(s);
+                    bw.newLine();
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Konnte Queue nicht speichern: " + e.getMessage());
+        }
+    }
+
 
     public int getQueueSize() {
         return commandQueue.size();

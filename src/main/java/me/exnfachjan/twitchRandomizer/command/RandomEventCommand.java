@@ -92,17 +92,27 @@ public class RandomEventCommand implements CommandExecutor {
             weightsForPick[9] = 0; // no_crafting
         }
 
-        // --- PATCH: Nur Events mit Gewicht > 0 dürfen gepickt werden! ---
-        List<Integer> validIndices = new ArrayList<>();
-        for (int i = 0; i < weightsForPick.length; i++) {
-            if (weightsForPick[i] > 0) validIndices.add(i);
-        }
-        if (validIndices.isEmpty()) {
+        // --- ECHTE gewichtete Zufallsauswahl ---
+        int totalWeight = 0;
+        for (int w : weightsForPick) totalWeight += w;
+        if (totalWeight <= 0) {
             sender.sendMessage("Keine aktiven Events verfügbar!");
             return true;
         }
-
-        int event = validIndices.get(rng.nextInt(validIndices.size()));
+        int r = rng.nextInt(totalWeight);
+        int acc = 0;
+        int event = -1;
+        for (int i = 0; i < weightsForPick.length; i++) {
+            acc += weightsForPick[i];
+            if (r < acc) {
+                event = i;
+                break;
+            }
+        }
+        if (event == -1) {
+            sender.sendMessage("Fehler: Konnte kein Event auswählen!");
+            return true;
+        }
         this.lastIndex = event;
 
         for (Player player : players) {
