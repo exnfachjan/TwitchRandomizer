@@ -9,6 +9,10 @@ TwitchRandomizer is a powerful Minecraft (Paper 1.21.8+) plugin that brings inte
 - **Twitch Chat Integration:**  
   Twitch viewers can trigger random events by subscribing or donating bits to your channel!
 
+- **Play this Challenge with your Twitch Friends:**
+  The Plugin can read subscriptions and bits from multiple Twitch accounts. So you can play this challenge with your Twitch friends!
+***Shared Chat might not work properly!***
+
 - **Event Weighting and Customization:**  
   Adjust the likelihood of each event — make some more common, some rare, or disable them entirely. Easily reload or adjust settings on the fly.
 

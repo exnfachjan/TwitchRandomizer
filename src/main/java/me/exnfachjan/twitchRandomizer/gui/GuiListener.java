@@ -243,6 +243,22 @@ public class GuiListener implements Listener {
                 p.sendMessage(ChatColor.RED + "Timer zurückgesetzt.");
             }
 
+            case "reset_weights_defaults" -> {
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) {
+                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.edit");
+                    return;
+                }
+                Map<String, Integer> defaults = plugin.getDefaultWeights();
+                for (Map.Entry<String, Integer> entry : defaults.entrySet()) {
+                    plugin.getConfig().set("events.weights." + entry.getKey(), entry.getValue());
+                }
+                plugin.saveConfig();
+                plugin.applyDynamicConfig();
+                p.sendMessage(ChatColor.GREEN + "Alle Gewichte wurden auf Standardwerte zurückgesetzt!");
+                gui.openWeights(p);
+            }
+
+
             case "edit_twitch" -> {
                 if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.twitch"))) {
                     p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.twitch");
@@ -298,13 +314,16 @@ public class GuiListener implements Listener {
         String text = "";
         BookMeta newMeta = e.getNewBookMeta();
         if (newMeta != null) {
-            if (newMeta.getPageCount() > 0) {
-                String page1 = newMeta.getPage(1);
-                if (page1 != null) {
-                    String[] lines = page1.split("\\R", -1);
-                    if (lines.length > 0) text = lines[0].trim();
+            // Multi-Channel-Input: Komma, Semikolon oder Zeilenumbruch (Multi-Page)
+            StringBuilder sb = new StringBuilder();
+            for (int i = 1; i <= newMeta.getPageCount(); i++) {
+                String page = newMeta.getPage(i);
+                if (page != null) {
+                    if (sb.length() > 0) sb.append("\n");
+                    sb.append(page.trim());
                 }
             }
+            text = sb.toString();
             if ((text == null || text.isEmpty()) && newMeta.getTitle() != null) {
                 text = newMeta.getTitle().trim();
             }
@@ -322,13 +341,26 @@ public class GuiListener implements Listener {
             return;
         }
 
-        // === SPEICHERN in config.yml ===
         FileConfiguration cfg = plugin.getConfig();
         if (mode == EditType.CHANNEL) {
-            String channel = text.trim();
-            if (channel.startsWith("#")) channel = channel.substring(1);
-            cfg.set("twitch.channel", channel);
-            p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.saved_channel"));
+            // Multi-Channel-Input: Komma, Semikolon oder Zeilenumbruch
+            String input = text.trim().replace(" ", "");
+            String[] split = input.split("[,;\\n]+");
+            java.util.List<String> channels = new java.util.ArrayList<>();
+            for (String s : split) {
+                if (!s.isBlank()) {
+                    String ch = s;
+                    if (ch.startsWith("#")) ch = ch.substring(1);
+                    channels.add(ch);
+                }
+            }
+            if (!channels.isEmpty()) {
+                cfg.set("twitch.channels", channels);
+                cfg.set("twitch.channel", null); // optional: alten Einzelchannel entfernen
+                p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.saved_channel_list", Map.of("channels", String.join(", ", channels))));
+            } else {
+                p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.no_valid_channels"));
+            }
         } else {
             String token = normalizeToken(text);
             cfg.set("twitch.oauth_token", token);
@@ -341,8 +373,6 @@ public class GuiListener implements Listener {
         Bukkit.getScheduler().runTask(plugin, () -> gui.openMain(p));
     }
 
-    // Entfernt das „sichere Buch“, wenn der Spieler sich blockweise bewegt (X/Y/Z ändert),
-    // während eine Twitch-Info-Eingabe aussteht.
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onPlayerMove(PlayerMoveEvent e) {
         Player p = e.getPlayer();

@@ -12,6 +12,10 @@ import me.exnfachjan.twitchRandomizer.pause.GamePauseService;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 public class TwitchRandomizer extends JavaPlugin {
 
     private TimerManager timerManager;
@@ -28,6 +32,34 @@ public class TwitchRandomizer extends JavaPlugin {
     // ==== Reset-Bestätigung (In-Memory) ====
     private long resetConfirmUntilMs = 0L;
     private String resetConfirmRequester = null;
+
+    /**
+     * Gibt die Default-Event-Gewichte zurück, wie sie im Projekt verwendet werden sollen.
+     * Diese Werte sind hartcodiert und können NICHT über die config.yml überschrieben werden!
+     */
+    public Map<String, Integer> getDefaultWeights() {
+        Map<String, Integer> defaults = new HashMap<>();
+        defaults.put("spawn_mobs", 35);
+        defaults.put("potion", 15);
+        defaults.put("give_item", 20);
+        defaults.put("clear_inventory", 4);
+        defaults.put("teleport", 5);
+        defaults.put("damage_half_heart", 10);
+        defaults.put("fire", 10);
+        defaults.put("inv_shuffle", 8);
+        defaults.put("hot_potato", 7);
+        defaults.put("no_crafting", 6);
+        defaults.put("safe_creepers", 5);
+        defaults.put("floor_is_lava", 7);
+        defaults.put("nasa_call", 5);
+        defaults.put("slippery_ground", 6);
+        defaults.put("hell_is_calling", 6);
+        defaults.put("tnt_rain", 4);
+        defaults.put("anvil_rain", 6);
+        defaults.put("skyblock", 7);
+        defaults.put("fake_totem", 5);
+        return defaults;
+    }
 
     @Override
     public void onLoad() {
@@ -77,12 +109,21 @@ public class TwitchRandomizer extends JavaPlugin {
         PluginCommand resetCmd = getCommand("reset");
         if (resetCmd != null) resetCmd.setExecutor(new ResetCommand(this));
 
-        String channel = getConfig().getString("twitch.channel", "");
+        // NEU: Mehrere Channels unterstützen
+        List<String> channels = getConfig().getStringList("twitch.channels");
+        if (channels == null || channels.isEmpty()) {
+            // Fallback für alte Config (nur einzelner Channel)
+            String single = getConfig().getString("twitch.channel", "");
+            if (single != null && !single.isBlank()) {
+                channels = List.of(single);
+            }
+        }
         String token   = getConfig().getString("twitch.oauth_token", "");
         boolean enableChatTrigger = getConfig().getBoolean("twitch.chat_trigger.enabled", false);
 
         this.twitch = new TwitchIntegrationManager(this);
-        twitch.start(channel, token, enableChatTrigger);
+        // Wichtig: Passe auch TwitchIntegrationManager an!
+        twitch.start(channels, token, enableChatTrigger);
 
         PluginCommand cfgCmd = getCommand("trconfig");
         if (cfgCmd != null) {
@@ -175,5 +216,4 @@ public class TwitchRandomizer extends JavaPlugin {
     public void onGlobalPauseStateChanged(boolean paused) {
         // No-op: Timer tick/actionbar already reflect pause via GamePauseService.
     }
-
 }

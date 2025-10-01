@@ -133,7 +133,9 @@ public class Messages {
         de.put("gui.reset_confirm.cancel", "&cAbbrechen");
         de.put("gui.reset_confirm.confirm", "&aReset bestätigen");
         de.put("gui.book.title", "Twitch Eingabe");
-        de.put("gui.book.page.channel", "Ersetze diesen Text mit deinem Twitch Username");
+        de.put("gui.book.page.channel", "Trage hier einen oder mehrere Twitch-Kanalnamen ein.\n" +
+                "Du kannst mehrere Channels durch Komma, Semikolon oder Zeilenumbruch trennen.\n" +
+                "Beispiel: Kanal1, Kanal2, Kanal3");
         de.put("gui.book.page.token.text", "Ersetzte diesen Text mit den Access Token deines Bots, welchen du unter {url} erhalten kannst.");
         de.put("gui.book.page.token.link_text", "Token-Generator öffnen");
         de.put("gui.book.page.reward", "Schreibe auf die erste Seite den EXAKTEN Namen deiner Kanalpunkte-Belohnung und signiere das Buch.");
@@ -157,6 +159,20 @@ public class Messages {
         de.put("bossbar.floor_is_lava", "Der Boden ist Lava");
         de.put("bossbar.slippery_ground", "Achtung Rutschgefahr");
         de.put("bossbar.no_crafting", "Crafting blockiert");
+        de.put("events.tnt_rain.solo", "TNT-Minecart-Regen geht los!");
+        de.put("events.tnt_rain.by", "{user} lässt TNT-Minecarts auf dich regnen!");
+        de.put("events.anvil_rain.solo", "Ambossregen!");
+        de.put("events.anvil_rain.by", "{user} lässt Ambosse auf dich regnen!");
+        de.put("events.skyblock.solo", "Skyblock-Challenge! Alle Chunks im Umkreis verschwinden bis zum Void.");
+        de.put("events.skyblock.by", "{user} hat den Skyblock-Modus aktiviert – alles um dich herum verschwindet!");
+        de.put("gui.weights.reset_defaults_name", "Alle Gewichte zurücksetzen");
+        de.put("gui.weights.reset_defaults_lore", java.util.List.of("Setzt alle Eventgewichte auf", "ihren Standardwert zurück."));
+        de.put("event.fake_totem.given", "§eDir wurde ein Totem der Unsterblichkeit gegeben ... oder?");
+        de.put("event.fake_totem.given_by", "§e{user} hat dir ein Totem der Unsterblichkeit gegeben ... oder?");
+        de.put("event.fake_totem.fail", "§cDas war nur ein Fake-Totem!");
+        de.put("item.minecraft.totem_of_undying", "Totem der Unsterblichkeit");
+        de.put("gui.book.chat.saved_channel_list", "Twitch-Kanäle wurden gespeichert: {channels}");
+        de.put("gui.book.chat.no_valid_channels", "Keine gültigen Channelnamen erkannt.");
 
         en.clear();
         en.put("commands.saved_and_reconfigured", "&aConfiguration saved and (re)configured.");
@@ -262,7 +278,9 @@ public class Messages {
         en.put("gui.reset_confirm.cancel", "&cCancel");
         en.put("gui.reset_confirm.confirm", "&aConfirm reset");
         en.put("gui.book.title", "Twitch Input");
-        en.put("gui.book.page.channel", "Replace this text with your Twitch username");
+        en.put("gui.book.page.channel", "Enter one or more Twitch channel names here.\n" +
+                "You can separate multiple channels with commas, semicolons, or new lines.\n" +
+                "Example: Channel1, Channel2, Channel3");
         en.put("gui.book.page.token.text", "Replace this text with your bot's access token, which you can obtain at {url}");
         en.put("gui.book.page.token.link_text", "Open Token Generator");
         en.put("gui.book.chat.warn_sensitive", "§6[Notice] §eBe careful with sensitive data (channel/token).");
@@ -285,6 +303,21 @@ public class Messages {
         en.put("bossbar.floor_is_lava", "The Floor is Lava");
         en.put("bossbar.slippery_ground", "Caution Slippery");
         en.put("bossbar.no_crafting", "Crafting Blocked");
+        en.put("events.tnt_rain.solo", "It's raining TNT minecarts! TNT minecarts will rain on you.");
+        en.put("events.tnt_rain.by", "{user} made it rain TNT minecarts on you!");
+        en.put("events.anvil_rain.solo", "Anvil rain! Anvils will fall on you.");
+        en.put("events.anvil_rain.by", "{user} made it rain anvils on you!");
+        en.put("events.skyblock.solo", "Skyblock challenge! All chunks around you were deleted down to the void.");
+        en.put("events.skyblock.by", "{user} activated skyblock mode – everything around you disappears!");
+        en.put("gui.weights.reset_defaults_name", "Reset all weights");
+        en.put("gui.weights.reset_defaults_lore", java.util.List.of("Resets all event weights", "to their default value."));
+        en.put("event.fake_totem.given", "§eYou received a Totem of Undying ... or did you?");
+        en.put("event.fake_totem.given_by", "§e{user} gave you a Totem of Undying ... or did they?");
+        en.put("event.fake_totem.fail", "§cThat was just a fake totem!");
+        en.put("item.minecraft.totem_of_undying", "Totem of Undying");
+        en.put("gui.book.chat.saved_channel_list", "Twitch channels saved: {channels}");
+        en.put("gui.book.chat.no_valid_channels", "No valid channel names detected.");
+
     }
 
     // Re-reads mode/default + loads per-player overrides (texts stay embedded)

@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'me.exnfachjan'
-version = '1.1.3'
+version = '1.2.0'
 
 repositories {
     mavenCentral()
@@ -17,12 +17,11 @@ repositories {
 }
 
 dependencies {
-    compileOnly "io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT"
-
-    // Twitch4J (JitPack)
+    compileOnly "io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT"
+    
     implementation "com.github.twitch4j:twitch4j:1.25.0"
     implementation "com.github.twitch4j:twitch4j-auth:1.25.0"
-    implementation "com.github.twitch4j:twitch4j-common:1.25.0" // <- wichtig für OAuth2Credential
+    implementation "com.github.twitch4j:twitch4j-common:1.25.0"
 }
 
 def targetJavaVersion = 21

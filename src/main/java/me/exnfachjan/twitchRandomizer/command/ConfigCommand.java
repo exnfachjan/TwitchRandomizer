@@ -92,16 +92,32 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
         switch (sub) {
             case "set" -> {
                 if (args.length < 3) {
-                    sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig twitch set <channel|token|interval|chat_trigger|debug|subs|chat_test|bits_enabled|bits_per_trigger> <wert>");
+                    sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig twitch set <channels|channel|token|interval|chat_trigger|debug|subs|chat_test|bits_enabled|bits_per_trigger> <wert>");
                     return true;
                 }
                 String key = args[1].toLowerCase(Locale.ROOT);
                 String value = join(args, 2);
                 switch (key) {
-                    case "channel" -> cfg.set("twitch.channel", value);
+                    case "channels" -> {
+                        // Mehrere Channels als Liste (Komma, Semikolon, Leerzeichen, Zeilenumbruch getrennt)
+                        String[] split = value.split("[,;\\s\\n]+");
+                        List<String> channelList = Arrays.stream(split)
+                                .map(String::trim)
+                                .filter(s -> !s.isEmpty())
+                                .toList();
+                        cfg.set("twitch.channels", channelList);
+                        cfg.set("twitch.channel", null); // optional: alten Einzelchannel entfernen
+                        plugin.saveConfig();
+                        plugin.applyDynamicConfig();
+                        sender.sendMessage(ChatColor.GREEN + "Twitch-Channels gespeichert: " + String.join(", ", channelList));
+                        return true;
+                    }
+                    case "channel" -> {
+                        // Einzelchannel für Rückwärtskompatibilität (nicht empfohlen)
+                        cfg.set("twitch.channel", value);
+                    }
                     case "token", "oauth", "oauth_token" -> cfg.set("twitch.oauth_token", value);
                     case "interval" -> {
-                        // als Double speichern
                         double d = parseDouble(value, 1.0);
                         cfg.set("twitch.trigger_interval_seconds", d);
                     }
@@ -126,29 +142,46 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
             }
             case "get" -> {
                 if (args.length < 2) {
-                    sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig twitch get <channel|token|interval|chat_trigger|debug|subs|chat_test|bits_enabled|bits_per_trigger>");
+                    sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig twitch get <channels|channel|token|interval|chat_trigger|debug|subs|chat_test|bits_enabled|bits_per_trigger>");
                     return true;
                 }
                 String key = args[1].toLowerCase(Locale.ROOT);
-                String path = switch (key) {
-                    case "channel" -> "twitch.channel";
-                    case "token", "oauth", "oauth_token" -> "twitch.oauth_token";
-                    case "interval" -> "twitch.trigger_interval_seconds";
-                    case "chat_trigger" -> "twitch.chat_trigger.enabled";
-                    case "debug" -> "twitch.debug";
-                    case "subs" -> "twitch.triggers.subscriptions.enabled";
-                    case "chat_test" -> "twitch.triggers.chat_test.enabled";
-                    case "bits_enabled" -> "twitch.triggers.bits.enabled";
-                    case "bits_per_trigger" -> "twitch.triggers.bits.bits_per_trigger";
-                    default -> null;
-                };
-                if (path == null) {
-                    sender.sendMessage(ChatColor.RED + "Unbekanntes Feld: " + key);
-                    return true;
+                switch (key) {
+                    case "channels" -> {
+                        List<String> channels = cfg.getStringList("twitch.channels");
+                        if (channels == null || channels.isEmpty()) {
+                            String fallback = cfg.getString("twitch.channel", "");
+                            if (fallback != null && !fallback.isBlank()) channels = List.of(fallback);
+                        }
+                        sender.sendMessage(ChatColor.AQUA + "twitch.channels" + ChatColor.GRAY + " = " + ChatColor.WHITE + String.join(", ", channels));
+                        return true;
+                    }
+                    case "channel" -> {
+                        String val = cfg.getString("twitch.channel", "");
+                        sender.sendMessage(ChatColor.AQUA + "twitch.channel" + ChatColor.GRAY + " = " + ChatColor.WHITE + val);
+                        return true;
+                    }
+                    default -> {
+                        String path = switch (key) {
+                            case "token", "oauth", "oauth_token" -> "twitch.oauth_token";
+                            case "interval" -> "twitch.trigger_interval_seconds";
+                            case "chat_trigger" -> "twitch.chat_trigger.enabled";
+                            case "debug" -> "twitch.debug";
+                            case "subs" -> "twitch.triggers.subscriptions.enabled";
+                            case "chat_test" -> "twitch.triggers.chat_test.enabled";
+                            case "bits_enabled" -> "twitch.triggers.bits.enabled";
+                            case "bits_per_trigger" -> "twitch.triggers.bits.bits_per_trigger";
+                            default -> null;
+                        };
+                        if (path == null) {
+                            sender.sendMessage(ChatColor.RED + "Unbekanntes Feld: " + key);
+                            return true;
+                        }
+                        Object val = plugin.getConfig().get(path);
+                        sender.sendMessage(ChatColor.AQUA + path + ChatColor.GRAY + " = " + ChatColor.WHITE + String.valueOf(val));
+                        return true;
+                    }
                 }
-                Object val = plugin.getConfig().get(path);
-                sender.sendMessage(ChatColor.AQUA + path + ChatColor.GRAY + " = " + ChatColor.WHITE + String.valueOf(val));
-                return true;
             }
             case "reconnect" -> {
                 TwitchIntegrationManager tim = plugin.getTwitch();
@@ -257,10 +290,10 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
                 case "twitch" -> {
                     if (args.length == 2) return prefixFilter(args[1], List.of("set","get","reconnect"));
                     if (args.length == 3 && args[1].equalsIgnoreCase("set")) {
-                        return prefixFilter(args[2], List.of("channel","token","interval","chat_trigger","debug","subs","chat_test","bits_enabled","bits_per_trigger"));
+                        return prefixFilter(args[2], List.of("channels","channel","token","interval","chat_trigger","debug","subs","chat_test","bits_enabled","bits_per_trigger"));
                     }
                     if (args.length == 3 && args[1].equalsIgnoreCase("get")) {
-                        return prefixFilter(args[2], List.of("channel","token","interval","chat_trigger","debug","subs","chat_test","bits_enabled","bits_per_trigger"));
+                        return prefixFilter(args[2], List.of("channels","channel","token","interval","chat_trigger","debug","subs","chat_test","bits_enabled","bits_per_trigger"));
                     }
                 }
                 case "weights" -> {

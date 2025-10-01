@@ -29,6 +29,20 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.entity.Mob;
+import org.bukkit.entity.Wolf;
+import org.bukkit.entity.Bee;
+import org.bukkit.entity.Panda;
+import org.bukkit.entity.IronGolem;
+import org.bukkit.entity.Llama;
+import org.bukkit.Chunk;
+import org.bukkit.NamespacedKey;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.event.entity.EntityResurrectEvent;
+import org.bukkit.GameMode;
+
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,6 +55,7 @@ public class RandomEvents implements Listener {
     private final Map<UUID, UUID> hotPotatoMob = new HashMap<>();
     private final Map<UUID, BukkitTask> hotPotatoTask = new HashMap<>();
     private final Random rng = new Random();
+    private final Set<UUID> skyblockLocked = new HashSet<>();
 
     // Für Boden-Events
     private final Map<UUID, BukkitTask> groundTasks = new HashMap<>();
@@ -194,6 +209,54 @@ public class RandomEvents implements Listener {
 
     // ====== Events ======
 
+    // === FAKE TOTEM EVENT ===
+
+    public void triggerFakeTotem(Player p, String byUser) {
+        ItemStack fakeTotem = new ItemStack(Material.TOTEM_OF_UNDYING);
+        ItemMeta meta = fakeTotem.getItemMeta();
+        // Name wie echtes Totem (nutzt die Locale des Spielers, sofern du das für andere Items auch so machst)
+        meta.setDisplayName(i18n.tr(p, "item.minecraft.totem_of_undying"));
+        // Unsichtbarer Marker, damit wir das Totem erkennen können
+        NamespacedKey key = new NamespacedKey(plugin, "fake_totem");
+        meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
+        fakeTotem.setItemMeta(meta);
+        p.getInventory().addItem(fakeTotem);
+
+        Map<String,String> ph = new HashMap<>();
+        if(byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        String keyMsg = (byUser != null && !byUser.isBlank()) ? "event.fake_totem.given_by" : "event.fake_totem.given";
+        p.sendMessage(i18n.tr(p, keyMsg, ph));
+    }
+
+    @EventHandler
+    public void onEntityResurrect(EntityResurrectEvent event) {
+        if (!(event.getEntity() instanceof Player p)) return;
+        NamespacedKey key = new NamespacedKey(plugin, "fake_totem");
+
+        // Offhand prüfen
+        ItemStack offhand = p.getInventory().getItemInOffHand();
+        if (offhand != null && offhand.getType() == Material.TOTEM_OF_UNDYING) {
+            ItemMeta meta = offhand.getItemMeta();
+            if (meta != null && meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
+                event.setCancelled(true);
+                p.getInventory().setItemInOffHand(null);
+                p.sendMessage(i18n.tr(p, "event.fake_totem.fail"));
+                return; // Wenn in Offhand, ist Mainhand egal (wird nie benutzt)
+            }
+        }
+
+        // Mainhand prüfen
+        ItemStack mainhand = p.getInventory().getItemInMainHand();
+        if (mainhand != null && mainhand.getType() == Material.TOTEM_OF_UNDYING) {
+            ItemMeta meta = mainhand.getItemMeta();
+            if (meta != null && meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
+                event.setCancelled(true);
+                p.getInventory().setItemInMainHand(null);
+                p.sendMessage(i18n.tr(p, "event.fake_totem.fail"));
+            }
+        }
+    }
+
     public void triggerSpawnMobs(Player p, String byUser) {
         List<EntityType> allMobTypes = Arrays.asList(
                 EntityType.ZOMBIE, EntityType.SKELETON, EntityType.CREEPER, EntityType.SPIDER,
@@ -211,8 +274,9 @@ public class RandomEvents implements Listener {
                 EntityType.DOLPHIN, EntityType.TURTLE, EntityType.COD, EntityType.SALMON,
                 EntityType.PUFFERFISH, EntityType.TROPICAL_FISH, EntityType.PANDA, EntityType.FOX,
                 EntityType.BEE, EntityType.STRIDER, EntityType.AXOLOTL, EntityType.GOAT,
-                EntityType.ALLAY, EntityType.FROG
+                EntityType.ALLAY, EntityType.FROG, EntityType.WITHER, EntityType.WARDEN
         );
+
         List<EntityType> availableMobs = allMobTypes.stream()
                 .filter(type -> type != null && type.isSpawnable())
                 .collect(Collectors.toList());
@@ -224,7 +288,51 @@ public class RandomEvents implements Listener {
         for (int i = 0; i < amount; i++) {
             double offsetX = rng.nextDouble() * 4 - 2;
             double offsetZ = rng.nextDouble() * 4 - 2;
-            p.getWorld().spawnEntity(p.getLocation().add(offsetX, 0, offsetZ), selectedType);
+            Entity entity = p.getWorld().spawnEntity(p.getLocation().add(offsetX, 0, offsetZ), selectedType);
+
+            // Wenn es ein Mob ist, versuche Aggro
+            if (entity instanceof Mob mob) {
+                mob.setTarget(p);
+
+                // Hostile-Mobs: Fokus NIE verlieren & Buffs
+                if (isHostileMob(selectedType)) {
+                    mob.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20 * 60 * 60, 1, true, false, true)); // 1h
+                    mob.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * 60 * 60, 1, true, false, true)); // Speed II, 1h
+
+                    // Fokus-Task
+                    new BukkitRunnable() {
+                        @Override
+                        public void run() {
+                            if (mob.isDead() || !p.isOnline() || p.isDead()) {
+                                this.cancel();
+                                return;
+                            }
+                            if (mob.getTarget() == null || !mob.getTarget().equals(p)) {
+                                mob.setTarget(p);
+                            }
+                        }
+                    }.runTaskTimer(plugin, 20L, 20L);
+                }
+            }
+            // Spezialfälle für neutrale Mobs
+            if (entity instanceof Wolf wolf) {
+                wolf.setAngry(true);
+                wolf.setTarget(p);
+            }
+            if (entity instanceof Bee bee) {
+                bee.setAnger(999999); // maximale Aggro
+                bee.setTarget(p);
+            }
+            if (entity instanceof Panda panda) {
+                panda.setAggressive(true);
+            }
+            if (entity instanceof IronGolem golem) {
+                golem.setPlayerCreated(false); // Aggro auf Spieler erlauben
+                golem.setTarget(p);
+            }
+            if (entity instanceof Llama llama) {
+                llama.setTarget(p);
+            }
         }
         Map<String, String> ph = new HashMap<>();
         ph.put("amount", String.valueOf(amount));
@@ -234,6 +342,98 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
+    // Hostile-Mobs: Zombies, Skelette, Creeper usw.
+    private boolean isHostileMob(EntityType type) {
+        return switch (type) {
+            case ZOMBIE, SKELETON, CREEPER, SPIDER, CAVE_SPIDER, ENDERMAN, WITCH, SLIME, MAGMA_CUBE, BLAZE,
+                 GHAST, WITHER_SKELETON, ZOMBIFIED_PIGLIN, ENDERMITE, GUARDIAN, ELDER_GUARDIAN, SHULKER, VEX,
+                 VINDICATOR, EVOKER, RAVAGER, PILLAGER, PHANTOM, DROWNED, HUSK, STRAY, PIGLIN, PIGLIN_BRUTE,
+                 HOGLIN, ZOGLIN -> true;
+            default -> false;
+        };
+    }
+    public void triggerTntRain(Player p, String byUser) {
+        int duration = plugin.getConfig().getInt("events.settings.tnt_rain.duration_seconds", 30);
+        int radius = plugin.getConfig().getInt("events.settings.tnt_rain.radius", 25); // 25 in jede Richtung = 50x50
+        int intervalTicks = plugin.getConfig().getInt("events.settings.tnt_rain.interval_ticks", 6); // alle 0.3 Sek.
+
+        World world = p.getWorld();
+        int totalTicks = duration * 20;
+        new BukkitRunnable() {
+            int ticksRun = 0;
+            Random rng = new Random();
+
+            @Override
+            public void run() {
+                if (!p.isOnline() || p.isDead()) {
+                    cancel();
+                    return;
+                }
+                int tntCount = 8 + rng.nextInt(5); // hohe Dichte
+                Location playerLoc = p.getLocation();
+                for (int i = 0; i < tntCount; i++) {
+                    double dx = rng.nextDouble() * radius * 2 - radius;
+                    double dz = rng.nextDouble() * radius * 2 - radius;
+                    // Spawne IMMER 3-7 Blöcke über Spieler, egal wie tief!
+                    int yOffset = 3 + rng.nextInt(5);
+                    int ySpawn = Math.min(playerLoc.getWorld().getMaxHeight() - 2, playerLoc.getBlockY() + yOffset);
+                    Location spawnLoc = playerLoc.clone().add(dx, ySpawn - playerLoc.getY(), dz);
+                    world.spawnEntity(spawnLoc, EntityType.TNT_MINECART);
+                }
+                ticksRun += intervalTicks;
+                if (ticksRun >= totalTicks) {
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 0L, intervalTicks);
+
+        // Nachricht
+        Map<String, String> ph = new HashMap<>();
+        ph.put("seconds", String.valueOf(duration));
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        String key = (byUser != null && !byUser.isBlank()) ? "events.tnt_rain.by" : "events.tnt_rain.solo";
+        p.sendMessage(i18n.tr(p, key, ph));
+    }
+    public void triggerAnvilRain(Player p, String byUser) {
+        int duration = plugin.getConfig().getInt("events.settings.anvil_rain.duration_seconds", 30);
+        int radius = plugin.getConfig().getInt("events.settings.anvil_rain.radius", 25);
+        int intervalTicks = plugin.getConfig().getInt("events.settings.anvil_rain.interval_ticks", 6);
+
+        World world = p.getWorld();
+        int totalTicks = duration * 20;
+        new BukkitRunnable() {
+            int ticksRun = 0;
+            Random rng = new Random();
+
+            @Override
+            public void run() {
+                if (!p.isOnline() || p.isDead()) {
+                    cancel();
+                    return;
+                }
+                int anvilCount = 8 + rng.nextInt(5);
+                Location base = p.getLocation();
+                for (int i = 0; i < anvilCount; i++) {
+                    double dx = rng.nextDouble() * radius * 2 - radius;
+                    double dz = rng.nextDouble() * radius * 2 - radius;
+                    int ySpawn = Math.min(world.getMaxHeight() - 2, base.getBlockY() + 30 + rng.nextInt(10));
+                    Location spawnLoc = base.clone().add(dx, ySpawn - base.getY(), dz);
+                    world.spawnFallingBlock(spawnLoc, Material.ANVIL.createBlockData());
+                }
+                ticksRun += intervalTicks;
+                if (ticksRun >= totalTicks) {
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 0L, intervalTicks);
+
+        // Nachricht
+        Map<String, String> ph = new HashMap<>();
+        ph.put("seconds", String.valueOf(duration));
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        String key = (byUser != null && !byUser.isBlank()) ? "events.anvil_rain.by" : "events.anvil_rain.solo";
+        p.sendMessage(i18n.tr(p, key, ph));
+    }
     public void triggerGiveItem(Player p, String byUser) {
         List<Material> mats = Arrays.stream(Material.values())
                 .filter(Material::isItem)
@@ -251,6 +451,63 @@ public class RandomEvents implements Listener {
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
 
         String key = (byUser != null && !byUser.isBlank()) ? "events.give.item.by" : "events.give.item.solo";
+        p.sendMessage(i18n.tr(p, key, ph));
+    }
+    public void triggerSkyblock(Player p, String byUser) {
+        int chunkRadius = plugin.getConfig().getInt("events.settings.skyblock.radius", 2);
+        World world = p.getWorld();
+        Chunk playerChunk = p.getLocation().getChunk();
+
+        // === Spieler sofort sperren (BEVOR irgendetwas passiert) ===
+        Set<UUID> toLock = new HashSet<>();
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (!online.getWorld().equals(world)) continue;
+            if (online.getGameMode() == GameMode.SPECTATOR || online.isDead()) continue;
+            toLock.add(online.getUniqueId());
+        }
+        skyblockLocked.addAll(toLock);
+
+        // === Alle Spieler auf einen Fleck teleportieren ===
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (!online.getWorld().equals(world)) continue;
+            if (online.getGameMode() == GameMode.SPECTATOR || online.isDead()) continue;
+            online.teleport(p.getLocation());
+        }
+
+        // === Chunks löschen (nur für p) ===
+        for (int cx = -chunkRadius; cx <= chunkRadius; cx++) {
+            for (int cz = -chunkRadius; cz <= chunkRadius; cz++) {
+                int absChunkX = playerChunk.getX() + cx;
+                int absChunkZ = playerChunk.getZ() + cz;
+
+                if (absChunkX == playerChunk.getX() && absChunkZ == playerChunk.getZ()) continue;
+
+                Chunk targetChunk = world.getChunkAt(absChunkX, absChunkZ);
+                if (!targetChunk.isLoaded()) world.loadChunk(targetChunk);
+
+                int minY = world.getMinHeight();
+                int maxY = world.getMaxHeight();
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        for (int y = minY; y < maxY; y++) {
+                            Block block = targetChunk.getBlock(x, y, z);
+                            block.setType(Material.AIR, false);
+                        }
+                    }
+                }
+            }
+        }
+
+        // === Nach dem Löschen: Spieler wieder freigeben ===
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            skyblockLocked.removeAll(toLock);
+        }, 1L); // Sofort danach, minimum Delay
+
+        // Nachricht
+        Map<String, String> ph = new HashMap<>();
+        ph.put("radius", String.valueOf(chunkRadius));
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        String key = (byUser != null && !byUser.isBlank()) ? "events.skyblock.by" : "events.skyblock.solo";
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
@@ -509,9 +766,34 @@ public class RandomEvents implements Listener {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 Location spawn = base.clone().add(rng.nextDouble() * 4 - 2, 16 + rng.nextInt(12), rng.nextDouble() * 4 - 2);
                 org.bukkit.entity.Fireball ball = (org.bukkit.entity.Fireball) w.spawnEntity(spawn, EntityType.FIREBALL);
-                ball.setDirection(new org.bukkit.util.Vector(0, -1, 0));
                 ball.setYield(2.5F);
                 ball.setIsIncendiary(true);
+
+                // Zielspieler merken (als WeakReference für GC-Sicherheit)
+                UUID targetId = p.getUniqueId();
+
+                // Homing-Task starten
+                new org.bukkit.scheduler.BukkitRunnable() {
+                    int ticks = 0;
+                    @Override
+                    public void run() {
+                        if (!ball.isValid() || ball.isDead() || ball.isOnGround() || ticks > 200) { // Max. 10 Sekunden
+                            this.cancel();
+                            return;
+                        }
+                        Player target = Bukkit.getPlayer(targetId);
+                        if (target == null || !target.isOnline() || target.isDead()) {
+                            this.cancel();
+                            return;
+                        }
+                        // Richtung berechnen
+                        org.bukkit.util.Vector toTarget = target.getLocation().add(0, 1.5, 0).toVector()
+                                .subtract(ball.getLocation().toVector());
+                        org.bukkit.util.Vector velocity = toTarget.normalize().multiply(0.7); // Geschwindigkeit anpassen!
+                        ball.setVelocity(velocity);
+                        ticks += 2; // wir updaten alle 2 Ticks
+                    }
+                }.runTaskTimer(plugin, 0L, 2L); // alle 2 Ticks
             }, i * 10L);
         }
         Map<String, String> ph = new HashMap<>();

@@ -30,8 +30,8 @@ public class TwitchIntegrationManager {
     private final JavaPlugin plugin;
     private TwitchClient twitchClient;
 
-    // Aktuelle Verbindungskonfiguration
-    private String currentChannel = null;
+    // NEU: Mehrere Channels!
+    private List<String> currentChannels = new ArrayList<>();
     private String currentToken = null; // immer normalisiert (ohne "oauth:")
 
     // Toggles (Basis-Flags)
@@ -106,10 +106,29 @@ public class TwitchIntegrationManager {
         return !deathScreenPlayers.isEmpty();
     }
 
-    public void start(String channel, String oauthToken, boolean legacyChatTriggerFlag) {
+    // PATCH: TRUE wenn Timer läuft oder jemand im Deathscreen ist
+    private boolean isTimerRunningOrDeathscreen() {
+        try {
+            if (plugin instanceof TwitchRandomizer t) {
+                TimerManager tm = t.getTimerManager();
+                // Timer läuft wie normal
+                if (tm != null && tm.isRunning() && !((t.getPauseService()!=null) && t.getPauseService().isPaused())) {
+                    return true;
+                }
+                // Timer pausiert – aber jemand ist im Deathscreen (darf queuen!)
+                if (isAnyPlayerInDeathScreen()) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    // NEU: Liste von Channels!
+    public void start(List<String> channels, String oauthToken, boolean legacyChatTriggerFlag) {
         String normToken = normalizeToken(oauthToken);
-        if (channel == null || channel.isBlank() || normToken.isBlank()) {
-            plugin.getLogger().warning("Twitch nicht konfiguriert (twitch.channel/oauth_token). Überspringe Verbindung.");
+        if (channels == null || channels.isEmpty() || normToken.isBlank()) {
+            plugin.getLogger().warning("Twitch nicht konfiguriert (twitch.channels/oauth_token). Überspringe Verbindung.");
             return;
         }
 
@@ -143,12 +162,16 @@ public class TwitchIntegrationManager {
                 .withChatAccount(chatCredential)
                 .build();
 
-        // Chat beitreten
-        twitchClient.getChat().joinChannel(channel);
-        this.currentChannel = channel;
+        // Channels joinen (alle)
+        for (String channel : channels) {
+            if (channel != null && !channel.isBlank()) {
+                twitchClient.getChat().joinChannel(channel);
+                plugin.getLogger().info("Mit Twitch-Chat verbunden: #" + channel);
+            }
+        }
+        this.currentChannels = new ArrayList<>(channels);
         this.currentToken = normToken;
 
-        plugin.getLogger().info("Mit Twitch-Chat verbunden: #" + channel);
         plugin.getLogger().info("Trigger-Intervall: " + seconds + "s (" + gapTicks + " Ticks)");
         plugin.getLogger().info(
                 "Triggers: subs=" + subsEnabled
@@ -167,7 +190,7 @@ public class TwitchIntegrationManager {
         // Subs
         twitchClient.getEventManager().onEvent(SubscriptionEvent.class, event -> {
             if (!subsEnabled) return;
-            if (!isTimerRunning()) return;
+            if (!isTimerRunningOrDeathscreen()) return;
             String user = resolveUserFromSubscription(event);
             enqueue("randomevent " + user);
         });
@@ -175,7 +198,7 @@ public class TwitchIntegrationManager {
         // Bits / Cheers (anonyme Cheers ignorieren)
         twitchClient.getEventManager().onEvent(CheerEvent.class, event -> {
             if (!bitsEnabled) return;
-            if (!isTimerRunning()) return;
+            if (!isTimerRunningOrDeathscreen()) return;
 
             int bits = Math.max(0, event.getBits());
             if (bits < bitsPerTrigger) return;
@@ -191,9 +214,9 @@ public class TwitchIntegrationManager {
             if (debug) plugin.getLogger().info("[Twitch] Cheer: " + user + " -> " + bits + " bits -> +" + count + " Events (queue=" + commandQueue.size() + ")");
         });
 
-        // Chat: !test, !gift, !giftbomb
+        // Chat: !test, !gift, !giftbomb – weiterhin NUR wenn Timer aktiv!
         twitchClient.getEventManager().onEvent(ChannelMessageEvent.class, event -> {
-            if (!isTimerRunning()) return;
+            if (!isTimerRunningOrDeathscreen()) return;
 
             String msg = event.getMessage();
             if (msg == null) return;
@@ -248,6 +271,7 @@ public class TwitchIntegrationManager {
         saveQueueAsync();
     }
 
+    // applyConfig prüft jetzt auf Channel-Liste
     public void applyConfig() {
         this.subsEnabled        = plugin.getConfig().getBoolean("twitch.triggers.subscriptions.enabled", true);
         this.chatTriggerEnabled = plugin.getConfig().getBoolean("twitch.triggers.chat_test.enabled",
@@ -267,10 +291,17 @@ public class TwitchIntegrationManager {
         this.simGiftBombEnabled = plugin.getConfig().getBoolean("twitch.triggers.sim_giftbomb.enabled", false);
         this.simGiftBombDefaultCount = Math.max(1, plugin.getConfig().getInt("twitch.triggers.sim_giftbomb.default_count", 5));
 
-        String newChannel = plugin.getConfig().getString("twitch.channel", "");
+        List<String> newChannels = plugin.getConfig().getStringList("twitch.channels");
+        if (newChannels == null || newChannels.isEmpty()) {
+            // Fallback: alter Einzelchannel
+            String fallback = plugin.getConfig().getString("twitch.channel", "");
+            if (fallback != null && !fallback.isBlank()) {
+                newChannels = List.of(fallback);
+            }
+        }
         String newTokenRaw = plugin.getConfig().getString("twitch.oauth_token", "");
         String newToken = normalizeToken(newTokenRaw);
-        boolean haveCreds = newChannel != null && !newChannel.isBlank() && !newToken.isBlank();
+        boolean haveCreds = newChannels != null && !newChannels.isEmpty() && !newToken.isBlank();
 
         boolean needRestart = false;
         if (twitchClient == null && haveCreds) {
@@ -280,7 +311,7 @@ public class TwitchIntegrationManager {
                 stop();
                 return;
             }
-            if (!Objects.equals(currentChannel, newChannel) || !Objects.equals(currentToken, newToken)) {
+            if (!Objects.equals(currentChannels, newChannels) || !Objects.equals(currentToken, newToken)) {
                 needRestart = true;
             }
         }
@@ -288,7 +319,7 @@ public class TwitchIntegrationManager {
         if (needRestart) {
             stop();
             boolean legacy = plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false);
-            start(newChannel, newTokenRaw, legacy);
+            start(newChannels, newTokenRaw, legacy);
         }
     }
 
@@ -527,7 +558,6 @@ public class TwitchIntegrationManager {
             plugin.getLogger().warning("Konnte Queue nicht speichern: " + e.getMessage());
         }
     }
-
 
     public int getQueueSize() {
         return commandQueue.size();

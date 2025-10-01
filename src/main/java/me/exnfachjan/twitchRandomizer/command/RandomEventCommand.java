@@ -32,7 +32,11 @@ public class RandomEventCommand implements CommandExecutor {
             "floor_is_lava",
             "nasa_call",
             "slippery_ground",
-            "hell_is_calling"
+            "hell_is_calling",
+            "tnt_rain",
+            "anvil_rain",
+            "skyblock",
+            "fake_totem"
     );
 
     private int[] weights;
@@ -132,6 +136,10 @@ public class RandomEventCommand implements CommandExecutor {
                 case 12 -> events.triggerNasaCall(player, byUser);
                 case 13 -> events.triggerSlipperyGround(player, byUser);
                 case 14 -> events.triggerHellIsCalling(player, byUser);
+                case 15 -> events.triggerTntRain(player, byUser);
+                case 16 -> events.triggerAnvilRain(player, byUser);
+                case 17 -> events.triggerSkyblock(player, byUser);
+                case 18 -> events.triggerFakeTotem(player, byUser);
             }
         }
         return true;

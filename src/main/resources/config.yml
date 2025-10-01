@@ -1,6 +1,9 @@
 twitch:
   # Twitch-Channel (Broadcaster)
-  channel: "XXXXX"
+  channels:
+    - "Channel1"
+    - "Channel2"
+    - "Channel3"
 
   # OAuth Access Token im Format "oauth:xxxxxxxx..."
   # Benötigt mind.:
@@ -70,6 +73,10 @@ events:
     nasa_call: 5
     slippery_ground: 6
     hell_is_calling: 6
+    tnt_rain: 4
+    anvil_rain: 6
+    skyblock: 7
+    fake_totem: 5
 
   settings:
     no_crafting:
