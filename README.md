@@ -1,6 +1,6 @@
 # TwitchRandomizer
 
-TwitchRandomizer is a powerful Minecraft (Paper 1.21.8+) plugin that brings interactive, randomized challenges to your server... all controlled by your Twitch viewers! It seamlessly integrates your Minecraft gameplay with Twitch chat, letting your audience influence and trigger in-game events in real time.
+TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings interactive, randomized challenges to your server... all controlled by your Twitch viewers! It seamlessly integrates your Minecraft gameplay with Twitch chat, letting your audience influence and trigger in-game events in real time.
 
 ---
 
