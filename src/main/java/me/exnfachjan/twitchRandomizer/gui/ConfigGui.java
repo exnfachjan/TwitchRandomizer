@@ -213,7 +213,8 @@ public class ConfigGui {
         int slot = 0;
         for (String key : RandomEventCommand.EVENT_KEYS_ORDER) {
             int w = Math.max(0, cfg.getInt("events.weights." + key, 0));
-            Map<String, String> ph = Map.of("key", key, "weight", String.valueOf(w));
+            String eventName = i18n.tr(p, "event.name." + key);
+                Map<String, String> ph = Map.of("key", eventName, "weight", String.valueOf(w));
             Material icon = EVENT_ICON.getOrDefault(key, Material.PAPER);
             inv.setItem(slot++, tag(MenuType.WEIGHTS,
                     item(icon,

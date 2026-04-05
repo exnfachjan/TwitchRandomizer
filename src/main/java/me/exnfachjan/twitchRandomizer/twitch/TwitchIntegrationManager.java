@@ -389,50 +389,94 @@ public class TwitchIntegrationManager {
     }
 
     private String resolveAuthorFromChat(ChannelMessageEvent event) {
+        String name = "unknown";
+        String role = "";
         try {
             String display = (event.getMessageEvent() != null)
                     ? event.getMessageEvent().getTagValue("display-name").orElse(null)
                     : null;
-            if (display != null && !display.isBlank()) return display;
-            if (event.getMessageEvent() != null) {
+            if (display != null && !display.isBlank()) name = display;
+            else if (event.getMessageEvent() != null) {
                 String loginFromIrc = event.getMessageEvent().getUserName();
-                if (loginFromIrc != null && !loginFromIrc.isBlank()) return loginFromIrc;
+                if (loginFromIrc != null && !loginFromIrc.isBlank()) name = loginFromIrc;
+            } else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
+                name = event.getUser().getName();
             }
-            if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
-                return event.getUser().getName();
-            }
+            // Rolle aus badges-Tag lesen
+            role = resolveTwitchRoleFromIRC(event.getMessageEvent());
         } catch (Throwable ignored) {}
-        return "unknown";
+        return colorizeByRole(name, role);
     }
 
     private String resolveAuthorFromCheer(CheerEvent event) {
+        String name = "unknown";
+        String role = "";
         try {
             String display = (event.getMessageEvent() != null)
                     ? event.getMessageEvent().getTagValue("display-name").orElse(null)
                     : null;
-            if (display != null && !display.isBlank()) return display;
-            if (event.getMessageEvent() != null) {
+            if (display != null && !display.isBlank()) name = display;
+            else if (event.getMessageEvent() != null) {
                 String loginFromIrc = event.getMessageEvent().getUserName();
-                if (loginFromIrc != null && !loginFromIrc.isBlank()) return loginFromIrc;
+                if (loginFromIrc != null && !loginFromIrc.isBlank()) name = loginFromIrc;
+            } else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
+                name = event.getUser().getName();
             }
-            if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
-                return event.getUser().getName();
-            }
+            role = resolveTwitchRoleFromIRC(event.getMessageEvent());
         } catch (Throwable ignored) {}
-        return "unknown";
+        return colorizeByRole(name, role);
     }
 
     private String resolveUserFromSubscription(SubscriptionEvent event) {
+        String name = "unknown";
+        String role = "";
         try {
             String display = (event.getMessageEvent() != null)
                     ? event.getMessageEvent().getTagValue("display-name").orElse(null)
                     : null;
-            if (display != null && !display.isBlank()) return display;
-            if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
-                return event.getUser().getName();
+            if (display != null && !display.isBlank()) name = display;
+            else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
+                name = event.getUser().getName();
             }
+            role = resolveTwitchRoleFromIRC(event.getMessageEvent());
         } catch (Throwable ignored) {}
-        return "unknown";
+        return colorizeByRole(name, role);
+    }
+
+    /**
+     * Liest die Twitch-Rolle aus dem badges-Tag des IRC-Events.
+     * Gibt "broadcaster", "moderator", "vip" oder "" zurück.
+     */
+    private String resolveTwitchRoleFromIRC(Object msgEvent) {
+        if (msgEvent == null) return "";
+        try {
+            // badges-Tag enthält z.B. "broadcaster/1,subscriber/12" oder "moderator/1,subscriber/3"
+            java.lang.reflect.Method m = msgEvent.getClass().getMethod("getTagValue", String.class);
+            @SuppressWarnings("unchecked")
+            java.util.Optional<String> opt = (java.util.Optional<String>) m.invoke(msgEvent, "badges");
+            String badges = opt.orElse("");
+            if (badges == null || badges.isBlank()) return "";
+            String lower = badges.toLowerCase(Locale.ROOT);
+            if (lower.contains("broadcaster")) return "broadcaster";
+            if (lower.contains("moderator")) return "moderator";
+            if (lower.contains("vip")) return "vip";
+        } catch (Throwable ignored) {}
+        return "";
+    }
+
+    /**
+     * Färbt den Usernamen basierend auf der Twitch-Rolle ein.
+     * Broadcaster = §c (Rot), Moderator = §a (Grün), VIP = §d (Pink)
+     * Normal = §f (Weiß), §r (Reset) am Ende damit der Rest der Nachricht normal bleibt.
+     */
+    private String colorizeByRole(String name, String role) {
+        String color = switch (role) {
+            case "broadcaster" -> "\u00A7c";  // Rot
+            case "moderator"   -> "\u00A7a";  // Grün
+            case "vip"         -> "\u00A7d";  // Pink
+            default            -> "\u00A7f";  // Weiß
+        };
+        return color + name + "\u00A7r";
     }
 
     private boolean isLikelyAnonymousCheer(CheerEvent event, String user) {
