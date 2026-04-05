@@ -656,15 +656,22 @@ public class RandomEvents implements Listener {
             // Tag als safe markieren
             creeper.getPersistentDataContainer().set(safeKey, PersistentDataType.BYTE, (byte) 1);
 
-            // AI komplett deaktivieren — Creeper steht still, schaut zum Spieler
+            // AI komplett deaktivieren — Creeper steht still
             creeper.setAI(false);
             creeper.setCustomName("§c⚠ Creeper");
             creeper.setCustomNameVisible(true);
 
-            // Creeper zum Spieler drehen
-            Location lookAt = center.clone();
-            lookAt.setY(creeper.getLocation().getY());
-            creeper.lookAt(p);
+            // Creeper manuell zum Spieler drehen (lookAt funktioniert nicht ohne AI)
+            Location creeperLoc = creeper.getLocation();
+            double dx = center.getX() - creeperLoc.getX();
+            double dz = center.getZ() - creeperLoc.getZ();
+            double dy = center.getY() - creeperLoc.getY();
+            double dist = Math.sqrt(dx * dx + dz * dz);
+            float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+            float pitch = (float) Math.toDegrees(-Math.atan2(dy, dist));
+            creeperLoc.setYaw(yaw);
+            creeperLoc.setPitch(pitch);
+            creeper.teleport(creeperLoc);
 
             spawnedCreepers.add(creeper);
         }
