@@ -37,8 +37,8 @@ public class Messages {
         de.put("commands.randomevent.weights_reloaded", "&aEvent-Gewichte neu geladen.");
         de.put("commands.randomevent.cooldown_active", "&eWartezeit aktiv: &f{seconds}s &everbleibend.");
         de.put("commands.randomevent.no_permission", "&cDir fehlt die Berechtigung: &f{perm}");
-        de.put("events.damage.half_heart.by", "{user} zieht dir ein halbes Herz ab!");
-        de.put("events.damage.half_heart.solo", "Du verlierst ein halbes Herz!");
+        de.put("events.damage.half_heart.by", "{user} zieht dir {hearts} Herzen ab!");
+        de.put("events.damage.half_heart.solo", "Du verlierst {hearts} Herzen!");
         de.put("events.spawn.by", "{user} spawnt {amount}x {entity} bei dir!");
         de.put("events.spawn.solo", "Es spawnen {amount}x {entity} bei dir!");
         de.put("events.ignite.short.by", "{user} zündet dich kurz an!");

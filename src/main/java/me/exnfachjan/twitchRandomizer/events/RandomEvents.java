@@ -588,9 +588,12 @@ public class RandomEvents implements Listener {
     }
 
     public void triggerDamageHalfHeart(Player p, String byUser) {
+        int hearts = 3 + rng.nextInt(6); // 3-8 Herzen
+        double damage = hearts * 2.0;    // 1 Herz = 2 HP
         double hp = p.getHealth();
-        if (hp > 1.0) p.setHealth(Math.max(1.0, hp - 1.0));
+        if (hp > 1.0) p.setHealth(Math.max(1.0, hp - damage));
         Map<String, String> ph = new HashMap<>();
+        ph.put("hearts", String.valueOf(hearts));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank()) ? "events.damage.half_heart.by" : "events.damage.half_heart.solo";
         p.sendMessage(i18n.tr(p, key, ph));
