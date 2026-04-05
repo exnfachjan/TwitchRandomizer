@@ -627,8 +627,8 @@ public class RandomEvents implements Listener {
 
     /**
      * Creeper-Angriff: 6 Creeper werden wie eine Uhr um den Spieler platziert (12, 2, 4, 6, 8, 10 Uhr).
-     * Spieler wird festgehalten. Creeper explodieren, machen aber keinen Schaden (weder Spieler noch Umgebung).
-     * Creeper sind mit PersistentDataContainer getaggt, damit der Listener sie erkennt.
+     * Spieler wird festgehalten bis die Creeper explodieren. Kein Schaden, kein Block-Damage, kein Knockback.
+     * Creeper haben keine AI — sie stehen still und werden manuell gezündet.
      */
     public void triggerSafeCreepers(Player p, String byUser) {
         FileConfiguration cfg = plugin.getConfig();
@@ -638,10 +638,10 @@ public class RandomEvents implements Listener {
         Location center = p.getLocation();
         NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
 
-        // Uhrzeiten: 12, 2, 4, 6, 8, 10 → Winkel in Grad (12 Uhr = Norden = -Z)
+        // Uhrzeiten: 12, 2, 4, 6, 8, 10 → gleichmäßig alle 60°
         double[] angles = {0, 60, 120, 180, 240, 300};
 
-        List<Entity> spawnedCreepers = new ArrayList<>();
+        List<Creeper> spawnedCreepers = new ArrayList<>();
 
         for (double angleDeg : angles) {
             double angleRad = Math.toRadians(angleDeg);
@@ -653,37 +653,55 @@ public class RandomEvents implements Listener {
             if (powered) {
                 creeper.setPowered(true);
             }
+            // Tag als safe markieren
             creeper.getPersistentDataContainer().set(safeKey, PersistentDataType.BYTE, (byte) 1);
-            creeper.setTarget(p);
+
+            // AI komplett deaktivieren — Creeper steht still, schaut zum Spieler
+            creeper.setAI(false);
             creeper.setCustomName("§c⚠ Creeper");
             creeper.setCustomNameVisible(true);
+
+            // Creeper zum Spieler drehen
+            Location lookAt = center.clone();
+            lookAt.setY(creeper.getLocation().getY());
+            creeper.lookAt(p);
+
             spawnedCreepers.add(creeper);
         }
 
-        // Spieler festhalten
+        // Spieler festhalten — kurze Dauer, nur bis Explosion (ca. 3s)
         p.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-        p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20 * 5, 127, false, false, false));
-        p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 20 * 5, 128, false, false, false));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20 * 4, 127, false, false, false));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 20 * 4, 128, false, false, false));
 
-        // Nach 2 Sekunden: Alle Creeper zünden
+        // Nach 1.5 Sekunden: Creeper explodieren lassen (sofort, nicht über ignite/fuse)
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            for (Entity e : spawnedCreepers) {
-                if (e.isValid() && !e.isDead() && e instanceof Creeper c) {
-                    c.ignite();
+            for (Creeper c : spawnedCreepers) {
+                if (c.isValid() && !c.isDead()) {
+                    // Sofort explodieren — explode() triggert die Explosion ohne Fuse-Delay
+                    c.explode();
                 }
             }
-        }, 40L);
-
-        // Sicherheits-Cleanup nach 10 Sekunden
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            for (Entity e : spawnedCreepers) {
-                if (e.isValid() && !e.isDead()) {
-                    e.remove();
-                }
-            }
+            // Effekte SOFORT bei Explosion entfernen
             p.removePotionEffect(PotionEffectType.SLOWNESS);
             p.removePotionEffect(PotionEffectType.JUMP_BOOST);
-        }, 200L);
+            // Velocity auf 0 setzen um Knockback zu verhindern
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                p.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+            });
+        }, 30L); // 1.5 Sekunden
+
+        // Sicherheits-Cleanup nach 5 Sekunden
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (Creeper c : spawnedCreepers) {
+                if (c.isValid() && !c.isDead()) {
+                    c.remove();
+                }
+            }
+            // Sicherheitshalber nochmal Effekte entfernen
+            p.removePotionEffect(PotionEffectType.SLOWNESS);
+            p.removePotionEffect(PotionEffectType.JUMP_BOOST);
+        }, 100L); // 5 Sekunden
 
         Map<String, String> ph = new HashMap<>();
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
@@ -700,7 +718,7 @@ public class RandomEvents implements Listener {
         event.blockList().clear();
     }
 
-    /** Verhindert Spieler-/Entity-Schaden durch safe Creeper. */
+    /** Verhindert Spieler-/Entity-Schaden und Knockback durch safe Creeper. */
     @EventHandler
     public void onSafeCreeperDamage(EntityDamageByEntityEvent event) {
         Entity damager = event.getDamager();
@@ -708,6 +726,12 @@ public class RandomEvents implements Listener {
         NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
         if (!creeper.getPersistentDataContainer().has(safeKey, PersistentDataType.BYTE)) return;
         event.setCancelled(true);
+        // Knockback verhindern: Velocity des Opfers auf 0 setzen im nächsten Tick
+        if (event.getEntity() instanceof Player victim) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                victim.setVelocity(new org.bukkit.util.Vector(0, victim.getVelocity().getY() > 0 ? 0 : victim.getVelocity().getY(), 0));
+            });
+        }
     }
 
     // ==== Floor is Lava (mit Boden-Restore) ====
