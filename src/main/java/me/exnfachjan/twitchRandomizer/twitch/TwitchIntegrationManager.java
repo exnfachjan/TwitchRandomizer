@@ -465,18 +465,15 @@ public class TwitchIntegrationManager {
     }
 
     /**
-     * Färbt den Usernamen basierend auf der Twitch-Rolle ein.
-     * Broadcaster = §c (Rot), Moderator = §a (Grün), VIP = §d (Pink)
-     * Normal = §f (Weiß), §r (Reset) am Ende damit der Rest der Nachricht normal bleibt.
+     * Kodiert die Twitch-Rolle als Prefix im Usernamen.
+     * Format: "role:ROLLE:Username" — wird im RandomEventCommand wieder geparst.
+     * So bleiben keine §-Codes im Command/Queue-String.
      */
     private String colorizeByRole(String name, String role) {
-        String color = switch (role) {
-            case "broadcaster" -> "\u00A7c";  // Rot
-            case "moderator"   -> "\u00A7a";  // Grün
-            case "vip"         -> "\u00A7d";  // Pink
-            default            -> "\u00A7f";  // Weiß
-        };
-        return color + name + "\u00A7r";
+        if (role != null && !role.isEmpty()) {
+            return "role:" + role + ":" + name;
+        }
+        return name;
     }
 
     private boolean isLikelyAnonymousCheer(CheerEvent event, String user) {

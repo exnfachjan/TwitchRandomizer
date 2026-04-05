@@ -3,6 +3,7 @@ package me.exnfachjan.twitchRandomizer.command;
 import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
 import me.exnfachjan.twitchRandomizer.events.RandomEvents;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -62,13 +63,21 @@ public class RandomEventCommand implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         String byUser = null;
         if (args.length >= 1) {
-            String first = args[0] != null ? args[0].trim() : "";
+            // Alle Args zusammenfügen (falls Username Leerzeichen hätte)
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < args.length; i++) {
+                if (i > 0) sb.append(' ');
+                sb.append(args[i]);
+            }
+            String first = sb.toString().trim();
+
             if (!first.isEmpty()) {
                 if (first.regionMatches(true, 0, "by:", 0, 3)) {
                     first = first.substring(3).trim();
                 }
                 if (!first.isEmpty()) {
-                    byUser = first;
+                    // Parse "role:ROLLE:Username" Format von TwitchIntegrationManager
+                    byUser = parseAndColorize(first);
                 }
             }
         }
@@ -96,7 +105,7 @@ public class RandomEventCommand implements CommandExecutor {
             weightsForPick[9] = 0; // no_crafting
         }
 
-        // --- ECHTE gewichtete Zufallsauswahl ---
+        // --- Gewichtete Zufallsauswahl ---
         int totalWeight = 0;
         for (int w : weightsForPick) totalWeight += w;
         if (totalWeight <= 0) {
@@ -143,6 +152,31 @@ public class RandomEventCommand implements CommandExecutor {
             }
         }
         return true;
+    }
+
+    /**
+     * Parst das Format "role:ROLLE:Username" und gibt einen farbigen Minecraft-String zurück.
+     * Broadcaster = §c (Rot), Moderator = §a (Grün), VIP = §d (Pink), Normal = §f (Weiß).
+     * Falls kein role:-Prefix vorhanden, wird der Name unverändert zurückgegeben.
+     */
+    private String parseAndColorize(String input) {
+        if (input.startsWith("role:")) {
+            // Format: role:broadcaster:Username oder role:vip:Username
+            String withoutPrefix = input.substring(5); // nach "role:"
+            int colonIdx = withoutPrefix.indexOf(':');
+            if (colonIdx > 0 && colonIdx < withoutPrefix.length() - 1) {
+                String role = withoutPrefix.substring(0, colonIdx).toLowerCase(java.util.Locale.ROOT);
+                String name = withoutPrefix.substring(colonIdx + 1);
+                String color = switch (role) {
+                    case "broadcaster" -> ChatColor.RED.toString();
+                    case "moderator"   -> ChatColor.GREEN.toString();
+                    case "vip"         -> ChatColor.LIGHT_PURPLE.toString();
+                    default            -> ChatColor.WHITE.toString();
+                };
+                return color + name + ChatColor.RESET;
+            }
+        }
+        return input;
     }
 
     private int[] loadWeightsFromConfig() {

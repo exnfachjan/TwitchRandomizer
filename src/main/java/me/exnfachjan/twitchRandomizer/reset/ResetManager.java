@@ -54,7 +54,6 @@ public class ResetManager {
                         FileUtils.copyDirectory(source, target);
                         plugin.getLogger().info("[Reset] Copied pregenerated world to " + name);
 
-                        // PATCH: Sicherstellen, dass playerdata/ existiert
                         File playerDataDir = new File(target, "playerdata");
                         if (!playerDataDir.exists()) {
                             boolean created = playerDataDir.mkdirs();
@@ -88,7 +87,7 @@ public class ResetManager {
         String fallbackServer = plugin.getConfig().getString("reset.fallback_server", "");
         int transferWaitTicks = Math.max(0, plugin.getConfig().getInt("reset.transfer_wait_ticks", 60));
         boolean restartOnReset = plugin.getConfig().getBoolean("restart-on-reset", false);
-        int titleLeadTicks = Math.max(0, plugin.getConfig().getInt("reset.title_lead_ticks", 40)); // NEU: Zeit, um Title sichtbar zu lassen
+        int titleLeadTicks = Math.max(0, plugin.getConfig().getInt("reset.title_lead_ticks", 40));
 
         String levelName = !Bukkit.getWorlds().isEmpty() ? Bukkit.getWorlds().get(0).getName() : "world";
         session.set("reset", true);
@@ -98,19 +97,42 @@ public class ResetManager {
 
         String requester = (requestedBy instanceof Player p) ? p.getName() : "Console";
 
+        // FIX: Timer zurücksetzen bei World Reset
+        try {
+            if (plugin.getTimerManager() != null) {
+                plugin.getTimerManager().reset();
+                plugin.getLogger().info("[Reset] Timer zurückgesetzt.");
+            }
+        } catch (Throwable ignored) {}
+
+        // FIX: Death Counter zurücksetzen bei World Reset
+        try {
+            if (plugin.getDeathCounter() != null) {
+                plugin.getDeathCounter().clear();
+                plugin.getLogger().info("[Reset] Death Counter zurückgesetzt.");
+            }
+        } catch (Throwable ignored) {}
+
+        // FIX: Queue leeren bei World Reset
+        try {
+            if (plugin.getTwitch() != null) {
+                int cleared = plugin.getTwitch().clearQueue();
+                plugin.getLogger().info("[Reset] Queue geleert (" + cleared + " Einträge).");
+            }
+        } catch (Throwable ignored) {}
+
         // 1) Titel (sofort)
         for (Player player : Bukkit.getOnlinePlayers()) {
             try {
                 String title = i18n.tr(player, "title.reset.line1");
                 String sub = i18n.tr(player, "title.reset.line2");
-                // längere Stay-Time ist egal – wir verzögern jetzt den Transfer separat
                 player.sendTitle(title, sub, 10, 60, 10);
             } catch (Throwable ignored) {}
         }
 
         boolean doTransfer = (fallbackServer != null && !fallbackServer.isBlank());
 
-        // 2) Transfer/Kick verzögert, damit der Title sichtbar wird
+        // 2) Transfer/Kick verzögert
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (doTransfer) {
                 for (Player player : Bukkit.getOnlinePlayers()) {
@@ -126,7 +148,7 @@ public class ResetManager {
             }
         }, titleLeadTicks);
 
-        // 3) Pregeneration ein paar Ticks nach Transfer
+        // 3) Pregeneration
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             try {
                 preGenerateSeedWorlds(seed, levelName);
@@ -135,7 +157,7 @@ public class ResetManager {
             }
         }, titleLeadTicks + 10L);
 
-        // 4) Shutdown/Restart nach Transferwartezeit
+        // 4) Shutdown/Restart
         long shutdownDelay = titleLeadTicks + Math.max(3L, transferWaitTicks);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (restartOnReset) {
