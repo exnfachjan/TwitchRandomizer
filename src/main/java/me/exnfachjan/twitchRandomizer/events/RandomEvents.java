@@ -632,7 +632,7 @@ public class RandomEvents implements Listener {
      */
     public void triggerSafeCreepers(Player p, String byUser) {
         FileConfiguration cfg = plugin.getConfig();
-        int radius = Math.max(1, cfg.getInt("events.settings.safe_creepers.radius", 6));
+        int radius = Math.max(1, cfg.getInt("events.settings.safe_creepers.radius", 2));
         boolean powered = cfg.getBoolean("events.settings.safe_creepers.powered", true);
 
         Location center = p.getLocation();

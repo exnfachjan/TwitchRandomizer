@@ -92,7 +92,7 @@ events:
       explosion_power: 2.0
     safe_creepers:
       count: 3
-      radius: 6
+      radius: 2
       lifetime_seconds: 8
       powered: true
     floor_is_lava:
