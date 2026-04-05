@@ -133,7 +133,7 @@ The GUI uses sensible permission checks for each action.
 
 ## 🗝 Credits
 
-Built by exnfachjan with the help of AI (Copilot and ChatGPT).  
+Built by exnfachjan with the help of AI (Claude by Anthropic).  
 Thanks to the Paper/Spigot communities and Twitch4J for solid foundations.
 
 ---
