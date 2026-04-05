@@ -115,4 +115,3 @@ events:
 language:
   mode: auto # auto = Clientsprache; manual = per-Spieler (GUI oder extern)
   default: en # Fallback: de oder en
-

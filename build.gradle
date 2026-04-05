@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'me.exnfachjan'
-version = '1.2.0'
+version = '1.3.0'
 
 repositories {
     mavenCentral()
@@ -17,8 +17,8 @@ repositories {
 }
 
 dependencies {
-    compileOnly "io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT"
-    
+    compileOnly "io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT"
+
     implementation "com.github.twitch4j:twitch4j:1.25.0"
     implementation "com.github.twitch4j:twitch4j-auth:1.25.0"
     implementation "com.github.twitch4j:twitch4j-common:1.25.0"
@@ -54,10 +54,6 @@ processResources {
 // Shadow: Erzeuge ein Fat-JAR und nutze es beim Run-Server
 tasks.named('shadowJar') {
     archiveClassifier.set('')
-    //minimize()
-    //relocate 'com.github.twitch4j', 'me.exnfachjan.shaded.twitch4j'
-    //relocate 'com.github.philippheuer', 'me.exnfachjan.shaded.philippheuer'
-    // Wichtig: slf4j NICHT relocaten, Paper bringt das selbst mit.
 }
 
 tasks.named('jar') {
@@ -70,7 +66,7 @@ tasks.named('build') {
 
 // run-paper soll das Shadow-JAR als Plugin laden
 tasks.named('runServer') {
-    minecraftVersion("1.21.8")
+    minecraftVersion("1.21.11")
     // füge das shadowJar dem Plugins-Ordner des Test-Servers hinzu
     pluginJars.from(tasks.named('shadowJar'))
 }
