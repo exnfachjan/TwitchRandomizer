@@ -42,6 +42,9 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.event.entity.EntityResurrectEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.ExplosionPrimeEvent;
 import org.bukkit.GameMode;
 
 import java.util.*;
@@ -623,47 +626,88 @@ public class RandomEvents implements Listener {
     }
 
     /**
-     * FIX: safe_creepers spawnt jetzt tatsächlich Creeper statt nur Sound/Partikel abzuspielen.
-     * Liest Config-Werte (count, radius, lifetime_seconds, powered).
+     * Creeper-Angriff: 6 Creeper werden wie eine Uhr um den Spieler platziert (12, 2, 4, 6, 8, 10 Uhr).
+     * Spieler wird festgehalten. Creeper explodieren, machen aber keinen Schaden (weder Spieler noch Umgebung).
+     * Creeper sind mit PersistentDataContainer getaggt, damit der Listener sie erkennt.
      */
     public void triggerSafeCreepers(Player p, String byUser) {
         FileConfiguration cfg = plugin.getConfig();
-        int count = Math.max(1, cfg.getInt("events.settings.safe_creepers.count", 3));
         int radius = Math.max(1, cfg.getInt("events.settings.safe_creepers.radius", 6));
-        int lifetimeSeconds = Math.max(1, cfg.getInt("events.settings.safe_creepers.lifetime_seconds", 8));
         boolean powered = cfg.getBoolean("events.settings.safe_creepers.powered", true);
+
+        Location center = p.getLocation();
+        NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
+
+        // Uhrzeiten: 12, 2, 4, 6, 8, 10 → Winkel in Grad (12 Uhr = Norden = -Z)
+        double[] angles = {0, 60, 120, 180, 240, 300};
 
         List<Entity> spawnedCreepers = new ArrayList<>();
 
-        for (int i = 0; i < count; i++) {
-            double offsetX = rng.nextDouble() * radius * 2 - radius;
-            double offsetZ = rng.nextDouble() * radius * 2 - radius;
-            Location spawnLoc = p.getLocation().add(offsetX, 0, offsetZ);
+        for (double angleDeg : angles) {
+            double angleRad = Math.toRadians(angleDeg);
+            double offsetX = Math.sin(angleRad) * radius;
+            double offsetZ = -Math.cos(angleRad) * radius;
+            Location spawnLoc = center.clone().add(offsetX, 0, offsetZ);
 
             Creeper creeper = (Creeper) p.getWorld().spawnEntity(spawnLoc, EntityType.CREEPER);
             if (powered) {
                 creeper.setPowered(true);
             }
+            creeper.getPersistentDataContainer().set(safeKey, PersistentDataType.BYTE, (byte) 1);
             creeper.setTarget(p);
             creeper.setCustomName("§c⚠ Creeper");
             creeper.setCustomNameVisible(true);
             spawnedCreepers.add(creeper);
         }
 
-        // Entferne Creeper nach Ablauf der Lebenszeit (falls sie nicht vorher explodiert sind)
+        // Spieler festhalten
+        p.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20 * 5, 127, false, false, false));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 20 * 5, 128, false, false, false));
+
+        // Nach 2 Sekunden: Alle Creeper zünden
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (Entity e : spawnedCreepers) {
+                if (e.isValid() && !e.isDead() && e instanceof Creeper c) {
+                    c.ignite();
+                }
+            }
+        }, 40L);
+
+        // Sicherheits-Cleanup nach 10 Sekunden
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             for (Entity e : spawnedCreepers) {
                 if (e.isValid() && !e.isDead()) {
                     e.remove();
                 }
             }
-        }, lifetimeSeconds * 20L);
+            p.removePotionEffect(PotionEffectType.SLOWNESS);
+            p.removePotionEffect(PotionEffectType.JUMP_BOOST);
+        }, 200L);
 
         Map<String, String> ph = new HashMap<>();
-        ph.put("count", String.valueOf(count));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank()) ? "events.safe_creepers.explode_by" : "events.safe_creepers.explode";
         p.sendMessage(i18n.tr(p, key, ph));
+    }
+
+    /** Verhindert Block-Zerstörung durch safe Creeper. */
+    @EventHandler
+    public void onSafeCreeperExplode(EntityExplodeEvent event) {
+        if (!(event.getEntity() instanceof Creeper creeper)) return;
+        NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
+        if (!creeper.getPersistentDataContainer().has(safeKey, PersistentDataType.BYTE)) return;
+        event.blockList().clear();
+    }
+
+    /** Verhindert Spieler-/Entity-Schaden durch safe Creeper. */
+    @EventHandler
+    public void onSafeCreeperDamage(EntityDamageByEntityEvent event) {
+        Entity damager = event.getDamager();
+        if (!(damager instanceof Creeper creeper)) return;
+        NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
+        if (!creeper.getPersistentDataContainer().has(safeKey, PersistentDataType.BYTE)) return;
+        event.setCancelled(true);
     }
 
     // ==== Floor is Lava (mit Boden-Restore) ====
