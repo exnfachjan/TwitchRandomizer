@@ -173,6 +173,25 @@ public class Messages {
         de.put("item.minecraft.totem_of_undying", "Totem der Unsterblichkeit");
         de.put("gui.book.chat.saved_channel_list", "Twitch-Kanäle wurden gespeichert: {channels}");
         de.put("gui.book.chat.no_valid_channels", "Keine gültigen Channelnamen erkannt.");
+        de.put("event.name.spawn_mobs", "Mobs spawnen");
+        de.put("event.name.potion", "Zufälliger Trank");
+        de.put("event.name.give_item", "Zufälliges Item");
+        de.put("event.name.clear_inventory", "Inventar leeren");
+        de.put("event.name.teleport", "Zufälliger Teleport");
+        de.put("event.name.damage_half_heart", "Herzen abziehen");
+        de.put("event.name.fire", "In Brand setzen");
+        de.put("event.name.inv_shuffle", "Inventar mischen");
+        de.put("event.name.hot_potato", "Heiße Kartoffel");
+        de.put("event.name.no_crafting", "Crafting blockieren");
+        de.put("event.name.safe_creepers", "Creeper-Angriff");
+        de.put("event.name.floor_is_lava", "Boden ist Lava");
+        de.put("event.name.nasa_call", "NASA-Anruf");
+        de.put("event.name.slippery_ground", "Rutschiger Boden");
+        de.put("event.name.hell_is_calling", "Hölle ruft an");
+        de.put("event.name.tnt_rain", "TNT-Regen");
+        de.put("event.name.anvil_rain", "Amboss-Regen");
+        de.put("event.name.skyblock", "Skyblock");
+        de.put("event.name.fake_totem", "Fake-Totem");
 
         en.clear();
         en.put("commands.saved_and_reconfigured", "&aConfiguration saved and (re)configured.");
@@ -317,6 +336,25 @@ public class Messages {
         en.put("item.minecraft.totem_of_undying", "Totem of Undying");
         en.put("gui.book.chat.saved_channel_list", "Twitch channels saved: {channels}");
         en.put("gui.book.chat.no_valid_channels", "No valid channel names detected.");
+        en.put("event.name.spawn_mobs", "Spawn Mobs");
+        en.put("event.name.potion", "Random Potion");
+        en.put("event.name.give_item", "Random Item");
+        en.put("event.name.clear_inventory", "Clear Inventory");
+        en.put("event.name.teleport", "Random Teleport");
+        en.put("event.name.damage_half_heart", "Lose Hearts");
+        en.put("event.name.fire", "Set on Fire");
+        en.put("event.name.inv_shuffle", "Shuffle Inventory");
+        en.put("event.name.hot_potato", "Hot Potato");
+        en.put("event.name.no_crafting", "Block Crafting");
+        en.put("event.name.safe_creepers", "Creeper Attack");
+        en.put("event.name.floor_is_lava", "Floor is Lava");
+        en.put("event.name.nasa_call", "NASA Call");
+        en.put("event.name.slippery_ground", "Slippery Ground");
+        en.put("event.name.hell_is_calling", "Hell is Calling");
+        en.put("event.name.tnt_rain", "TNT Rain");
+        en.put("event.name.anvil_rain", "Anvil Rain");
+        en.put("event.name.skyblock", "Skyblock");
+        en.put("event.name.fake_totem", "Fake Totem");
 
     }
 
