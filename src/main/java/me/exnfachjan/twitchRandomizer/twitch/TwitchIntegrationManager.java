@@ -161,8 +161,8 @@ public class TwitchIntegrationManager {
         plugin.getLogger().info("Triggers: subs=" + subsEnabled
                 + ", chat_test=" + chatTriggerEnabled
                 + ", bits=" + bitsEnabled + " (bits_per_trigger=" + bitsPerTrigger + ")");
-        plugin.getLogger().info("Sim-Trigger (nur bei debug=true): gift=" + (debug && simGiftEnabled)
-                + ", giftbomb=" + (debug && simGiftBombEnabled) + " (default_count=" + simGiftBombDefaultCount + ")");
+        plugin.getLogger().info("Sim-Trigger: gift=" + simGiftEnabled
+                + ", giftbomb=" + simGiftBombEnabled + " (default_count=" + simGiftBombDefaultCount + ")");
 
         // Queue laden (nur einmal pro Serverlauf)
         if (!queueLoaded) {
@@ -211,7 +211,6 @@ public class TwitchIntegrationManager {
             boolean chatTestEnabledNow = plugin.getConfig().getBoolean(
                     "twitch.triggers.chat_test.enabled",
                     plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false));
-            boolean debugNow = plugin.getConfig().getBoolean("twitch.debug", false);
             boolean simGiftNow = plugin.getConfig().getBoolean("twitch.triggers.sim_gift.enabled", false);
             boolean simGiftBombNow = plugin.getConfig().getBoolean("twitch.triggers.sim_giftbomb.enabled", false);
             int simGiftBombDefaultNow = Math.max(1, plugin.getConfig().getInt("twitch.triggers.sim_giftbomb.default_count", 5));
@@ -221,12 +220,12 @@ public class TwitchIntegrationManager {
                 return;
             }
 
-            if (debugNow && simGiftNow && lower.equals(CMD_GIFT)) {
+            if (simGiftNow && lower.equals(CMD_GIFT)) {
                 enqueue("randomevent " + author);
                 return;
             }
 
-            if (debugNow && simGiftBombNow && lower.startsWith(CMD_GIFTBOMB)) {
+            if (simGiftBombNow && lower.startsWith(CMD_GIFTBOMB)) {
                 int n = simGiftBombDefaultNow;
                 String[] parts = trimmed.split("\\s+");
                 if (parts.length > 1) {
