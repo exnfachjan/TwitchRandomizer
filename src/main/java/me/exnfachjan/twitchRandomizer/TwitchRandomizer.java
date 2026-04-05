@@ -109,20 +109,18 @@ public class TwitchRandomizer extends JavaPlugin {
         PluginCommand resetCmd = getCommand("reset");
         if (resetCmd != null) resetCmd.setExecutor(new ResetCommand(this));
 
-        // NEU: Mehrere Channels unterstützen
+        // Mehrere Channels unterstützen
         List<String> channels = getConfig().getStringList("twitch.channels");
         if (channels == null || channels.isEmpty()) {
-            // Fallback für alte Config (nur einzelner Channel)
             String single = getConfig().getString("twitch.channel", "");
             if (single != null && !single.isBlank()) {
                 channels = List.of(single);
             }
         }
-        String token   = getConfig().getString("twitch.oauth_token", "");
+        String token = getConfig().getString("twitch.oauth_token", "");
         boolean enableChatTrigger = getConfig().getBoolean("twitch.chat_trigger.enabled", false);
 
         this.twitch = new TwitchIntegrationManager(this);
-        // Wichtig: Passe auch TwitchIntegrationManager an!
         twitch.start(channels, token, enableChatTrigger);
 
         PluginCommand cfgCmd = getCommand("trconfig");
@@ -143,6 +141,10 @@ public class TwitchRandomizer extends JavaPlugin {
 
         PluginCommand trguiCmd = getCommand("trgui");
         if (trguiCmd != null) trguiCmd.setExecutor(new TrGuiCommand(this, configGui));
+
+        // /gui als Alias für trgui
+        PluginCommand guiCmd = getCommand("gui");
+        if (guiCmd != null) guiCmd.setExecutor(new TrGuiCommand(this, configGui));
     }
 
     @Override
@@ -161,23 +163,22 @@ public class TwitchRandomizer extends JavaPlugin {
     public SessionConfig getSessionConfig() { return sessionConfig; }
 
     public void applyDynamicConfig() {
-        // IMMER im Main-Thread ausführen, damit Bukkit- & Twitch4J-Aufrufe safe sind
         org.bukkit.Bukkit.getScheduler().runTask(this, () -> {
             try {
                 if (twitch != null) {
-                    twitch.applyConfig(); // prüft Änderungen & reconnectet bei Bedarf
+                    twitch.applyConfig();
                 }
             } catch (Throwable ignored) {}
 
             try {
                 if (randomEventExecutor != null) {
-                    randomEventExecutor.reloadWeights(); // RandomEvent-Gewichte neu laden
+                    randomEventExecutor.reloadWeights();
                 }
             } catch (Throwable ignored) {}
 
             try {
                 if (messages != null) {
-                    messages.load(); // i18n live neu laden
+                    messages.load();
                 }
             } catch (Throwable e) {
                 getLogger().warning("i18n reload failed: " + e.getMessage());

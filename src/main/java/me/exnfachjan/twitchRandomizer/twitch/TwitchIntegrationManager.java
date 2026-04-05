@@ -25,16 +25,16 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class TwitchIntegrationManager {
     private final JavaPlugin plugin;
     private TwitchClient twitchClient;
 
-    // NEU: Mehrere Channels!
     private List<String> currentChannels = new ArrayList<>();
-    private String currentToken = null; // immer normalisiert (ohne "oauth:")
+    private String currentToken = null;
 
-    // Toggles (Basis-Flags)
+    // Toggles
     private boolean subsEnabled;
     private boolean chatTriggerEnabled;
 
@@ -54,22 +54,20 @@ public class TwitchIntegrationManager {
     private final Queue<String> commandQueue = new ConcurrentLinkedQueue<>();
     private BukkitTask queueWorker;
 
-    // Verhindere doppeltes Nachladen der Queue bei Reconnect
     private boolean queueLoaded = false;
 
-    // Cooldown (Ticks) zwischen Dispatches – aus Sekunden (Config) berechnet
-    private int gapTicks = 20; // default 1.0s
+    // Cooldown (Ticks) zwischen Dispatches
+    private int gapTicks = 20;
     private int ticksSinceLastDispatch = 0;
     private boolean cooledAndReady = true;
 
-    // Optionales Debug-Logging
     private boolean debug = false;
 
     // Persistenz
     private final File queueFile;
 
-    // PATCH: Spieler im Deathscreen merken
-    private final Set<UUID> deathScreenPlayers = new HashSet<>();
+    // FIX: Thread-safe Set statt normalem HashSet für Deathscreen-Tracking
+    private final Set<UUID> deathScreenPlayers = ConcurrentHashMap.newKeySet();
 
     public TwitchIntegrationManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -78,13 +76,11 @@ public class TwitchIntegrationManager {
         Bukkit.getPluginManager().registerEvents(new Listener() {
             @EventHandler
             public void onPlayerDeath(PlayerDeathEvent event) {
-                Player player = event.getEntity();
-                deathScreenPlayers.add(player.getUniqueId());
+                deathScreenPlayers.add(event.getEntity().getUniqueId());
             }
             @EventHandler
             public void onPlayerRespawn(PlayerRespawnEvent event) {
-                Player player = event.getPlayer();
-                deathScreenPlayers.remove(player.getUniqueId());
+                deathScreenPlayers.remove(event.getPlayer().getUniqueId());
             }
             @EventHandler
             public void onPlayerQuit(PlayerQuitEvent event) {
@@ -95,27 +91,21 @@ public class TwitchIntegrationManager {
 
     private boolean isAnyPlayerInDeathScreen() {
         if (deathScreenPlayers.isEmpty()) return false;
-        Iterator<UUID> it = deathScreenPlayers.iterator();
-        while (it.hasNext()) {
-            UUID uuid = it.next();
+        // Cleanup: Spieler die nicht mehr tot sind entfernen
+        deathScreenPlayers.removeIf(uuid -> {
             Player p = Bukkit.getPlayer(uuid);
-            if (p == null || !p.isDead()) {
-                it.remove();
-            }
-        }
+            return p == null || !p.isDead();
+        });
         return !deathScreenPlayers.isEmpty();
     }
 
-    // PATCH: TRUE wenn Timer läuft oder jemand im Deathscreen ist
     private boolean isTimerRunningOrDeathscreen() {
         try {
             if (plugin instanceof TwitchRandomizer t) {
                 TimerManager tm = t.getTimerManager();
-                // Timer läuft wie normal
-                if (tm != null && tm.isRunning() && !((t.getPauseService()!=null) && t.getPauseService().isPaused())) {
+                if (tm != null && tm.isRunning() && !((t.getPauseService() != null) && t.getPauseService().isPaused())) {
                     return true;
                 }
-                // Timer pausiert – aber jemand ist im Deathscreen (darf queuen!)
                 if (isAnyPlayerInDeathScreen()) {
                     return true;
                 }
@@ -124,7 +114,6 @@ public class TwitchIntegrationManager {
         return false;
     }
 
-    // NEU: Liste von Channels!
     public void start(List<String> channels, String oauthToken, boolean legacyChatTriggerFlag) {
         String normToken = normalizeToken(oauthToken);
         if (channels == null || channels.isEmpty() || normToken.isBlank()) {
@@ -133,36 +122,32 @@ public class TwitchIntegrationManager {
         }
 
         // === Config lesen ===
-        this.subsEnabled        = plugin.getConfig().getBoolean("twitch.triggers.subscriptions.enabled", true);
+        this.subsEnabled = plugin.getConfig().getBoolean("twitch.triggers.subscriptions.enabled", true);
         this.chatTriggerEnabled = plugin.getConfig().getBoolean("twitch.triggers.chat_test.enabled", legacyChatTriggerFlag);
 
-        // Bits-Trigger aus Config
-        this.bitsEnabled    = plugin.getConfig().getBoolean("twitch.triggers.bits.enabled", false);
+        this.bitsEnabled = plugin.getConfig().getBoolean("twitch.triggers.bits.enabled", false);
         this.bitsPerTrigger = Math.max(1, plugin.getConfig().getInt("twitch.triggers.bits.bits_per_trigger", 500));
 
-        // Intervall (Sek -> Ticks)
         String raw = plugin.getConfig().getString("twitch.trigger_interval_seconds", "1.0");
         double seconds;
         try { seconds = Double.parseDouble(raw.replace(",", ".")); }
-        catch (Exception e) { seconds = 1.0; plugin.getLogger().warning("Ungültiger Wert für twitch.trigger_interval_seconds: '"+raw+"'. Fallback 1.0s."); }
+        catch (Exception e) { seconds = 1.0; plugin.getLogger().warning("Ungültiger Wert für twitch.trigger_interval_seconds: '" + raw + "'. Fallback 1.0s."); }
         if (seconds < 0.05) seconds = 0.05;
         this.gapTicks = Math.max(1, (int) Math.round(seconds * 20.0));
 
         this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
 
-        // Simulations-Trigger aus der Config
         this.simGiftEnabled = plugin.getConfig().getBoolean("twitch.triggers.sim_gift.enabled", false);
         this.simGiftBombEnabled = plugin.getConfig().getBoolean("twitch.triggers.sim_giftbomb.enabled", false);
         this.simGiftBombDefaultCount = Math.max(1, plugin.getConfig().getInt("twitch.triggers.sim_giftbomb.default_count", 5));
 
-        // === Client bauen: NUR Chat (kein PubSub/Helix) ===
+        // === Client bauen ===
         OAuth2Credential chatCredential = buildCredential(normToken);
         this.twitchClient = TwitchClientBuilder.builder()
                 .withEnableChat(true)
                 .withChatAccount(chatCredential)
                 .build();
 
-        // Channels joinen (alle)
         for (String channel : channels) {
             if (channel != null && !channel.isBlank()) {
                 twitchClient.getChat().joinChannel(channel);
@@ -173,11 +158,9 @@ public class TwitchIntegrationManager {
         this.currentToken = normToken;
 
         plugin.getLogger().info("Trigger-Intervall: " + seconds + "s (" + gapTicks + " Ticks)");
-        plugin.getLogger().info(
-                "Triggers: subs=" + subsEnabled
-                        + ", chat_test=" + chatTriggerEnabled
-                        + ", bits=" + bitsEnabled + " (bits_per_trigger=" + bitsPerTrigger + ")"
-        );
+        plugin.getLogger().info("Triggers: subs=" + subsEnabled
+                + ", chat_test=" + chatTriggerEnabled
+                + ", bits=" + bitsEnabled + " (bits_per_trigger=" + bitsPerTrigger + ")");
         plugin.getLogger().info("Sim-Trigger (nur bei debug=true): gift=" + (debug && simGiftEnabled)
                 + ", giftbomb=" + (debug && simGiftBombEnabled) + " (default_count=" + simGiftBombDefaultCount + ")");
 
@@ -195,7 +178,7 @@ public class TwitchIntegrationManager {
             enqueue("randomevent " + user);
         });
 
-        // Bits / Cheers (anonyme Cheers ignorieren)
+        // Bits / Cheers
         twitchClient.getEventManager().onEvent(CheerEvent.class, event -> {
             if (!bitsEnabled) return;
             if (!isTimerRunningOrDeathscreen()) return;
@@ -214,7 +197,7 @@ public class TwitchIntegrationManager {
             if (debug) plugin.getLogger().info("[Twitch] Cheer: " + user + " -> " + bits + " bits -> +" + count + " Events (queue=" + commandQueue.size() + ")");
         });
 
-        // Chat: !test, !gift, !giftbomb – weiterhin NUR wenn Timer aktiv!
+        // Chat: !test, !gift, !giftbomb
         twitchClient.getEventManager().onEvent(ChannelMessageEvent.class, event -> {
             if (!isTimerRunningOrDeathscreen()) return;
 
@@ -227,8 +210,7 @@ public class TwitchIntegrationManager {
 
             boolean chatTestEnabledNow = plugin.getConfig().getBoolean(
                     "twitch.triggers.chat_test.enabled",
-                    plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false)
-            );
+                    plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false));
             boolean debugNow = plugin.getConfig().getBoolean("twitch.debug", false);
             boolean simGiftNow = plugin.getConfig().getBoolean("twitch.triggers.sim_gift.enabled", false);
             boolean simGiftBombNow = plugin.getConfig().getBoolean("twitch.triggers.sim_giftbomb.enabled", false);
@@ -271,14 +253,13 @@ public class TwitchIntegrationManager {
         saveQueueAsync();
     }
 
-    // applyConfig prüft jetzt auf Channel-Liste
     public void applyConfig() {
-        this.subsEnabled        = plugin.getConfig().getBoolean("twitch.triggers.subscriptions.enabled", true);
+        this.subsEnabled = plugin.getConfig().getBoolean("twitch.triggers.subscriptions.enabled", true);
         this.chatTriggerEnabled = plugin.getConfig().getBoolean("twitch.triggers.chat_test.enabled",
                 plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false));
-        this.bitsEnabled        = plugin.getConfig().getBoolean("twitch.triggers.bits.enabled", false);
-        this.bitsPerTrigger     = Math.max(1, plugin.getConfig().getInt("twitch.triggers.bits.bits_per_trigger", 500));
-        this.debug              = plugin.getConfig().getBoolean("twitch.debug", false);
+        this.bitsEnabled = plugin.getConfig().getBoolean("twitch.triggers.bits.enabled", false);
+        this.bitsPerTrigger = Math.max(1, plugin.getConfig().getInt("twitch.triggers.bits.bits_per_trigger", 500));
+        this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
 
         String raw = plugin.getConfig().getString("twitch.trigger_interval_seconds", "1.0");
         double seconds;
@@ -293,7 +274,6 @@ public class TwitchIntegrationManager {
 
         List<String> newChannels = plugin.getConfig().getStringList("twitch.channels");
         if (newChannels == null || newChannels.isEmpty()) {
-            // Fallback: alter Einzelchannel
             String fallback = plugin.getConfig().getString("twitch.channel", "");
             if (fallback != null && !fallback.isBlank()) {
                 newChannels = List.of(fallback);
@@ -327,18 +307,20 @@ public class TwitchIntegrationManager {
         try {
             if (plugin instanceof TwitchRandomizer t) {
                 TimerManager tm = t.getTimerManager();
-                return tm != null && tm.isRunning() && !((t.getPauseService()!=null) && t.getPauseService().isPaused());
+                return tm != null && tm.isRunning() && !((t.getPauseService() != null) && t.getPauseService().isPaused());
             }
         } catch (Throwable ignored) {}
         return false;
     }
 
-    // PATCH: Deathscreen-Pause
+    /**
+     * FIX: Queue-Worker läuft jetzt alle 2 Ticks statt jeden Tick (Performance).
+     * FIX: Deathscreen-Pause verwendet thread-safe Set.
+     */
     private void startQueueWorker() {
         this.queueWorker = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            // NEU: Pausiere, wenn jemand im Deathscreen ist!
+            // Pausiere, wenn jemand im Deathscreen ist
             if (isAnyPlayerInDeathScreen()) {
-                if (debug) plugin.getLogger().info("[Twitch] Queue pausiert – Spieler im Deathscreen.");
                 return;
             }
 
@@ -358,13 +340,11 @@ public class TwitchIntegrationManager {
                 int[] weights = randomEventExecutor != null ? randomEventExecutor.getWeights() : null;
 
                 if (weights == null || weights.length == 0) {
-                    if (debug) plugin.getLogger().info("[Twitch] Queue pausiert – keine Event-Gewichte geladen.");
                     return;
                 }
 
                 int[] weightsForPick = Arrays.copyOf(weights, weights.length);
 
-                // Dynamisches Filtering wie im Command:
                 boolean anyGroundActive = false;
                 boolean noCraftingActive = false;
                 if (randomEvents != null && !players.isEmpty()) {
@@ -374,16 +354,15 @@ public class TwitchIntegrationManager {
                     }
                 }
                 if (anyGroundActive) {
-                    weightsForPick[11] = 0; // floor_is_lava
-                    weightsForPick[13] = 0; // slippery_ground
+                    weightsForPick[11] = 0;
+                    weightsForPick[13] = 0;
                 }
                 if (noCraftingActive) {
-                    weightsForPick[9] = 0; // no_crafting
+                    weightsForPick[9] = 0;
                 }
 
                 int pickable = Arrays.stream(weightsForPick).sum();
                 if (pickable <= 0) {
-                    if (debug) plugin.getLogger().info("[Twitch] Queue pausiert – keine auslösbaren Events (alle deaktiviert oder geblockt).");
                     return;
                 }
             } catch (Throwable t) {
@@ -391,7 +370,8 @@ public class TwitchIntegrationManager {
                 return;
             }
 
-            if (ticksSinceLastDispatch < gapTicks) ticksSinceLastDispatch++;
+            // FIX: Cooldown-Tracking um 2 Ticks erhöhen (da Worker alle 2 Ticks läuft)
+            if (ticksSinceLastDispatch < gapTicks) ticksSinceLastDispatch += 2;
             else cooledAndReady = true;
 
             if (!cooledAndReady) return;
@@ -406,7 +386,7 @@ public class TwitchIntegrationManager {
 
             saveQueueAsync();
 
-        }, 1L, 1L);
+        }, 1L, 2L); // FIX: Alle 2 Ticks statt jeden Tick
     }
 
     private String resolveAuthorFromChat(ChannelMessageEvent event) {
@@ -423,7 +403,6 @@ public class TwitchIntegrationManager {
                 return event.getUser().getName();
             }
         } catch (Throwable ignored) {}
-        if (debug) plugin.getLogger().warning("[Twitch] Konnte Autor nicht ermitteln – fallback 'unknown'.");
         return "unknown";
     }
 
@@ -441,7 +420,6 @@ public class TwitchIntegrationManager {
                 return event.getUser().getName();
             }
         } catch (Throwable ignored) {}
-        if (debug) plugin.getLogger().warning("[Twitch] Konnte Cheer-User nicht ermitteln – fallback 'unknown'.");
         return "unknown";
     }
 
@@ -455,7 +433,6 @@ public class TwitchIntegrationManager {
                 return event.getUser().getName();
             }
         } catch (Throwable ignored) {}
-        if (debug) plugin.getLogger().warning("[Twitch] Konnte Sub-User nicht ermitteln – fallback 'unknown'.");
         return "unknown";
     }
 
@@ -532,7 +509,6 @@ public class TwitchIntegrationManager {
     }
 
     private void saveQueueAsync() {
-        // PATCH: Save synchron synchronously if plugin is disabled
         if (!plugin.isEnabled()) {
             saveQueueSync();
             return;

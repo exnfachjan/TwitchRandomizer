@@ -15,6 +15,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Zombie;
+import org.bukkit.entity.Creeper;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.CraftItemEvent;
@@ -42,7 +43,6 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.GameMode;
-
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -148,17 +148,13 @@ public class RandomEvents implements Listener {
         int seconds = 30 + rng.nextInt(91);
         noCraftUntil.put(p.getUniqueId(), System.currentTimeMillis() + (seconds * 1000));
 
-        // Bossbar anzeigen
         showNoCraftBossbar(p, seconds);
 
-        // Eventuell alten Task abbrechen
         BukkitTask oldTask = noCraftTasks.remove(p.getUniqueId());
         if (oldTask != null) oldTask.cancel();
 
-        // Task für Bossbar-Update und Ablauf
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
             int remaining = seconds;
-
             @Override
             public void run() {
                 if (!isNoCraftingActive(p) || remaining <= 0) {
@@ -171,13 +167,11 @@ public class RandomEvents implements Listener {
                 remaining--;
             }
         }, 0L, 20L);
-
         noCraftTasks.put(p.getUniqueId(), task);
 
         Map<String, String> ph = new HashMap<>();
         ph.put("seconds", String.valueOf(seconds));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-
         String key = (byUser != null && !byUser.isBlank()) ? "events.no_crafting.start_by" : "events.no_crafting.start";
         p.sendMessage(i18n.tr(p, key, ph));
     }
@@ -214,16 +208,14 @@ public class RandomEvents implements Listener {
     public void triggerFakeTotem(Player p, String byUser) {
         ItemStack fakeTotem = new ItemStack(Material.TOTEM_OF_UNDYING);
         ItemMeta meta = fakeTotem.getItemMeta();
-        // Name wie echtes Totem (nutzt die Locale des Spielers, sofern du das für andere Items auch so machst)
         meta.setDisplayName(i18n.tr(p, "item.minecraft.totem_of_undying"));
-        // Unsichtbarer Marker, damit wir das Totem erkennen können
         NamespacedKey key = new NamespacedKey(plugin, "fake_totem");
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         fakeTotem.setItemMeta(meta);
         p.getInventory().addItem(fakeTotem);
 
-        Map<String,String> ph = new HashMap<>();
-        if(byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        Map<String, String> ph = new HashMap<>();
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String keyMsg = (byUser != null && !byUser.isBlank()) ? "event.fake_totem.given_by" : "event.fake_totem.given";
         p.sendMessage(i18n.tr(p, keyMsg, ph));
     }
@@ -233,7 +225,6 @@ public class RandomEvents implements Listener {
         if (!(event.getEntity() instanceof Player p)) return;
         NamespacedKey key = new NamespacedKey(plugin, "fake_totem");
 
-        // Offhand prüfen
         ItemStack offhand = p.getInventory().getItemInOffHand();
         if (offhand != null && offhand.getType() == Material.TOTEM_OF_UNDYING) {
             ItemMeta meta = offhand.getItemMeta();
@@ -241,11 +232,10 @@ public class RandomEvents implements Listener {
                 event.setCancelled(true);
                 p.getInventory().setItemInOffHand(null);
                 p.sendMessage(i18n.tr(p, "event.fake_totem.fail"));
-                return; // Wenn in Offhand, ist Mainhand egal (wird nie benutzt)
+                return;
             }
         }
 
-        // Mainhand prüfen
         ItemStack mainhand = p.getInventory().getItemInMainHand();
         if (mainhand != null && mainhand.getType() == Material.TOTEM_OF_UNDYING) {
             ItemMeta meta = mainhand.getItemMeta();
@@ -265,7 +255,8 @@ public class RandomEvents implements Listener {
                 EntityType.ZOMBIFIED_PIGLIN, EntityType.ENDERMITE, EntityType.GUARDIAN, EntityType.ELDER_GUARDIAN,
                 EntityType.SHULKER, EntityType.VEX, EntityType.VINDICATOR, EntityType.EVOKER,
                 EntityType.RAVAGER, EntityType.PILLAGER, EntityType.PHANTOM,
-                EntityType.DROWNED, EntityType.HUSK, EntityType.STRAY, EntityType.PIGLIN, EntityType.PIGLIN_BRUTE, EntityType.HOGLIN, EntityType.ZOGLIN,
+                EntityType.DROWNED, EntityType.HUSK, EntityType.STRAY, EntityType.PIGLIN, EntityType.PIGLIN_BRUTE,
+                EntityType.HOGLIN, EntityType.ZOGLIN,
                 EntityType.COW, EntityType.PIG, EntityType.SHEEP, EntityType.CHICKEN, EntityType.HORSE,
                 EntityType.DONKEY, EntityType.MULE, EntityType.LLAMA, EntityType.TRADER_LLAMA,
                 EntityType.WOLF, EntityType.CAT, EntityType.OCELOT, EntityType.RABBIT, EntityType.VILLAGER,
@@ -290,16 +281,13 @@ public class RandomEvents implements Listener {
             double offsetZ = rng.nextDouble() * 4 - 2;
             Entity entity = p.getWorld().spawnEntity(p.getLocation().add(offsetX, 0, offsetZ), selectedType);
 
-            // Wenn es ein Mob ist, versuche Aggro
             if (entity instanceof Mob mob) {
                 mob.setTarget(p);
 
-                // Hostile-Mobs: Fokus NIE verlieren & Buffs
                 if (isHostileMob(selectedType)) {
-                    mob.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20 * 60 * 60, 1, true, false, true)); // 1h
-                    mob.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * 60 * 60, 1, true, false, true)); // Speed II, 1h
+                    mob.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20 * 60 * 60, 1, true, false, true));
+                    mob.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * 60 * 60, 1, true, false, true));
 
-                    // Fokus-Task
                     new BukkitRunnable() {
                         @Override
                         public void run() {
@@ -314,20 +302,19 @@ public class RandomEvents implements Listener {
                     }.runTaskTimer(plugin, 20L, 20L);
                 }
             }
-            // Spezialfälle für neutrale Mobs
             if (entity instanceof Wolf wolf) {
                 wolf.setAngry(true);
                 wolf.setTarget(p);
             }
             if (entity instanceof Bee bee) {
-                bee.setAnger(999999); // maximale Aggro
+                bee.setAnger(999999);
                 bee.setTarget(p);
             }
             if (entity instanceof Panda panda) {
                 panda.setAggressive(true);
             }
             if (entity instanceof IronGolem golem) {
-                golem.setPlayerCreated(false); // Aggro auf Spieler erlauben
+                golem.setPlayerCreated(false);
                 golem.setTarget(p);
             }
             if (entity instanceof Llama llama) {
@@ -342,7 +329,6 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    // Hostile-Mobs: Zombies, Skelette, Creeper usw.
     private boolean isHostileMob(EntityType type) {
         return switch (type) {
             case ZOMBIE, SKELETON, CREEPER, SPIDER, CAVE_SPIDER, ENDERMAN, WITCH, SLIME, MAGMA_CUBE, BLAZE,
@@ -352,48 +338,42 @@ public class RandomEvents implements Listener {
             default -> false;
         };
     }
+
     public void triggerTntRain(Player p, String byUser) {
         int duration = plugin.getConfig().getInt("events.settings.tnt_rain.duration_seconds", 30);
-        int radius = plugin.getConfig().getInt("events.settings.tnt_rain.radius", 25); // 25 in jede Richtung = 50x50
-        int intervalTicks = plugin.getConfig().getInt("events.settings.tnt_rain.interval_ticks", 6); // alle 0.3 Sek.
+        int radius = plugin.getConfig().getInt("events.settings.tnt_rain.radius", 25);
+        int intervalTicks = plugin.getConfig().getInt("events.settings.tnt_rain.interval_ticks", 6);
 
         World world = p.getWorld();
         int totalTicks = duration * 20;
         new BukkitRunnable() {
             int ticksRun = 0;
-            Random rng = new Random();
-
+            final Random rng = new Random();
             @Override
             public void run() {
-                if (!p.isOnline() || p.isDead()) {
-                    cancel();
-                    return;
-                }
-                int tntCount = 8 + rng.nextInt(5); // hohe Dichte
+                if (!p.isOnline() || p.isDead()) { cancel(); return; }
+                int tntCount = 8 + rng.nextInt(5);
                 Location playerLoc = p.getLocation();
                 for (int i = 0; i < tntCount; i++) {
                     double dx = rng.nextDouble() * radius * 2 - radius;
                     double dz = rng.nextDouble() * radius * 2 - radius;
-                    // Spawne IMMER 3-7 Blöcke über Spieler, egal wie tief!
                     int yOffset = 3 + rng.nextInt(5);
                     int ySpawn = Math.min(playerLoc.getWorld().getMaxHeight() - 2, playerLoc.getBlockY() + yOffset);
                     Location spawnLoc = playerLoc.clone().add(dx, ySpawn - playerLoc.getY(), dz);
                     world.spawnEntity(spawnLoc, EntityType.TNT_MINECART);
                 }
                 ticksRun += intervalTicks;
-                if (ticksRun >= totalTicks) {
-                    cancel();
-                }
+                if (ticksRun >= totalTicks) cancel();
             }
         }.runTaskTimer(plugin, 0L, intervalTicks);
 
-        // Nachricht
         Map<String, String> ph = new HashMap<>();
         ph.put("seconds", String.valueOf(duration));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank()) ? "events.tnt_rain.by" : "events.tnt_rain.solo";
         p.sendMessage(i18n.tr(p, key, ph));
     }
+
     public void triggerAnvilRain(Player p, String byUser) {
         int duration = plugin.getConfig().getInt("events.settings.anvil_rain.duration_seconds", 30);
         int radius = plugin.getConfig().getInt("events.settings.anvil_rain.radius", 25);
@@ -403,14 +383,10 @@ public class RandomEvents implements Listener {
         int totalTicks = duration * 20;
         new BukkitRunnable() {
             int ticksRun = 0;
-            Random rng = new Random();
-
+            final Random rng = new Random();
             @Override
             public void run() {
-                if (!p.isOnline() || p.isDead()) {
-                    cancel();
-                    return;
-                }
+                if (!p.isOnline() || p.isDead()) { cancel(); return; }
                 int anvilCount = 8 + rng.nextInt(5);
                 Location base = p.getLocation();
                 for (int i = 0; i < anvilCount; i++) {
@@ -421,19 +397,17 @@ public class RandomEvents implements Listener {
                     world.spawnFallingBlock(spawnLoc, Material.ANVIL.createBlockData());
                 }
                 ticksRun += intervalTicks;
-                if (ticksRun >= totalTicks) {
-                    cancel();
-                }
+                if (ticksRun >= totalTicks) cancel();
             }
         }.runTaskTimer(plugin, 0L, intervalTicks);
 
-        // Nachricht
         Map<String, String> ph = new HashMap<>();
         ph.put("seconds", String.valueOf(duration));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank()) ? "events.anvil_rain.by" : "events.anvil_rain.solo";
         p.sendMessage(i18n.tr(p, key, ph));
     }
+
     public void triggerGiveItem(Player p, String byUser) {
         List<Material> mats = Arrays.stream(Material.values())
                 .filter(Material::isItem)
@@ -441,7 +415,6 @@ public class RandomEvents implements Listener {
                 .collect(Collectors.toList());
 
         Material mat = mats.get(rng.nextInt(mats.size()));
-
         int amount = 1 + rng.nextInt(5);
         p.getInventory().addItem(new ItemStack(mat, amount));
 
@@ -449,16 +422,15 @@ public class RandomEvents implements Listener {
         ph.put("item", pretty(mat.name()));
         ph.put("amount", String.valueOf(amount));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-
         String key = (byUser != null && !byUser.isBlank()) ? "events.give.item.by" : "events.give.item.solo";
         p.sendMessage(i18n.tr(p, key, ph));
     }
+
     public void triggerSkyblock(Player p, String byUser) {
         int chunkRadius = plugin.getConfig().getInt("events.settings.skyblock.radius", 2);
         World world = p.getWorld();
         Chunk playerChunk = p.getLocation().getChunk();
 
-        // === Spieler sofort sperren (BEVOR irgendetwas passiert) ===
         Set<UUID> toLock = new HashSet<>();
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (!online.getWorld().equals(world)) continue;
@@ -467,43 +439,51 @@ public class RandomEvents implements Listener {
         }
         skyblockLocked.addAll(toLock);
 
-        // === Alle Spieler auf einen Fleck teleportieren ===
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (!online.getWorld().equals(world)) continue;
             if (online.getGameMode() == GameMode.SPECTATOR || online.isDead()) continue;
             online.teleport(p.getLocation());
         }
 
-        // === Chunks löschen (nur für p) ===
+        // FIX: Chunk-Clearing aufteilen um TPS-Drops zu vermeiden
+        List<int[]> chunksToDelete = new ArrayList<>();
         for (int cx = -chunkRadius; cx <= chunkRadius; cx++) {
             for (int cz = -chunkRadius; cz <= chunkRadius; cz++) {
-                int absChunkX = playerChunk.getX() + cx;
-                int absChunkZ = playerChunk.getZ() + cz;
-
-                if (absChunkX == playerChunk.getX() && absChunkZ == playerChunk.getZ()) continue;
-
-                Chunk targetChunk = world.getChunkAt(absChunkX, absChunkZ);
-                if (!targetChunk.isLoaded()) world.loadChunk(targetChunk);
-
-                int minY = world.getMinHeight();
-                int maxY = world.getMaxHeight();
-                for (int x = 0; x < 16; x++) {
-                    for (int z = 0; z < 16; z++) {
-                        for (int y = minY; y < maxY; y++) {
-                            Block block = targetChunk.getBlock(x, y, z);
-                            block.setType(Material.AIR, false);
-                        }
-                    }
-                }
+                if (cx == 0 && cz == 0) continue; // Spieler-Chunk behalten
+                chunksToDelete.add(new int[]{playerChunk.getX() + cx, playerChunk.getZ() + cz});
             }
         }
 
-        // === Nach dem Löschen: Spieler wieder freigeben ===
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            skyblockLocked.removeAll(toLock);
-        }, 1L); // Sofort danach, minimum Delay
+        // Verarbeite 2 Chunks pro Tick, um den Server nicht einzufrieren
+        new BukkitRunnable() {
+            int index = 0;
+            @Override
+            public void run() {
+                int processed = 0;
+                while (index < chunksToDelete.size() && processed < 2) {
+                    int[] coords = chunksToDelete.get(index++);
+                    Chunk targetChunk = world.getChunkAt(coords[0], coords[1]);
+                    if (!targetChunk.isLoaded()) world.loadChunk(targetChunk);
 
-        // Nachricht
+                    int minY = world.getMinHeight();
+                    int maxY = world.getMaxHeight();
+                    for (int x = 0; x < 16; x++) {
+                        for (int z = 0; z < 16; z++) {
+                            for (int y = minY; y < maxY; y++) {
+                                targetChunk.getBlock(x, y, z).setType(Material.AIR, false);
+                            }
+                        }
+                    }
+                    processed++;
+                }
+
+                if (index >= chunksToDelete.size()) {
+                    skyblockLocked.removeAll(toLock);
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+
         Map<String, String> ph = new HashMap<>();
         ph.put("radius", String.valueOf(chunkRadius));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
@@ -514,15 +494,12 @@ public class RandomEvents implements Listener {
     public void triggerClearInventory(Player p, String byUser) {
         PlayerInventory inv = p.getInventory();
         List<Integer> allSlots = new ArrayList<>();
-        // Main inventory: 0-35, Armor: 36-39, Offhand: 40
         for (int i = 0; i <= 40; i++) allSlots.add(i);
         Collections.shuffle(allSlots, rng);
 
-        // Mindestens 1, maximal alle Slots
         int slotsToClear = 1 + rng.nextInt(allSlots.size());
         for (int i = 0; i < slotsToClear; i++) {
-            int slot = allSlots.get(i);
-            inv.setItem(slot, null);
+            inv.setItem(allSlots.get(i), null);
         }
         p.updateInventory();
 
@@ -533,15 +510,18 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
+    /**
+     * FIX: Teleport findet jetzt ein sicheres Y-Level am Ziel,
+     * statt den Spieler auf dem aktuellen Y in die Erde zu teleportieren.
+     */
     public void triggerTeleport(Player p, String byUser) {
-        Random rng = new Random();
         // 0,001% Wahrscheinlichkeit für Advanced End
         if (rng.nextInt(100_000) == 0) {
             World endWorld = Bukkit.getWorld("world_the_end");
             if (endWorld != null) {
                 int x = 1000 + rng.nextInt(500);
                 int z = 1000 + rng.nextInt(500);
-                int y = 70; // Sichere Y-Koordinate fürs End (kannst du anpassen)
+                int y = 70;
                 setAirCube(endWorld, x, y, z);
                 Location tpLoc = new Location(endWorld, x + 0.5, y, z + 0.5);
                 p.teleport(tpLoc);
@@ -554,15 +534,15 @@ public class RandomEvents implements Listener {
                 p.sendMessage(i18n.tr(p, key, ph));
                 return;
             }
-            // Falls kein End, normaler Teleport unten
         }
 
         World w = p.getWorld();
         int x = rng.nextInt(3000) - 1500;
         int z = rng.nextInt(3000) - 1500;
-        int y = p.getLocation().getBlockY(); // Immer exakt das aktuelle Y-Level!
 
-        // 3x3x3 Air Cube erstellen
+        // FIX: Finde sicheres Y am Zielort statt das aktuelle Y zu nehmen
+        int y = findSafeY(w, x, z);
+
         setAirCube(w, x, y, z);
         Location tpLoc = new Location(w, x + 0.5, y, z + 0.5);
         p.teleport(tpLoc);
@@ -575,7 +555,24 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    // Hilfsfunktion: Macht einen 3x3x3 Air Cube um die Zielkoordinate
+    /**
+     * Findet ein sicheres Y-Level: Höchster solider Block + 1 (Oberfläche).
+     */
+    private int findSafeY(World w, int x, int z) {
+        int maxY = w.getMaxHeight() - 1;
+        int minY = w.getMinHeight();
+        // Von oben nach unten suchen
+        for (int y = maxY; y > minY; y--) {
+            Block block = w.getBlockAt(x, y, z);
+            Block above = w.getBlockAt(x, y + 1, z);
+            if (block.getType().isSolid() && !above.getType().isSolid()) {
+                return y + 1;
+            }
+        }
+        // Fallback: Oberfläche nicht gefunden, nehme 64
+        return Math.max(minY + 1, 64);
+    }
+
     private void setAirCube(World w, int centerX, int centerY, int centerZ) {
         for (int dx = -1; dx <= 1; dx++) {
             for (int dy = -1; dy <= 1; dy++) {
@@ -584,7 +581,7 @@ public class RandomEvents implements Listener {
                     int by = centerY + dy;
                     int bz = centerZ + dz;
                     if (by < w.getMinHeight() || by > w.getMaxHeight()) continue;
-                    w.getBlockAt(bx, by, bz).setType(org.bukkit.Material.AIR, false);
+                    w.getBlockAt(bx, by, bz).setType(Material.AIR, false);
                 }
             }
         }
@@ -615,29 +612,60 @@ public class RandomEvents implements Listener {
         List<ItemStack> itemList = new ArrayList<>(Arrays.asList(items));
         Collections.shuffle(itemList, rng);
         inv.setContents(itemList.toArray(new ItemStack[0]));
-        p.updateInventory(); // <-- Inventar-Update für Client!
+        p.updateInventory();
         Map<String, String> ph = new HashMap<>();
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank()) ? "events.inv_shuffle.by" : "events.inv_shuffle.solo";
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
+    /**
+     * FIX: safe_creepers spawnt jetzt tatsächlich Creeper statt nur Sound/Partikel abzuspielen.
+     * Liest Config-Werte (count, radius, lifetime_seconds, powered).
+     */
     public void triggerSafeCreepers(Player p, String byUser) {
-        int seconds = 60 + rng.nextInt(61);
+        FileConfiguration cfg = plugin.getConfig();
+        int count = Math.max(1, cfg.getInt("events.settings.safe_creepers.count", 3));
+        int radius = Math.max(1, cfg.getInt("events.settings.safe_creepers.radius", 6));
+        int lifetimeSeconds = Math.max(1, cfg.getInt("events.settings.safe_creepers.lifetime_seconds", 8));
+        boolean powered = cfg.getBoolean("events.settings.safe_creepers.powered", true);
+
+        List<Entity> spawnedCreepers = new ArrayList<>();
+
+        for (int i = 0; i < count; i++) {
+            double offsetX = rng.nextDouble() * radius * 2 - radius;
+            double offsetZ = rng.nextDouble() * radius * 2 - radius;
+            Location spawnLoc = p.getLocation().add(offsetX, 0, offsetZ);
+
+            Creeper creeper = (Creeper) p.getWorld().spawnEntity(spawnLoc, EntityType.CREEPER);
+            if (powered) {
+                creeper.setPowered(true);
+            }
+            creeper.setTarget(p);
+            creeper.setCustomName("§c⚠ Creeper");
+            creeper.setCustomNameVisible(true);
+            spawnedCreepers.add(creeper);
+        }
+
+        // Entferne Creeper nach Ablauf der Lebenszeit (falls sie nicht vorher explodiert sind)
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (Entity e : spawnedCreepers) {
+                if (e.isValid() && !e.isDead()) {
+                    e.remove();
+                }
+            }
+        }, lifetimeSeconds * 20L);
+
         Map<String, String> ph = new HashMap<>();
-        ph.put("seconds", String.valueOf(seconds));
+        ph.put("count", String.valueOf(count));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank()) ? "events.safe_creepers.explode_by" : "events.safe_creepers.explode";
         p.sendMessage(i18n.tr(p, key, ph));
-        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "execute as @a at @s run particle minecraft:explosion_emitter ~1 ~ ~");
-        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "execute as @a at @s run playsound minecraft:entity.generic.explode master @s ~1 ~ ~ 1 1 0");
     }
 
     // ==== Floor is Lava (mit Boden-Restore) ====
     public void triggerFloorIsLava(Player p, String byUser) {
-        if (isAnyGroundEventActive(p)) {
-            return;
-        }
+        if (isAnyGroundEventActive(p)) return;
         FileConfiguration cfg = plugin.getConfig();
         int min = Math.max(10, cfg.getInt("events.settings.floor_is_lava.min_seconds", 10));
         int max = Math.max(min, cfg.getInt("events.settings.floor_is_lava.max_seconds", 180));
@@ -694,9 +722,7 @@ public class RandomEvents implements Listener {
 
     // ==== Slippery Ground ====
     public void triggerSlipperyGround(Player p, String byUser) {
-        if (isAnyGroundEventActive(p)) {
-            return;
-        }
+        if (isAnyGroundEventActive(p)) return;
         FileConfiguration cfg = plugin.getConfig();
         int min = Math.max(10, cfg.getInt("events.settings.slippery_ground.min_seconds", 10));
         int max = Math.max(min, cfg.getInt("events.settings.slippery_ground.max_seconds", 180));
@@ -769,15 +795,13 @@ public class RandomEvents implements Listener {
                 ball.setYield(2.5F);
                 ball.setIsIncendiary(true);
 
-                // Zielspieler merken (als WeakReference für GC-Sicherheit)
                 UUID targetId = p.getUniqueId();
 
-                // Homing-Task starten
-                new org.bukkit.scheduler.BukkitRunnable() {
+                new BukkitRunnable() {
                     int ticks = 0;
                     @Override
                     public void run() {
-                        if (!ball.isValid() || ball.isDead() || ball.isOnGround() || ticks > 200) { // Max. 10 Sekunden
+                        if (!ball.isValid() || ball.isDead() || ball.isOnGround() || ticks > 200) {
                             this.cancel();
                             return;
                         }
@@ -786,14 +810,13 @@ public class RandomEvents implements Listener {
                             this.cancel();
                             return;
                         }
-                        // Richtung berechnen
                         org.bukkit.util.Vector toTarget = target.getLocation().add(0, 1.5, 0).toVector()
                                 .subtract(ball.getLocation().toVector());
-                        org.bukkit.util.Vector velocity = toTarget.normalize().multiply(0.7); // Geschwindigkeit anpassen!
+                        org.bukkit.util.Vector velocity = toTarget.normalize().multiply(0.7);
                         ball.setVelocity(velocity);
-                        ticks += 2; // wir updaten alle 2 Ticks
+                        ticks += 2;
                     }
-                }.runTaskTimer(plugin, 0L, 2L); // alle 2 Ticks
+                }.runTaskTimer(plugin, 0L, 2L);
             }, i * 10L);
         }
         Map<String, String> ph = new HashMap<>();
@@ -846,6 +869,7 @@ public class RandomEvents implements Listener {
         }, duration * 20L);
         hotPotatoTask.put(p.getUniqueId(), task);
     }
+
     public void endHotPotato(Player p) {
         UUID pu = p.getUniqueId();
         BukkitTask t = hotPotatoTask.remove(pu);

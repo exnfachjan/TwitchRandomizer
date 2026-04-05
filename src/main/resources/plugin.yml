@@ -1,6 +1,6 @@
 name: TwitchRandomizer
 main: me.exnfachjan.twitchRandomizer.TwitchRandomizer
-version: 1.2.0
+version: 1.3.0
 api-version: "1.21"
 
 commands:
@@ -35,7 +35,6 @@ commands:
     description: Alias für twitchqueue (separat registriert)
     usage: /queue add <Anzahl> [Name]
     permission: twitchrandomizer.queue
-    # optional: keine Aliases nötig
 
   trgui:
     description: Öffnet das TwitchRandomizer GUI

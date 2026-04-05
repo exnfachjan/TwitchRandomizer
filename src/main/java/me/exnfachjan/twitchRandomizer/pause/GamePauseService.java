@@ -44,14 +44,17 @@ public final class GamePauseService implements Listener {
         return false;
     }
 
+    /**
+     * FIX: Vorher stand hier "return !any || true;" was IMMER true ergab (auch am Anfang der Schleife).
+     * Logik: Wenn die Schleife durchläuft ohne false zu returnen, sind alle Spectator.
+     * Wenn niemand online ist, wird ebenfalls pausiert.
+     */
     private boolean allOnlineAreSpectator() {
-        boolean any = false;
+        if (Bukkit.getOnlinePlayers().isEmpty()) return true; // Niemand online → pausieren
         for (Player p : Bukkit.getOnlinePlayers()) {
-            any = true;
             if (p.getGameMode() != GameMode.SPECTATOR) return false;
         }
-        // If nobody is online, prefer pausing
-        return !any || true;
+        return true; // Alle online sind Spectator
     }
 
     // ==== Events ====

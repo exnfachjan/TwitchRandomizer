@@ -14,17 +14,14 @@ twitch:
   # Den Token kannst du hier direkt erstellen: https://twitchtokengenerator.com/quick/1KRFjxyoNE
   oauth_token: "oauth:XXXXXXX"
 
-
   # Cooldown zwischen den Events (Sekunden) - Persönliche empfehlung 30 Sekunden
   trigger_interval_seconds: 30.0
 
-  # Debug: Ermöglicht des Testen der Events. Debug muss aktiv sein, damit sim_gift und sim_giftbomb funktionieren.
-  # ACHTUNG: Bei aktivem Debug werden KEINE echten Twitch-Events verarbeitet!
-  debug: true
+  # Debug: Ermöglicht das Testen der Events. Debug muss aktiv sein, damit sim_gift und sim_giftbomb funktionieren.
+  debug: false
 
   # Aktive Auslöser
   triggers:
-
     bits:
       enabled: true
       bits_per_trigger: 500
@@ -35,13 +32,13 @@ twitch:
     chat_test:
       enabled: true
 
-      # NEU: Simulierte Geschenk-Subs (nur aktiv, wenn twitch.debug=true)
+    # Simulierte Geschenk-Subs (nur aktiv, wenn twitch.debug=true)
     sim_gift:
-      enabled: true           # !gift
+      enabled: true # !gift
 
     sim_giftbomb:
-      enabled: true           # !giftbomb [N]
-      default_count: 5         # Standardanzahl, wenn N fehlt
+      enabled: true # !giftbomb [N]
+      default_count: 5 # Standardanzahl, wenn N fehlt
 
 # Einstellungen für Reset-Verhalten sowie Fallback-Server (BungeeCord)
 reset:
@@ -49,11 +46,18 @@ reset:
   randomize_seed: true
   fallback_server: "lobby"
   transfer_wait_ticks: 60
+  title_lead_ticks: 40
+
+# Ob der Server nach einem Reset neugestartet oder heruntergefahren wird
+restart-on-reset: false
 
 challenge:
   # Wenn true: Stirbt ein Spieler, ist die Challenge vorbei -> alle werden Spectator.
-  # Wenn false: kein Auto-Spectator, normales Respawn-Spiel möglich.
-  auto_spectator_on_death: true
+  auto_spectator_on_death: false
+  # Pausiert Timer/Queue wenn ein Spieler im Todesbildschirm ist
+  pause_on_death: true
+  # Pausiert Timer/Queue wenn alle Spieler Spectator sind
+  pause_if_all_spectator: true
 
 # Event-Gewichtungen (müssen NICHT exakt 100 ergeben; werden normalisiert)
 events:
@@ -84,7 +88,6 @@ events:
       max_seconds: 15
     hot_potato:
       duration_seconds: 10
-      # explode | damage | effects
       mode: explode
       explosion_power: 2.0
     safe_creepers:
@@ -98,7 +101,18 @@ events:
     slippery_ground:
       min_seconds: 10
       max_seconds: 180
+    tnt_rain:
+      duration_seconds: 30
+      radius: 25
+      interval_ticks: 6
+    anvil_rain:
+      duration_seconds: 30
+      radius: 25
+      interval_ticks: 6
+    skyblock:
+      radius: 2
 
 language:
-  mode: auto    # auto = Clientsprache; manual = per-Spieler (GUI oder extern)
-  default: en   # Fallback: de oder en
+  mode: auto # auto = Clientsprache; manual = per-Spieler (GUI oder extern)
+  default: en # Fallback: de oder en
+
