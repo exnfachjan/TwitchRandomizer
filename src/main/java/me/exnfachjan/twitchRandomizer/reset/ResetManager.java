@@ -105,13 +105,7 @@ public class ResetManager {
             }
         } catch (Throwable ignored) {}
 
-        // FIX: Death Counter zurücksetzen bei World Reset
-        try {
-            if (plugin.getDeathCounter() != null) {
-                plugin.getDeathCounter().clear();
-                plugin.getLogger().info("[Reset] Death Counter zurückgesetzt.");
-            }
-        } catch (Throwable ignored) {}
+        // Deaths werden NICHT zurückgesetzt — das geht manuell über das Misc-Menü
 
         // FIX: Queue leeren bei World Reset
         try {
