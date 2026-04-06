@@ -81,6 +81,7 @@ events:
     anvil_rain: 6
     skyblock: 7
     fake_totem: 5
+    equipment_shuffle: 8
 
   settings:
     no_crafting:

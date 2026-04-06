@@ -56,9 +56,7 @@ public class RandomEventCommand implements CommandExecutor {
         plugin.getLogger().info("RandomEvent-Gewichte neu geladen.");
     }
 
-    public int[] getWeights() {
-        return this.weights;
-    }
+    public int[] getWeights() { return this.weights; }
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
@@ -70,14 +68,9 @@ public class RandomEventCommand implements CommandExecutor {
                 sb.append(args[i]);
             }
             String first = sb.toString().trim();
-
             if (!first.isEmpty()) {
-                if (first.regionMatches(true, 0, "by:", 0, 3)) {
-                    first = first.substring(3).trim();
-                }
-                if (!first.isEmpty()) {
-                    byUser = parseAndColorize(first);
-                }
+                if (first.regionMatches(true, 0, "by:", 0, 3)) first = first.substring(3).trim();
+                if (!first.isEmpty()) byUser = parseAndColorize(first);
             }
         }
 
@@ -89,7 +82,6 @@ public class RandomEventCommand implements CommandExecutor {
 
         int[] weightsForPick = Arrays.copyOf(this.weights, this.weights.length);
 
-        // Dynamische Blockaden (z.B. Boden-Events/Crafting)
         boolean anyGroundActive = false;
         boolean noCraftingActive = false;
         for (Player player : players) {
@@ -104,7 +96,6 @@ public class RandomEventCommand implements CommandExecutor {
             weightsForPick[9] = 0; // no_crafting
         }
 
-        // --- Gewichtete Zufallsauswahl ---
         int totalWeight = 0;
         for (int w : weightsForPick) totalWeight += w;
         if (totalWeight <= 0) {
@@ -116,10 +107,7 @@ public class RandomEventCommand implements CommandExecutor {
         int event = -1;
         for (int i = 0; i < weightsForPick.length; i++) {
             acc += weightsForPick[i];
-            if (r < acc) {
-                event = i;
-                break;
-            }
+            if (r < acc) { event = i; break; }
         }
         if (event == -1) {
             sender.sendMessage("Fehler: Konnte kein Event auswählen!");
@@ -154,11 +142,6 @@ public class RandomEventCommand implements CommandExecutor {
         return true;
     }
 
-    /**
-     * Parst das Format "role:ROLLE:Username" und gibt einen farbigen Minecraft-String zurück.
-     * Broadcaster = §c (Rot), Moderator = §a (Grün), VIP = §d (Pink), Normal = §f (Weiß).
-     * Falls kein role:-Prefix vorhanden, wird der Name unverändert zurückgegeben.
-     */
     private String parseAndColorize(String input) {
         if (input.startsWith("role:")) {
             String withoutPrefix = input.substring(5);

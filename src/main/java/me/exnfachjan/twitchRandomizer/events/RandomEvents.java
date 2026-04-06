@@ -1040,7 +1040,7 @@ public class RandomEvents implements Listener {
         return sb.toString();
     }
     
-    // --- Equipment Tier Maps ---
+// --- Equipment Tier-Stufen ---
     private static final Material[][] TOOL_TIERS = {
             {Material.WOODEN_SWORD, Material.STONE_SWORD, Material.IRON_SWORD, Material.DIAMOND_SWORD, Material.NETHERITE_SWORD},
             {Material.WOODEN_PICKAXE, Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE},
@@ -1048,7 +1048,6 @@ public class RandomEvents implements Listener {
             {Material.WOODEN_SHOVEL, Material.STONE_SHOVEL, Material.IRON_SHOVEL, Material.DIAMOND_SHOVEL, Material.NETHERITE_SHOVEL},
             {Material.WOODEN_HOE, Material.STONE_HOE, Material.IRON_HOE, Material.DIAMOND_HOE, Material.NETHERITE_HOE},
     };
-
     private static final Material[][] ARMOR_TIERS = {
             {Material.LEATHER_HELMET, Material.CHAINMAIL_HELMET, Material.IRON_HELMET, Material.DIAMOND_HELMET, Material.NETHERITE_HELMET},
             {Material.LEATHER_CHESTPLATE, Material.CHAINMAIL_CHESTPLATE, Material.IRON_CHESTPLATE, Material.DIAMOND_CHESTPLATE, Material.NETHERITE_CHESTPLATE},
@@ -1057,19 +1056,20 @@ public class RandomEvents implements Listener {
     };
 
     private Material[] findTierArray(Material mat) {
-        for (Material[] tier : TOOL_TIERS) {
-            for (Material m : tier) {
-                if (m == mat) return tier;
-            }
-        }
-        for (Material[] tier : ARMOR_TIERS) {
-            for (Material m : tier) {
-                if (m == mat) return tier;
-            }
-        }
+        for (Material[] tier : TOOL_TIERS)
+            for (Material m : tier) if (m == mat) return tier;
+        for (Material[] tier : ARMOR_TIERS)
+            for (Material m : tier) if (m == mat) return tier;
         return null;
     }
 
+    /**
+     * Jedes Tool und Rüstungsteil im Inventar bekommt random
+     * eine Stufe hoch (Upgrade) oder eine Stufe runter (Downgrade).
+     * Ist es schon auf max (Netherite) → kann nur downgraden.
+     * Ist es schon auf min (Wood/Leather) → kann nur upgraden.
+     * Enchantments bleiben erhalten.
+     */
     public void triggerEquipmentShuffle(Player p, String byUser) {
         PlayerInventory inv = p.getInventory();
 
@@ -1079,7 +1079,7 @@ public class RandomEvents implements Listener {
 
             Material mat = item.getType();
             Material[] tierArray = findTierArray(mat);
-            if (tierArray == null) continue;
+            if (tierArray == null) continue; // Kein tiered Item → überspringen
 
             int currentIndex = -1;
             for (int i = 0; i < tierArray.length; i++) {
@@ -1087,22 +1087,37 @@ public class RandomEvents implements Listener {
             }
             if (currentIndex == -1) continue;
 
-            // 40% Upgrade, 40% Downgrade, 20% unchanged
-            int roll = rng.nextInt(10);
+            // Bestimme ob Upgrade oder Downgrade
+            boolean canUpgrade = currentIndex < tierArray.length - 1;
+            boolean canDowngrade = currentIndex > 0;
+
             int newIndex;
             String changeType;
 
-            if (roll < 4 && currentIndex < tierArray.length - 1) {
+            if (canUpgrade && canDowngrade) {
+                // Beides möglich → 50/50
+                if (rng.nextBoolean()) {
+                    newIndex = currentIndex + 1;
+                    changeType = "upgrade";
+                } else {
+                    newIndex = currentIndex - 1;
+                    changeType = "downgrade";
+                }
+            } else if (canUpgrade) {
+                // Nur Upgrade möglich (z.B. Wooden → Stone)
                 newIndex = currentIndex + 1;
                 changeType = "upgrade";
-            } else if (roll >= 4 && roll < 8 && currentIndex > 0) {
+            } else if (canDowngrade) {
+                // Nur Downgrade möglich (z.B. Netherite → Diamond)
                 newIndex = currentIndex - 1;
                 changeType = "downgrade";
             } else {
-                continue;
+                continue; // Sollte nie passieren (nur 1 Tier-Stufe)
             }
 
             Material newMat = tierArray[newIndex];
+
+            // Neues Item erstellen, Enchantments + Meta beibehalten
             ItemStack newItem = new ItemStack(newMat, item.getAmount());
             if (item.hasItemMeta()) {
                 org.bukkit.inventory.meta.ItemMeta oldMeta = item.getItemMeta();
@@ -1118,6 +1133,7 @@ public class RandomEvents implements Listener {
             }
             inv.setItem(slot, newItem);
 
+            // Detail-Nachricht pro geändertem Item
             Map<String, String> detailPh = new HashMap<>();
             detailPh.put("item", pretty(mat.name()));
             detailPh.put("new_item", pretty(newMat.name()));
@@ -1126,6 +1142,7 @@ public class RandomEvents implements Listener {
 
         p.updateInventory();
 
+        // Haupt-Nachricht
         Map<String, String> ph = new HashMap<>();
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank())
@@ -1133,4 +1150,5 @@ public class RandomEvents implements Listener {
                 : "events.equipment_shuffle.solo";
         p.sendMessage(i18n.tr(p, key, ph));
     }
+
 }

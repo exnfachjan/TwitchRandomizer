@@ -29,6 +29,7 @@ public class Messages {
             this.defaultLang = norm != null ? norm : "en";
         } catch (Throwable ignored) { }
 
+        // ===================== DEUTSCH =====================
         de.clear();
         de.put("commands.saved_and_reconfigured", "&aKonfiguration gespeichert und (re)konfiguriert.");
         de.put("commands.randomevent.triggered", "&aRandom-Event ausgelöst.");
@@ -37,7 +38,6 @@ public class Messages {
         de.put("commands.randomevent.weights_reloaded", "&aEvent-Gewichte neu geladen.");
         de.put("commands.randomevent.cooldown_active", "&eWartezeit aktiv: &f{seconds}s &everbleibend.");
         de.put("commands.randomevent.no_permission", "&cDir fehlt die Berechtigung: &f{perm}");
-        // NEU: Queue-Command i18n (DE)
         de.put("commands.queue.usage", "&eBenutzung: /twitchqueue add <Anzahl> [Nutzername]");
         de.put("commands.queue.invalid_amount", "&cUngültige Anzahl: &f{input}");
         de.put("commands.queue.twitch_unavailable", "&cTwitch-Integration nicht verfügbar.");
@@ -82,6 +82,10 @@ public class Messages {
         de.put("events.slippery_ground.end", "Der Boden ist wieder normal.");
         de.put("events.hell_is_calling.by", "{user} entfesselt die Hölle – Feuerbälle regnen herab!");
         de.put("events.hell_is_calling.solo", "Feuerbälle regnen auf dich nieder!");
+        de.put("events.equipment_shuffle.by", "{user} verändert dein Equipment!");
+        de.put("events.equipment_shuffle.solo", "Dein Equipment wurde zufällig verändert!");
+        de.put("events.equipment_shuffle.upgrade", "§a⬆ {item} → {new_item}");
+        de.put("events.equipment_shuffle.downgrade", "§c⬇ {item} → {new_item}");
         de.put("actionbar.timer.running_prefix", "⏱ {time}");
         de.put("actionbar.timer.paused", "TIMER PAUSIERT");
         de.put("actionbar.queue_label", "Queue");
@@ -200,14 +204,9 @@ public class Messages {
         de.put("event.name.anvil_rain", "Amboss-Regen");
         de.put("event.name.skyblock", "Skyblock");
         de.put("event.name.fake_totem", "Fake-Totem");
-        // NEU: Equipment Shuffle Event (DE)
-        de.put("events.equipment_shuffle.by", "{user} würfelt dein Equipment um!");
-        de.put("events.equipment_shuffle.solo", "Dein Equipment wurde zufällig verändert!");
-        de.put("events.equipment_shuffle.upgrade", "§a⬆ {item} → {new_item}");
-        de.put("events.equipment_shuffle.downgrade", "§c⬇ {item} → {new_item}");
-        de.put("events.equipment_shuffle.unchanged", "§7— {item} bleibt gleich");
         de.put("event.name.equipment_shuffle", "Equipment-Shuffle");
 
+        // ===================== ENGLISH =====================
         en.clear();
         en.put("commands.saved_and_reconfigured", "&aConfiguration saved and (re)configured.");
         en.put("commands.randomevent.triggered", "&aRandom event triggered.");
@@ -216,13 +215,11 @@ public class Messages {
         en.put("commands.randomevent.weights_reloaded", "&aEvent weights reloaded.");
         en.put("commands.randomevent.cooldown_active", "&eCooldown active: &f{seconds}s &eleft.");
         en.put("commands.randomevent.no_permission", "&cYou lack permission: &f{perm}");
-        // NEU: Queue-Command i18n (EN)
         en.put("commands.queue.usage", "&eUsage: /twitchqueue add <amount> [username]");
         en.put("commands.queue.invalid_amount", "&cInvalid amount: &f{input}");
         en.put("commands.queue.twitch_unavailable", "&cTwitch integration not available.");
         en.put("commands.queue.added", "&aAdded to queue: &f{amount}&a. Currently in queue: &f{queue_size}");
         en.put("commands.queue.added_with_user", "&aAdded to queue: &f{amount} × {user}&a. Currently in queue: &f{queue_size}");
-        // FIX: Half Heart EN mit {hearts} Placeholder (war vorher "You lose half a heart!")
         en.put("events.damage.half_heart.by", "{user} takes {hearts} hearts from you!");
         en.put("events.damage.half_heart.solo", "You lose {hearts} hearts!");
         en.put("events.spawn.by", "{user} spawns {amount}x {entity} at you!");
@@ -262,6 +259,10 @@ public class Messages {
         en.put("events.slippery_ground.end", "The ground is normal again.");
         en.put("events.hell_is_calling.by", "{user} calls hell – fireballs rain down!");
         en.put("events.hell_is_calling.solo", "Fireballs rain down on you!");
+        en.put("events.equipment_shuffle.by", "{user} changed your equipment!");
+        en.put("events.equipment_shuffle.solo", "Your equipment was randomly changed!");
+        en.put("events.equipment_shuffle.upgrade", "§a⬆ {item} → {new_item}");
+        en.put("events.equipment_shuffle.downgrade", "§c⬇ {item} → {new_item}");
         en.put("actionbar.timer.running_prefix", "⏱ {time}");
         en.put("actionbar.timer.paused", "TIMER PAUSED");
         en.put("actionbar.queue_label", "Queue");
@@ -379,17 +380,9 @@ public class Messages {
         en.put("event.name.anvil_rain", "Anvil Rain");
         en.put("event.name.skyblock", "Skyblock");
         en.put("event.name.fake_totem", "Fake Totem");
-        // NEU: Equipment Shuffle Event (EN)
-        en.put("events.equipment_shuffle.by", "{user} shuffled your equipment!");
-        en.put("events.equipment_shuffle.solo", "Your equipment was randomly changed!");
-        en.put("events.equipment_shuffle.upgrade", "§a⬆ {item} → {new_item}");
-        en.put("events.equipment_shuffle.downgrade", "§c⬇ {item} → {new_item}");
-        en.put("events.equipment_shuffle.unchanged", "§7— {item} unchanged");
         en.put("event.name.equipment_shuffle", "Equipment Shuffle");
-
     }
 
-    // Re-reads mode/default + loads per-player overrides (texts stay embedded)
     public void load() {
         try {
             String m = String.valueOf(plugin.getConfig().getString("language.mode", "auto")).toLowerCase(java.util.Locale.ROOT);
@@ -398,9 +391,7 @@ public class Messages {
             String norm = normalizeLang(def);
             this.defaultLang = norm != null ? norm : "en";
         } catch (Throwable ignored) { }
-
         try {
-            // Player-Locale aus config.yml -> player_locales.<uuid>
             org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
             store.clear();
             if (cfg.isConfigurationSection("player_locales")) {
@@ -428,68 +419,50 @@ public class Messages {
         } catch (Throwable ignored) { }
     }
 
-    // --- Public API ---
     public String tr(Player p, String key) {
         String lang = resolveLang(p);
         Object val = rawFor(lang, key);
         return colorize(val == null ? key : String.valueOf(val));
     }
-
     public String tr(Player p, String key, Map<String, String> placeholders) {
         return colorize(apply(tr(p, key), placeholders));
     }
-
     public List<String> trList(Player p, String key) {
         Object val = rawFor(resolveLang(p), key);
         List<String> out = new ArrayList<>();
-        if (val instanceof List<?> list) {
-            for (Object o : list) out.add(colorize(String.valueOf(o)));
-        } else {
-            out.add(tr(p, key));
-        }
+        if (val instanceof List<?> list) { for (Object o : list) out.add(colorize(String.valueOf(o))); }
+        else { out.add(tr(p, key)); }
         return out;
     }
-
     public List<String> trList(Player p, String key, Map<String, String> placeholders) {
         List<String> base = trList(p, key);
         List<String> out = new ArrayList<>(base.size());
         for (String line : base) out.add(colorize(apply(line, placeholders)));
         return out;
     }
-
     public void setPlayerLanguage(Player p, String lang) {
         String n = normalizeLang(lang);
-        if (n == null) store.remove(p.getUniqueId());
-        else store.put(p.getUniqueId(), n);
+        if (n == null) store.remove(p.getUniqueId()); else store.put(p.getUniqueId(), n);
     }
     public void clearPlayerLanguage(Player p) { store.remove(p.getUniqueId()); }
     public String currentLanguage(Player p) { return resolveLang(p); }
 
-    // --- Internals ---
     private Object rawFor(String lang, String key) {
         Object val = getMap(lang).get(key);
         if (val == null) val = getMap("de".equals(lang) ? "en" : "de").get(key);
         return val;
     }
     private Map<String, Object> getMap(String lang) { return "de".equals(lang) ? de : en; }
-
     private String resolveLang(Player p) {
         String override = store.get(p.getUniqueId());
         if (override != null) return override;
-
-        if (mode == Mode.MANUAL) {
-            return defaultLang;
-        }
-
+        if (mode == Mode.MANUAL) return defaultLang;
         try {
             String tag = p.locale().toLanguageTag();
             String l = tag == null ? "" : tag.toLowerCase(Locale.ROOT);
             return l.startsWith("de") ? "de" : "en";
-        } catch (Throwable ignored) {
-            return defaultLang;
-        }
+        } catch (Throwable ignored) { return defaultLang; }
     }
-
     private String normalizeLang(String lang) {
         if (lang == null) return null;
         String l = lang.trim().toLowerCase(Locale.ROOT);
@@ -497,16 +470,12 @@ public class Messages {
         if (l.startsWith("en")) return "en";
         return null;
     }
-
     private String apply(String src, Map<String, String> placeholders) {
         if (placeholders == null || placeholders.isEmpty()) return src;
         String out = src;
-        for (var e : placeholders.entrySet()) {
-            out = out.replace("{" + e.getKey() + "}", String.valueOf(e.getValue()));
-        }
+        for (var e : placeholders.entrySet()) out = out.replace("{" + e.getKey() + "}", String.valueOf(e.getValue()));
         return out;
     }
-
     private String colorize(String s) {
         try { return ChatColor.translateAlternateColorCodes('&', s); } catch (Throwable ignored) { return s; }
     }
