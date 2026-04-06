@@ -12,12 +12,13 @@ public final class EventMessageUtil {
 
     private EventMessageUtil() {}
 
-    public static void halfHeart(TwitchRandomizer plugin, Player p, String byUser) {
+    public static void halfHeart(TwitchRandomizer plugin, Player p, String byUser, int hearts) {
         String key = (byUser == null || byUser.isBlank())
                 ? "events.damage.half_heart.solo"
                 : "events.damage.half_heart.by";
         Map<String, String> ph = new HashMap<>();
         if (byUser != null) ph.put("user", byUser);
+        ph.put("hearts", String.valueOf(hearts));
         p.sendMessage(plugin.getMessages().tr(p, key, ph));
     }
 
@@ -62,7 +63,6 @@ public final class EventMessageUtil {
     }
 
     private static String pretty(String enumName) {
-        // ZOMBIE → Zombie, DETECTOR_RAIL → Detector Rail
         String s = enumName.toLowerCase(Locale.ROOT).replace('_', ' ');
         String[] parts = s.split(" ");
         StringBuilder sb = new StringBuilder();

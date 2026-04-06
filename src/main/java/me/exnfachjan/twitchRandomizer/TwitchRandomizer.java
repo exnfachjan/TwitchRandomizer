@@ -58,6 +58,7 @@ public class TwitchRandomizer extends JavaPlugin {
         defaults.put("anvil_rain", 6);
         defaults.put("skyblock", 7);
         defaults.put("fake_totem", 5);
+        defaults.put("equipment_shuffle", 8);
         return defaults;
     }
 

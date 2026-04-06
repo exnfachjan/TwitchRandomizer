@@ -37,6 +37,12 @@ public class Messages {
         de.put("commands.randomevent.weights_reloaded", "&aEvent-Gewichte neu geladen.");
         de.put("commands.randomevent.cooldown_active", "&eWartezeit aktiv: &f{seconds}s &everbleibend.");
         de.put("commands.randomevent.no_permission", "&cDir fehlt die Berechtigung: &f{perm}");
+        // NEU: Queue-Command i18n (DE)
+        de.put("commands.queue.usage", "&eBenutzung: /twitchqueue add <Anzahl> [Nutzername]");
+        de.put("commands.queue.invalid_amount", "&cUngültige Anzahl: &f{input}");
+        de.put("commands.queue.twitch_unavailable", "&cTwitch-Integration nicht verfügbar.");
+        de.put("commands.queue.added", "&aZur Queue hinzugefügt: &f{amount}&a. Aktuell in Queue: &f{queue_size}");
+        de.put("commands.queue.added_with_user", "&aZur Queue hinzugefügt: &f{amount} × {user}&a. Aktuell in Queue: &f{queue_size}");
         de.put("events.damage.half_heart.by", "{user} zieht dir {hearts} Herzen ab!");
         de.put("events.damage.half_heart.solo", "Du verlierst {hearts} Herzen!");
         de.put("events.spawn.by", "{user} spawnt {amount}x {entity} bei dir!");
@@ -194,6 +200,13 @@ public class Messages {
         de.put("event.name.anvil_rain", "Amboss-Regen");
         de.put("event.name.skyblock", "Skyblock");
         de.put("event.name.fake_totem", "Fake-Totem");
+        // NEU: Equipment Shuffle Event (DE)
+        de.put("events.equipment_shuffle.by", "{user} würfelt dein Equipment um!");
+        de.put("events.equipment_shuffle.solo", "Dein Equipment wurde zufällig verändert!");
+        de.put("events.equipment_shuffle.upgrade", "§a⬆ {item} → {new_item}");
+        de.put("events.equipment_shuffle.downgrade", "§c⬇ {item} → {new_item}");
+        de.put("events.equipment_shuffle.unchanged", "§7— {item} bleibt gleich");
+        de.put("event.name.equipment_shuffle", "Equipment-Shuffle");
 
         en.clear();
         en.put("commands.saved_and_reconfigured", "&aConfiguration saved and (re)configured.");
@@ -203,8 +216,15 @@ public class Messages {
         en.put("commands.randomevent.weights_reloaded", "&aEvent weights reloaded.");
         en.put("commands.randomevent.cooldown_active", "&eCooldown active: &f{seconds}s &eleft.");
         en.put("commands.randomevent.no_permission", "&cYou lack permission: &f{perm}");
-        en.put("events.damage.half_heart.by", "{user} takes half a heart from you!");
-        en.put("events.damage.half_heart.solo", "You lose half a heart!");
+        // NEU: Queue-Command i18n (EN)
+        en.put("commands.queue.usage", "&eUsage: /twitchqueue add <amount> [username]");
+        en.put("commands.queue.invalid_amount", "&cInvalid amount: &f{input}");
+        en.put("commands.queue.twitch_unavailable", "&cTwitch integration not available.");
+        en.put("commands.queue.added", "&aAdded to queue: &f{amount}&a. Currently in queue: &f{queue_size}");
+        en.put("commands.queue.added_with_user", "&aAdded to queue: &f{amount} × {user}&a. Currently in queue: &f{queue_size}");
+        // FIX: Half Heart EN mit {hearts} Placeholder (war vorher "You lose half a heart!")
+        en.put("events.damage.half_heart.by", "{user} takes {hearts} hearts from you!");
+        en.put("events.damage.half_heart.solo", "You lose {hearts} hearts!");
         en.put("events.spawn.by", "{user} spawns {amount}x {entity} at you!");
         en.put("events.spawn.solo", "{amount}x {entity} spawn at you!");
         en.put("events.ignite.short.by", "{user} sets you on fire briefly!");
@@ -235,7 +255,7 @@ public class Messages {
         en.put("events.floor_is_lava.start_by", "{user} turned the floor into lava! ({seconds}s)");
         en.put("events.floor_is_lava.start", "Floor is lava for {seconds}s!");
         en.put("events.floor_is_lava.end", "The floor is safe again.");
-        en.put("events.nasa_call.by", "{user} is calling NASA – you’re going to space!");
+        en.put("events.nasa_call.by", "{user} is calling NASA – you're going to space!");
         en.put("events.nasa_call.solo", "You are launched sky high!");
         en.put("events.slippery_ground.start_by", "{user} made the ground slippery! ({seconds}s)");
         en.put("events.slippery_ground.start", "The ground is slippery for {seconds}s!");
@@ -359,6 +379,13 @@ public class Messages {
         en.put("event.name.anvil_rain", "Anvil Rain");
         en.put("event.name.skyblock", "Skyblock");
         en.put("event.name.fake_totem", "Fake Totem");
+        // NEU: Equipment Shuffle Event (EN)
+        en.put("events.equipment_shuffle.by", "{user} shuffled your equipment!");
+        en.put("events.equipment_shuffle.solo", "Your equipment was randomly changed!");
+        en.put("events.equipment_shuffle.upgrade", "§a⬆ {item} → {new_item}");
+        en.put("events.equipment_shuffle.downgrade", "§c⬇ {item} → {new_item}");
+        en.put("events.equipment_shuffle.unchanged", "§7— {item} unchanged");
+        en.put("event.name.equipment_shuffle", "Equipment Shuffle");
 
     }
 
@@ -393,7 +420,6 @@ public class Messages {
     public void savePlayerLocales() {
         try {
             org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
-            // alte Sektion leeren, dann neu schreiben
             cfg.set("player_locales", null);
             for (var e : store.entrySet()) {
                 cfg.set("player_locales." + e.getKey().toString(), e.getValue());
@@ -448,16 +474,13 @@ public class Messages {
     private Map<String, Object> getMap(String lang) { return "de".equals(lang) ? de : en; }
 
     private String resolveLang(Player p) {
-        // 1) Per-Player Override hat IMMER Vorrang (egal ob AUTO oder MANUAL)
         String override = store.get(p.getUniqueId());
         if (override != null) return override;
 
-        // 2) MANUAL -> nutze defaultLang
         if (mode == Mode.MANUAL) {
             return defaultLang;
         }
 
-        // 3) AUTO -> vom Client ableiten, sonst fallback
         try {
             String tag = p.locale().toLanguageTag();
             String l = tag == null ? "" : tag.toLowerCase(Locale.ROOT);

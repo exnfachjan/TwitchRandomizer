@@ -2,11 +2,15 @@ package me.exnfachjan.twitchRandomizer.command;
 
 import me.exnfachjan.twitchRandomizer.twitch.TwitchIntegrationManager;
 import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
-import org.bukkit.ChatColor;
+import me.exnfachjan.twitchRandomizer.i18n.Messages;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class TwitchQueueCommand implements CommandExecutor {
 
@@ -22,8 +26,13 @@ public class TwitchQueueCommand implements CommandExecutor {
                              @NotNull String label,
                              @NotNull String[] args) {
 
+        Messages i18n = plugin.getMessages();
+        Player p = (sender instanceof Player) ? (Player) sender : null;
+
         if (args.length < 2 || !args[0].equalsIgnoreCase("add")) {
-            sender.sendMessage(ChatColor.YELLOW + "Benutzung: /twitchqueue add <anzahl> [nutzername]");
+            sender.sendMessage(p != null
+                    ? i18n.tr(p, "commands.queue.usage")
+                    : "§eUsage: /twitchqueue add <amount> [username]");
             return true;
         }
 
@@ -31,7 +40,9 @@ public class TwitchQueueCommand implements CommandExecutor {
         try {
             amount = Integer.parseInt(args[1]);
         } catch (NumberFormatException e) {
-            sender.sendMessage(ChatColor.RED + "Ungültige Anzahl: " + args[1]);
+            sender.sendMessage(p != null
+                    ? i18n.tr(p, "commands.queue.invalid_amount", Map.of("input", args[1]))
+                    : "§cInvalid amount: " + args[1]);
             return true;
         }
 
@@ -43,13 +54,28 @@ public class TwitchQueueCommand implements CommandExecutor {
 
         TwitchIntegrationManager tim = plugin.getTwitch();
         if (tim == null) {
-            sender.sendMessage(ChatColor.RED + "Twitch-Integration nicht verfügbar.");
+            sender.sendMessage(p != null
+                    ? i18n.tr(p, "commands.queue.twitch_unavailable")
+                    : "§cTwitch integration not available.");
             return true;
         }
 
         tim.enqueueMultiple(amount, byUser);
-        sender.sendMessage(ChatColor.GREEN + "Zur Queue hinzugefügt: " + amount
-                + (byUser != null ? (" × " + byUser) : "") + ". Aktuell in Queue: " + tim.getQueueSize());
+
+        Map<String, String> ph = new HashMap<>();
+        ph.put("amount", String.valueOf(amount));
+        ph.put("user", byUser != null ? byUser : "");
+        ph.put("queue_size", String.valueOf(tim.getQueueSize()));
+
+        String key = (byUser != null)
+                ? "commands.queue.added_with_user"
+                : "commands.queue.added";
+
+        sender.sendMessage(p != null
+                ? i18n.tr(p, key, ph)
+                : "§aAdded to queue: " + amount
+                  + (byUser != null ? (" × " + byUser) : "")
+                  + ". Currently in queue: " + tim.getQueueSize());
         return true;
     }
 }

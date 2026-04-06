@@ -107,12 +107,10 @@ public class ResetManager {
 
         // Deaths werden NICHT zurückgesetzt — das geht manuell über das Misc-Menü
 
-        // FIX: Queue leeren bei World Reset
+        // Queue bleibt bei Reset bestehen (wie Deaths)
         try {
-            if (plugin.getTwitch() != null) {
-                int cleared = plugin.getTwitch().clearQueue();
-                plugin.getLogger().info("[Reset] Queue geleert (" + cleared + " Einträge).");
-            }
+            int queueSize = (plugin.getTwitch() != null) ? plugin.getTwitch().getQueueSize() : 0;
+            plugin.getLogger().info("[Reset] Queue wird beibehalten (" + queueSize + " Einträge).");
         } catch (Throwable ignored) {}
 
         // 1) Titel (sofort)

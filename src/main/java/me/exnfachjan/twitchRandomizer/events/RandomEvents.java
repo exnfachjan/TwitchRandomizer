@@ -926,6 +926,7 @@ public class RandomEvents implements Listener {
             spawned.setCustomName("Heiße Kartoffel");
             spawned.setCustomNameVisible(true);
             spawned.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * duration + 100, 9, false, false, true));
+            spawned.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 20 * duration + 100, 2, false, false, true));
         });
         hotPotatoMob.put(p.getUniqueId(), z.getUniqueId());
         Map<String, String> ph = new HashMap<>();
@@ -1037,5 +1038,99 @@ public class RandomEvents implements Listener {
             if (i + 1 < parts.length) sb.append(' ');
         }
         return sb.toString();
+    }
+    
+    // --- Equipment Tier Maps ---
+    private static final Material[][] TOOL_TIERS = {
+            {Material.WOODEN_SWORD, Material.STONE_SWORD, Material.IRON_SWORD, Material.DIAMOND_SWORD, Material.NETHERITE_SWORD},
+            {Material.WOODEN_PICKAXE, Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE},
+            {Material.WOODEN_AXE, Material.STONE_AXE, Material.IRON_AXE, Material.DIAMOND_AXE, Material.NETHERITE_AXE},
+            {Material.WOODEN_SHOVEL, Material.STONE_SHOVEL, Material.IRON_SHOVEL, Material.DIAMOND_SHOVEL, Material.NETHERITE_SHOVEL},
+            {Material.WOODEN_HOE, Material.STONE_HOE, Material.IRON_HOE, Material.DIAMOND_HOE, Material.NETHERITE_HOE},
+    };
+
+    private static final Material[][] ARMOR_TIERS = {
+            {Material.LEATHER_HELMET, Material.CHAINMAIL_HELMET, Material.IRON_HELMET, Material.DIAMOND_HELMET, Material.NETHERITE_HELMET},
+            {Material.LEATHER_CHESTPLATE, Material.CHAINMAIL_CHESTPLATE, Material.IRON_CHESTPLATE, Material.DIAMOND_CHESTPLATE, Material.NETHERITE_CHESTPLATE},
+            {Material.LEATHER_LEGGINGS, Material.CHAINMAIL_LEGGINGS, Material.IRON_LEGGINGS, Material.DIAMOND_LEGGINGS, Material.NETHERITE_LEGGINGS},
+            {Material.LEATHER_BOOTS, Material.CHAINMAIL_BOOTS, Material.IRON_BOOTS, Material.DIAMOND_BOOTS, Material.NETHERITE_BOOTS},
+    };
+
+    private Material[] findTierArray(Material mat) {
+        for (Material[] tier : TOOL_TIERS) {
+            for (Material m : tier) {
+                if (m == mat) return tier;
+            }
+        }
+        for (Material[] tier : ARMOR_TIERS) {
+            for (Material m : tier) {
+                if (m == mat) return tier;
+            }
+        }
+        return null;
+    }
+
+    public void triggerEquipmentShuffle(Player p, String byUser) {
+        PlayerInventory inv = p.getInventory();
+
+        for (int slot = 0; slot < inv.getSize(); slot++) {
+            ItemStack item = inv.getItem(slot);
+            if (item == null || item.getType() == Material.AIR) continue;
+
+            Material mat = item.getType();
+            Material[] tierArray = findTierArray(mat);
+            if (tierArray == null) continue;
+
+            int currentIndex = -1;
+            for (int i = 0; i < tierArray.length; i++) {
+                if (tierArray[i] == mat) { currentIndex = i; break; }
+            }
+            if (currentIndex == -1) continue;
+
+            // 40% Upgrade, 40% Downgrade, 20% unchanged
+            int roll = rng.nextInt(10);
+            int newIndex;
+            String changeType;
+
+            if (roll < 4 && currentIndex < tierArray.length - 1) {
+                newIndex = currentIndex + 1;
+                changeType = "upgrade";
+            } else if (roll >= 4 && roll < 8 && currentIndex > 0) {
+                newIndex = currentIndex - 1;
+                changeType = "downgrade";
+            } else {
+                continue;
+            }
+
+            Material newMat = tierArray[newIndex];
+            ItemStack newItem = new ItemStack(newMat, item.getAmount());
+            if (item.hasItemMeta()) {
+                org.bukkit.inventory.meta.ItemMeta oldMeta = item.getItemMeta();
+                org.bukkit.inventory.meta.ItemMeta newMeta = newItem.getItemMeta();
+                if (oldMeta != null && newMeta != null) {
+                    for (var entry : oldMeta.getEnchants().entrySet()) {
+                        newMeta.addEnchant(entry.getKey(), entry.getValue(), true);
+                    }
+                    if (oldMeta.hasDisplayName()) newMeta.setDisplayName(oldMeta.getDisplayName());
+                    if (oldMeta.hasLore()) newMeta.setLore(oldMeta.getLore());
+                    newItem.setItemMeta(newMeta);
+                }
+            }
+            inv.setItem(slot, newItem);
+
+            Map<String, String> detailPh = new HashMap<>();
+            detailPh.put("item", pretty(mat.name()));
+            detailPh.put("new_item", pretty(newMat.name()));
+            p.sendMessage(i18n.tr(p, "events.equipment_shuffle." + changeType, detailPh));
+        }
+
+        p.updateInventory();
+
+        Map<String, String> ph = new HashMap<>();
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        String key = (byUser != null && !byUser.isBlank())
+                ? "events.equipment_shuffle.by"
+                : "events.equipment_shuffle.solo";
+        p.sendMessage(i18n.tr(p, key, ph));
     }
 }

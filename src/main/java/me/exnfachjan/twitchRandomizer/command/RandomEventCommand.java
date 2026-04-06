@@ -37,7 +37,8 @@ public class RandomEventCommand implements CommandExecutor {
             "tnt_rain",
             "anvil_rain",
             "skyblock",
-            "fake_totem"
+            "fake_totem",
+            "equipment_shuffle"
     );
 
     private int[] weights;
@@ -63,7 +64,6 @@ public class RandomEventCommand implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         String byUser = null;
         if (args.length >= 1) {
-            // Alle Args zusammenfügen (falls Username Leerzeichen hätte)
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < args.length; i++) {
                 if (i > 0) sb.append(' ');
@@ -76,7 +76,6 @@ public class RandomEventCommand implements CommandExecutor {
                     first = first.substring(3).trim();
                 }
                 if (!first.isEmpty()) {
-                    // Parse "role:ROLLE:Username" Format von TwitchIntegrationManager
                     byUser = parseAndColorize(first);
                 }
             }
@@ -149,6 +148,7 @@ public class RandomEventCommand implements CommandExecutor {
                 case 16 -> events.triggerAnvilRain(player, byUser);
                 case 17 -> events.triggerSkyblock(player, byUser);
                 case 18 -> events.triggerFakeTotem(player, byUser);
+                case 19 -> events.triggerEquipmentShuffle(player, byUser);
             }
         }
         return true;
@@ -161,8 +161,7 @@ public class RandomEventCommand implements CommandExecutor {
      */
     private String parseAndColorize(String input) {
         if (input.startsWith("role:")) {
-            // Format: role:broadcaster:Username oder role:vip:Username
-            String withoutPrefix = input.substring(5); // nach "role:"
+            String withoutPrefix = input.substring(5);
             int colonIdx = withoutPrefix.indexOf(':');
             if (colonIdx > 0 && colonIdx < withoutPrefix.length() - 1) {
                 String role = withoutPrefix.substring(0, colonIdx).toLowerCase(java.util.Locale.ROOT);

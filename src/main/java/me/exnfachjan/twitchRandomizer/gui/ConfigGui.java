@@ -56,7 +56,8 @@ public class ConfigGui {
             Map.entry("tnt_rain", Material.TNT_MINECART),
             Map.entry("anvil_rain", Material.ANVIL),
             Map.entry("skyblock", Material.GRASS_BLOCK),
-            Map.entry("fake_totem", Material.TOTEM_OF_UNDYING)
+            Map.entry("fake_totem", Material.TOTEM_OF_UNDYING),
+            Map.entry("equipment_shuffle", Material.SMITHING_TABLE)
     );
 
     public void openMain(Player p) {
