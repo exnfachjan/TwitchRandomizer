@@ -6,56 +6,49 @@ import okhttp3.*;
 import okio.ByteString;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 
 /**
- * StreamElements WebSocket Integration (via OkHttp – bereits im Classpath durch Twitch4J).
- * Unterstützt mehrere JWT-Tokens (einen pro Streamer/Channel).
+ * StreamElements WebSocket Integration.
  *
- * Config-Format:
- *   streamelements:
- *     enabled: true
- *     accounts:
- *       - channel: exnfachjan
- *         jwt_token: "eyJ..."
- *       - channel: freund
- *         jwt_token: "eyJ..."
- *     triggers:
- *       tips:
- *         enabled: true
- *         amount_per_trigger: 5.0
+ * JWT-Tokens werden aus "streamelements.yml" im Plugin-Ordner gelesen –
+ * diese Datei wird NIE von Bukkit's saveConfig() überschrieben.
  *
- * Format: accounts: "Channel1:JWT1;Channel2:JWT2"
+ * Format der streamelements.yml:
+ *   enabled: true
+ *   accounts: "exnfachjan:JWT1;freund:JWT2"
+ *   amount_per_trigger: 5.0
  */
 public class StreamElementsIntegrationManager {
 
     private static final String SE_WSS = "wss://realtime.streamelements.com/socket.io/?EIO=3&transport=websocket";
+    private static final String SE_FILE = "streamelements.yml";
 
     private final JavaPlugin plugin;
+    private final File seFile;
     private final OkHttpClient httpClient;
-
-    // Eine SEConnection pro Account
     private final List<SEConnection> connections = new CopyOnWriteArrayList<>();
-
-    // Config
-    private boolean enabled;
-    private boolean tipsEnabled;
-    private double amountPerTrigger;
-    private boolean debug;
-
-    // Änderungs-Tracking für applyConfig
-    private boolean lastEnabled = false;
-    private List<String> lastTokens = new ArrayList<>();
-
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+
+    // Gecachte Config-Werte
+    private boolean enabled = false;
+    private boolean tipsEnabled = true;
+    private double amountPerTrigger = 5.0;
+    private boolean debug = false;
+    private List<String> lastTokens = new ArrayList<>();
 
     public StreamElementsIntegrationManager(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.seFile = new File(plugin.getDataFolder(), SE_FILE);
         this.httpClient = new OkHttpClient.Builder()
                 .readTimeout(0, TimeUnit.MILLISECONDS)
                 .pingInterval(0, TimeUnit.SECONDS)
                 .build();
+        ensureFileExists();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -63,14 +56,19 @@ public class StreamElementsIntegrationManager {
     // ─────────────────────────────────────────────────────────────────────────
 
     public void start() {
-        readConfig();
+        SEConfig cfg = loadSEFile();
+        this.enabled = cfg.enabled;
+        this.tipsEnabled = cfg.tipsEnabled;
+        this.amountPerTrigger = cfg.amountPerTrigger;
+        this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
+
         if (!enabled) {
-            if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert.");
+            if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert (streamelements.yml).");
             return;
         }
-        List<AccountEntry> accounts = readAccounts();
+        List<AccountEntry> accounts = cfg.accounts;
         if (accounts.isEmpty()) {
-            plugin.getLogger().info("[SE] Keine JWT-Tokens konfiguriert.");
+            plugin.getLogger().info("[SE] Keine JWT-Tokens in streamelements.yml konfiguriert.");
             return;
         }
         for (AccountEntry acc : accounts) {
@@ -78,7 +76,6 @@ public class StreamElementsIntegrationManager {
             connections.add(conn);
             conn.start();
         }
-        lastEnabled = true;
         lastTokens = accounts.stream().map(a -> a.jwtToken).toList();
     }
 
@@ -89,14 +86,13 @@ public class StreamElementsIntegrationManager {
     }
 
     public void applyConfig() {
+        this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
+        SEConfig cfg = loadSEFile();
         boolean prevEnabled = this.enabled;
-        List<String> prevTokens = new ArrayList<>(this.lastTokens);
-        readConfig();
-        List<AccountEntry> accounts = readAccounts();
-        List<String> newTokens = accounts.stream().map(a -> a.jwtToken).toList();
+        List<String> newTokens = cfg.accounts.stream().map(a -> a.jwtToken).toList();
 
-        boolean enabledChanged = prevEnabled != this.enabled;
-        boolean tokensChanged = !prevTokens.equals(newTokens);
+        boolean enabledChanged = prevEnabled != cfg.enabled;
+        boolean tokensChanged = !lastTokens.equals(newTokens);
 
         if (!enabledChanged && !tokensChanged) {
             if (debug) plugin.getLogger().info("[SE] applyConfig: Keine relevante Änderung, skip.");
@@ -105,86 +101,137 @@ public class StreamElementsIntegrationManager {
 
         if (debug) plugin.getLogger().info("[SE] applyConfig: Änderung erkannt, neu verbinden...");
 
-        // Alle alten Verbindungen schließen
         for (SEConnection conn : connections) conn.stop();
         connections.clear();
 
-        if (!enabled || accounts.isEmpty()) {
-            if (debug) plugin.getLogger().info("[SE] SE deaktiviert oder keine Tokens.");
-            lastEnabled = false;
+        this.enabled = cfg.enabled;
+        this.tipsEnabled = cfg.tipsEnabled;
+        this.amountPerTrigger = cfg.amountPerTrigger;
+
+        if (!enabled || cfg.accounts.isEmpty()) {
             lastTokens = new ArrayList<>();
             return;
         }
 
-        // Kurz warten, dann neu verbinden – synchronized um Race Conditions zu vermeiden
-        final List<AccountEntry> accountsToConnect = accounts;
-        final List<String> tokensToSet = newTokens;
+        final List<AccountEntry> toConnect = cfg.accounts;
         scheduler.schedule(() -> {
-            // Doppelstart verhindern: nur starten wenn connections noch leer
-            if (!connections.isEmpty()) {
-                if (debug) plugin.getLogger().info("[SE] applyConfig: Verbindungen bereits aktiv, skip.");
-                return;
-            }
-            for (AccountEntry acc : accountsToConnect) {
+            if (!connections.isEmpty()) return;
+            for (AccountEntry acc : toConnect) {
                 SEConnection conn = new SEConnection(acc.channel, acc.jwtToken);
                 connections.add(conn);
                 conn.start();
             }
-            lastEnabled = true;
-            lastTokens = tokensToSet;
+            lastTokens = newTokens;
         }, 500, TimeUnit.MILLISECONDS);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Config lesen
+    // streamelements.yml direkt lesen (niemals Bukkit saveConfig verwenden)
     // ─────────────────────────────────────────────────────────────────────────
 
-    private void readConfig() {
-        this.enabled = plugin.getConfig().getBoolean("streamelements.enabled", false);
-        this.tipsEnabled = plugin.getConfig().getBoolean("streamelements.triggers.tips.enabled", true);
-        this.amountPerTrigger = plugin.getConfig().getDouble("streamelements.triggers.tips.amount_per_trigger", 5.0);
-        if (this.amountPerTrigger <= 0) this.amountPerTrigger = 5.0;
-        this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
+    private void ensureFileExists() {
+        if (seFile.exists()) return;
+        if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
+        try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(
+                new FileOutputStream(seFile), StandardCharsets.UTF_8))) {
+            pw.println("# StreamElements Configuration");
+            pw.println("# This file is NOT managed by the plugin automatically.");
+            pw.println("# Edit it manually and run /trconfig se reload ingame.");
+            pw.println("#");
+            pw.println("# JWT Token: StreamElements Dashboard -> My Account -> Channels -> JWT Token");
+            pw.println("# https://streamelements.com/dashboard/account/channels");
+            pw.println("#");
+            pw.println("# For multiple streamers use semicolons:");
+            pw.println("# accounts: \"Channel1:JWT1;Channel2:JWT2\"");
+            pw.println();
+            pw.println("enabled: false");
+            pw.println("accounts: \"YOUR_CHANNEL:YOUR_JWT_TOKEN\"");
+            pw.println("amount_per_trigger: 5.0");
+            pw.println("tips_enabled: true");
+            plugin.getLogger().info("[SE] streamelements.yml erstellt. Bitte JWT-Token eintragen.");
+        } catch (Exception e) {
+            plugin.getLogger().warning("[SE] Konnte streamelements.yml nicht erstellen: " + e.getMessage());
+        }
     }
 
-    private List<AccountEntry> readAccounts() {
+    private SEConfig loadSEFile() {
+        SEConfig result = new SEConfig();
+        if (!seFile.exists()) { ensureFileExists(); return result; }
+
+        try {
+            List<String> lines = Files.readAllLines(seFile.toPath(), StandardCharsets.UTF_8);
+            for (String line : lines) {
+                line = line.trim();
+                if (line.startsWith("#") || line.isBlank()) continue;
+
+                if (line.startsWith("enabled:")) {
+                    result.enabled = parseBool(line.substring("enabled:".length()));
+                } else if (line.startsWith("tips_enabled:")) {
+                    result.tipsEnabled = parseBool(line.substring("tips_enabled:".length()));
+                } else if (line.startsWith("amount_per_trigger:")) {
+                    result.amountPerTrigger = parseDouble(line.substring("amount_per_trigger:".length()), 5.0);
+                } else if (line.startsWith("accounts:")) {
+                    String raw = line.substring("accounts:".length()).trim();
+                    // Anführungszeichen entfernen
+                    if (raw.startsWith("\"") && raw.endsWith("\"")) raw = raw.substring(1, raw.length() - 1);
+                    else if (raw.startsWith("'") && raw.endsWith("'")) raw = raw.substring(1, raw.length() - 1);
+                    result.accounts = parseAccounts(raw);
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("[SE] Fehler beim Lesen von streamelements.yml: " + e.getMessage());
+        }
+        return result;
+    }
+
+    private List<AccountEntry> parseAccounts(String raw) {
         List<AccountEntry> result = new ArrayList<>();
-
-        // Format: "Channel1:JWT1;Channel2:JWT2"
-        String raw = plugin.getConfig().getString("streamelements.accounts", "");
-        if (raw != null && !raw.isBlank()) {
-            String[] entries = raw.split(";");
-            for (String entry : entries) {
-                entry = entry.trim();
-                if (entry.isBlank()) continue;
-                int colon = entry.indexOf(':');
-                if (colon <= 0 || colon >= entry.length() - 1) {
-                    plugin.getLogger().warning("[SE] Ungültiger Eintrag in streamelements.accounts (Format: Channel:JWT): " + entry);
-                    continue;
-                }
-                String channel = entry.substring(0, colon).trim();
-                String token = entry.substring(colon + 1).trim();
-                if (!token.isBlank()) {
-                    result.add(new AccountEntry(channel, token));
-                }
-            }
-        }
-
-        // Doppelte Tokens deduplizieren
-        List<AccountEntry> deduped = new ArrayList<>();
+        if (raw == null || raw.isBlank()) return result;
         Set<String> seen = new LinkedHashSet<>();
-        for (AccountEntry e : result) {
-            if (seen.add(e.jwtToken())) {
-                deduped.add(e);
+        for (String entry : raw.split(";")) {
+            entry = entry.trim();
+            if (entry.isBlank()) continue;
+            int colon = entry.indexOf(':');
+            if (colon <= 0 || colon >= entry.length() - 1) {
+                plugin.getLogger().warning("[SE] Ungültiger accounts-Eintrag (Format: Channel:JWT): " + entry);
+                continue;
+            }
+            String channel = entry.substring(0, colon).trim();
+            String token = entry.substring(colon + 1).trim();
+            if (token.isBlank() || token.equals("YOUR_JWT_TOKEN")) continue;
+            if (seen.add(token)) {
+                result.add(new AccountEntry(channel, token));
             } else {
-                plugin.getLogger().warning("[SE] Doppelter JWT-Token für '" + e.channel() + "' ignoriert.");
+                plugin.getLogger().warning("[SE] Doppelter Token für '" + channel + "' ignoriert.");
             }
         }
-        return deduped;
+        return result;
+    }
+
+    private boolean parseBool(String s) {
+        return "true".equalsIgnoreCase(s.trim());
+    }
+
+    private double parseDouble(String s, double def) {
+        try { return Double.parseDouble(s.trim().replace(",", ".")); }
+        catch (Exception e) { return def; }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Hilfsmethoden
+    // Hilfsklassen
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static class SEConfig {
+        boolean enabled = false;
+        boolean tipsEnabled = true;
+        double amountPerTrigger = 5.0;
+        List<AccountEntry> accounts = new ArrayList<>();
+    }
+
+    private record AccountEntry(String channel, String jwtToken) {}
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Timer-Check
     // ─────────────────────────────────────────────────────────────────────────
 
     private boolean isTimerRunning() {
@@ -220,9 +267,7 @@ public class StreamElementsIntegrationManager {
         int start = idx + search.length();
         if (start < json.length() && json.charAt(start) == '"') {
             String strVal = extractJsonString(json, key);
-            if (strVal != null) {
-                try { return Double.parseDouble(strVal); } catch (Exception ignored) {}
-            }
+            if (strVal != null) { try { return Double.parseDouble(strVal); } catch (Exception ignored) {} }
             return 0.0;
         }
         int end = start;
@@ -231,13 +276,7 @@ public class StreamElementsIntegrationManager {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Account-Datenhaltung
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private record AccountEntry(String channel, String jwtToken) {}
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // SEConnection – eine WebSocket-Verbindung pro Account
+    // SEConnection
     // ─────────────────────────────────────────────────────────────────────────
 
     private class SEConnection {
@@ -254,10 +293,7 @@ public class StreamElementsIntegrationManager {
             this.jwtToken = jwtToken;
         }
 
-        void start() {
-            shouldReconnect = true;
-            connect();
-        }
+        void start() { shouldReconnect = true; connect(); }
 
         void stop() {
             shouldReconnect = false;
@@ -265,14 +301,11 @@ public class StreamElementsIntegrationManager {
             cancelPing();
             WebSocket ws = wsSocket;
             wsSocket = null;
-            if (ws != null) {
-                try { ws.close(1000, "Plugin stopping"); } catch (Throwable ignored) {}
-            }
+            if (ws != null) try { ws.close(1000, "Plugin stopping"); } catch (Throwable ignored) {}
         }
 
         private void connect() {
-            Request request = new Request.Builder().url(SE_WSS).build();
-            httpClient.newWebSocket(request, new SEWebSocketListener());
+            httpClient.newWebSocket(new Request.Builder().url(SE_WSS).build(), new SEWebSocketListener());
         }
 
         private void scheduleReconnect() {
@@ -285,126 +318,66 @@ public class StreamElementsIntegrationManager {
         }
 
         private void cancelReconnect() {
-            if (reconnectTask != null && !reconnectTask.isDone()) {
-                reconnectTask.cancel(false);
-                reconnectTask = null;
-            }
+            if (reconnectTask != null && !reconnectTask.isDone()) { reconnectTask.cancel(false); reconnectTask = null; }
         }
 
         private void cancelPing() {
-            if (pingTask != null && !pingTask.isDone()) {
-                pingTask.cancel(false);
-                pingTask = null;
-            }
+            if (pingTask != null && !pingTask.isDone()) { pingTask.cancel(false); pingTask = null; }
         }
 
         private void handleMessage(String raw, WebSocket ws) {
             if (debug) plugin.getLogger().info("[SE:" + channelName + "] <<< " + raw);
 
             if (raw.startsWith("0")) {
-                String authMsg = "42[\"authenticate\",{\"method\":\"jwt\",\"token\":\"" + jwtToken + "\"}]";
-                ws.send(authMsg);
+                ws.send("42[\"authenticate\",{\"method\":\"jwt\",\"token\":\"" + jwtToken + "\"}]");
                 if (debug) plugin.getLogger().info("[SE:" + channelName + "] Auth gesendet.");
                 cancelPing();
-                pingTask = scheduler.scheduleAtFixedRate(() -> {
-                    if (wsSocket != null) wsSocket.send("2");
-                }, 25, 25, TimeUnit.SECONDS);
+                pingTask = scheduler.scheduleAtFixedRate(() -> { if (wsSocket != null) wsSocket.send("2"); }, 25, 25, TimeUnit.SECONDS);
                 return;
             }
-
-            if (raw.equals("2")) {
-                ws.send("3");
-                return;
-            }
-
+            if (raw.equals("2")) { ws.send("3"); return; }
             if (!raw.startsWith("42")) return;
+
             String content = raw.substring(2);
-
-            if (content.contains("\"authenticated\"")) {
-                plugin.getLogger().info("[SE:" + channelName + "] Erfolgreich authentifiziert!");
-                reconnectAttempts = 0;
-                return;
-            }
-
-            if (content.contains("\"unauthorized\"")) {
-                plugin.getLogger().severe("[SE:" + channelName + "] Authentifizierung fehlgeschlagen! JWT-Token prüfen.");
-                shouldReconnect = false;
-                return;
-            }
-
+            if (content.contains("\"authenticated\"")) { plugin.getLogger().info("[SE:" + channelName + "] Erfolgreich authentifiziert!"); reconnectAttempts = 0; return; }
+            if (content.contains("\"unauthorized\"")) { plugin.getLogger().severe("[SE:" + channelName + "] Auth fehlgeschlagen! JWT-Token prüfen."); shouldReconnect = false; return; }
             if (!tipsEnabled) return;
             if (!content.contains("\"tip\"") && !content.contains("\"donation\"")) return;
-            // event:update ignorieren (nur das eigentliche "event" verarbeiten)
             if (content.contains("\"event:update\"")) return;
 
             String username = extractJsonString(content, "username");
             if (username == null || username.isBlank()) username = "StreamElementsTip";
-            // Blau markieren (donation-Rolle)
             String taggedUsername = "role:donation:" + username;
-
             double amount = extractJsonDouble(content, "amount");
 
-            if (debug) plugin.getLogger().info("[SE:" + channelName + "] Tip von " + username + ": " + amount
-                    + " (amountPerTrigger=" + amountPerTrigger + ")");
-
-            if (amount < amountPerTrigger) {
-                if (debug) plugin.getLogger().info("[SE:" + channelName + "] Tip zu gering, ignoriert.");
-                return;
-            }
-
-            if (!isTimerRunning()) {
-                if (debug) plugin.getLogger().info("[SE:" + channelName + "] Timer läuft nicht, Tip ignoriert.");
-                return;
-            }
+            if (debug) plugin.getLogger().info("[SE:" + channelName + "] Tip von " + username + ": " + amount + " (min=" + amountPerTrigger + ")");
+            if (amount < amountPerTrigger) { if (debug) plugin.getLogger().info("[SE:" + channelName + "] Zu gering, ignoriert."); return; }
+            if (!isTimerRunning()) { if (debug) plugin.getLogger().info("[SE:" + channelName + "] Timer läuft nicht, ignoriert."); return; }
 
             int count = (int) (amount / amountPerTrigger);
             TwitchIntegrationManager twitch = getTwitch();
             if (twitch != null) {
                 twitch.enqueueMultiple(count, taggedUsername);
-                plugin.getLogger().info("[SE:" + channelName + "] Tip: " + username + " -> " + amount
-                        + " -> +" + count + " Event(s) in Queue.");
+                plugin.getLogger().info("[SE:" + channelName + "] Tip: " + username + " -> " + amount + " -> +" + count + " Event(s) in Queue.");
             }
         }
 
         private class SEWebSocketListener extends WebSocketListener {
-
-            @Override
-            public void onOpen(WebSocket webSocket, Response response) {
-                wsSocket = webSocket;
-                plugin.getLogger().info("[SE:" + channelName + "] WebSocket verbunden.");
-            }
-
-            @Override
-            public void onMessage(WebSocket webSocket, String text) {
-                handleMessage(text, webSocket);
-            }
-
-            @Override
-            public void onMessage(WebSocket webSocket, ByteString bytes) {
-                handleMessage(bytes.utf8(), webSocket);
-            }
-
-            @Override
-            public void onClosing(WebSocket webSocket, int code, String reason) {
-                webSocket.close(1000, null);
-            }
-
-            @Override
-            public void onClosed(WebSocket webSocket, int code, String reason) {
-                if (wsSocket != webSocket && wsSocket != null) return;
-                wsSocket = null;
-                cancelPing();
-                if (code == 1000) return; // Sauberes Schließen von uns
-                plugin.getLogger().warning("[SE:" + channelName + "] Verbindung getrennt (Code " + code + "): " + reason);
+            @Override public void onOpen(WebSocket ws, Response r) { wsSocket = ws; plugin.getLogger().info("[SE:" + channelName + "] WebSocket verbunden."); }
+            @Override public void onMessage(WebSocket ws, String text) { handleMessage(text, ws); }
+            @Override public void onMessage(WebSocket ws, ByteString bytes) { handleMessage(bytes.utf8(), ws); }
+            @Override public void onClosing(WebSocket ws, int code, String reason) { ws.close(1000, null); }
+            @Override public void onClosed(WebSocket ws, int code, String reason) {
+                if (wsSocket != ws && wsSocket != null) return;
+                wsSocket = null; cancelPing();
+                if (code == 1000) return;
+                plugin.getLogger().warning("[SE:" + channelName + "] Getrennt (Code " + code + "): " + reason);
                 scheduleReconnect();
             }
-
-            @Override
-            public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-                if (wsSocket != webSocket && wsSocket != null) return;
-                wsSocket = null;
-                cancelPing();
-                plugin.getLogger().warning("[SE:" + channelName + "] WebSocket-Fehler: " + t.getMessage());
+            @Override public void onFailure(WebSocket ws, Throwable t, Response r) {
+                if (wsSocket != ws && wsSocket != null) return;
+                wsSocket = null; cancelPing();
+                plugin.getLogger().warning("[SE:" + channelName + "] Fehler: " + t.getMessage());
                 scheduleReconnect();
             }
         }

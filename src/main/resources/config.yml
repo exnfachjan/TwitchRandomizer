@@ -9,7 +9,7 @@
 twitch:
   # Twitch channel(s) – add more lines for multiple streamers
   channels:
-    - YOUR_TWITCH_CHANNEL
+    - exnfachjan
 
   # OAuth Access Token in format "oauth:xxxxxxxx..."
   # Required scopes:
@@ -49,14 +49,12 @@ twitch:
 # ─────────────────────────────────────────────────────────────────────────────
 #  STREAMELEMENTS SETUP (optional)
 # ─────────────────────────────────────────────────────────────────────────────
-# JWT token: StreamElements Dashboard → My Account → Channels → JWT Token
-# https://streamelements.com/dashboard/account/channels
-#
-# For multiple streamers: Add each streamer as a separate entry under "accounts".
-# Each streamer needs their own JWT token from their SE account.
+# JWT tokens are stored in "streamelements.yml" (in the plugin folder).
+# That file is never touched by the plugin's auto-save, so tokens are safe.
+# Edit streamelements.yml manually, then run /trconfig se reload ingame.
 streamelements:
-  enabled: true
-  accounts: "exnfachjan:eyJhbGci..."
+  # Master switch (can also be toggled via /trgui → Trigger menu)
+  enabled: false
 
   triggers:
     tips:

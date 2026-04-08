@@ -62,9 +62,10 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(ChatColor.GREEN + "Gesetzt: " + ChatColor.AQUA + path + ChatColor.GRAY + " = " + ChatColor.WHITE + parsed);
             }
             case "reload" -> {
+                // Liest die config.yml von Disk neu ein und wendet alles an
                 plugin.reloadConfig();
                 plugin.applyDynamicConfig();
-                sender.sendMessage(ChatColor.GREEN + "Config neu geladen und angewendet.");
+                sender.sendMessage(ChatColor.GREEN + "Config reloaded and applied (Twitch + SE + Weights).");
             }
             case "apply" -> {
                 plugin.applyDynamicConfig();
@@ -72,6 +73,9 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
             }
             case "twitch" -> {
                 return handleTwitch(sender, Arrays.copyOfRange(args, 1, args.length));
+            }
+            case "se" -> {
+                return handleSE(sender, Arrays.copyOfRange(args, 1, args.length));
             }
             case "weights" -> {
                 return handleWeights(sender, Arrays.copyOfRange(args, 1, args.length));
@@ -81,6 +85,48 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // /trconfig se <reload|status>
+    // ─────────────────────────────────────────────────────────────────────────
+    private boolean handleSE(CommandSender sender, String[] args) {
+        if (args.length == 0) {
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /trconfig se <reload|status>");
+            return true;
+        }
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        switch (sub) {
+            case "reload" -> {
+                // Liest streamelements.yml direkt von Disk (nicht plugin.reloadConfig()!)
+                var se = plugin.getStreamElements();
+                if (se == null) {
+                    sender.sendMessage(ChatColor.RED + "StreamElements integration not available.");
+                    return true;
+                }
+                se.applyConfig();
+                sender.sendMessage(ChatColor.GREEN + "streamelements.yml reloaded and SE reconnected.");
+                sender.sendMessage(ChatColor.GRAY + "Check server log for [SE:...] messages.");
+            }
+            case "status" -> {
+                boolean enabled = plugin.getConfig().getBoolean("streamelements.enabled", false);
+                double amount = plugin.getConfig().getDouble("streamelements.triggers.tips.amount_per_trigger", 5.0);
+                java.io.File seFile = new java.io.File(plugin.getDataFolder(), "streamelements.yml");
+
+                sender.sendMessage(ChatColor.GOLD + "=== StreamElements Status ===");
+                sender.sendMessage(ChatColor.GRAY + "Enabled: " + (enabled ? ChatColor.GREEN + "yes" : ChatColor.RED + "no"));
+                sender.sendMessage(ChatColor.GRAY + "Amount per trigger: " + ChatColor.WHITE + amount);
+                sender.sendMessage(ChatColor.GRAY + "Config file: " + ChatColor.WHITE
+                        + (seFile.exists() ? ChatColor.GREEN + "streamelements.yml found" : ChatColor.RED + "streamelements.yml missing!"));
+                sender.sendMessage(ChatColor.GRAY + "To change tokens: edit " + ChatColor.WHITE + "streamelements.yml"
+                        + ChatColor.GRAY + " then run " + ChatColor.WHITE + "/trconfig se reload");
+            }
+            default -> sender.sendMessage(ChatColor.YELLOW + "Usage: /trconfig se <reload|status>");
+        }
+        return true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // /trconfig twitch <set|get|reconnect>
+    // ─────────────────────────────────────────────────────────────────────────
     private boolean handleTwitch(CommandSender sender, String[] args) {
         if (args.length == 0) {
             sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig twitch <set|get|reconnect> ...");
@@ -92,44 +138,34 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
         switch (sub) {
             case "set" -> {
                 if (args.length < 3) {
-                    sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig twitch set <channels|channel|token|interval|chat_trigger|debug|subs|chat_test|bits_enabled|bits_per_trigger> <wert>");
+                    sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig twitch set <channels|token|interval|debug|subs|bits_enabled|bits_per_trigger> <wert>");
                     return true;
                 }
                 String key = args[1].toLowerCase(Locale.ROOT);
                 String value = join(args, 2);
                 switch (key) {
                     case "channels" -> {
-                        // Mehrere Channels als Liste (Komma, Semikolon, Leerzeichen, Zeilenumbruch getrennt)
                         String[] split = value.split("[,;\\s\\n]+");
                         List<String> channelList = Arrays.stream(split)
                                 .map(String::trim)
                                 .filter(s -> !s.isEmpty())
                                 .toList();
                         cfg.set("twitch.channels", channelList);
-                        cfg.set("twitch.channel", null); // optional: alten Einzelchannel entfernen
+                        cfg.set("twitch.channel", null);
                         plugin.saveConfig();
                         plugin.applyDynamicConfig();
                         sender.sendMessage(ChatColor.GREEN + "Twitch-Channels gespeichert: " + String.join(", ", channelList));
                         return true;
                     }
-                    case "channel" -> {
-                        // Einzelchannel für Rückwärtskompatibilität (nicht empfohlen)
-                        cfg.set("twitch.channel", value);
-                    }
+                    case "channel" -> cfg.set("twitch.channel", value);
                     case "token", "oauth", "oauth_token" -> cfg.set("twitch.oauth_token", value);
-                    case "interval" -> {
-                        double d = parseDouble(value, 1.0);
-                        cfg.set("twitch.trigger_interval_seconds", d);
-                    }
+                    case "interval" -> cfg.set("twitch.trigger_interval_seconds", parseDouble(value, 1.0));
                     case "chat_trigger" -> cfg.set("twitch.chat_trigger.enabled", parseBoolean(value));
                     case "debug" -> cfg.set("twitch.debug", parseBoolean(value));
                     case "subs" -> cfg.set("twitch.triggers.subscriptions.enabled", parseBoolean(value));
                     case "chat_test" -> cfg.set("twitch.triggers.chat_test.enabled", parseBoolean(value));
                     case "bits_enabled" -> cfg.set("twitch.triggers.bits.enabled", parseBoolean(value));
-                    case "bits_per_trigger" -> {
-                        int i = parseInt(value, 500);
-                        cfg.set("twitch.triggers.bits.bits_per_trigger", i);
-                    }
+                    case "bits_per_trigger" -> cfg.set("twitch.triggers.bits.bits_per_trigger", parseInt(value, 500));
                     default -> {
                         sender.sendMessage(ChatColor.RED + "Unbekanntes Feld: " + key);
                         return true;
@@ -138,11 +174,10 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
                 plugin.saveConfig();
                 plugin.applyDynamicConfig();
                 sender.sendMessage(ChatColor.GREEN + "Twitch-Setting aktualisiert: " + key);
-                return true;
             }
             case "get" -> {
                 if (args.length < 2) {
-                    sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig twitch get <channels|channel|token|interval|chat_trigger|debug|subs|chat_test|bits_enabled|bits_per_trigger>");
+                    sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig twitch get <channels|token|interval|debug|subs|bits_enabled|bits_per_trigger>");
                     return true;
                 }
                 String key = args[1].toLowerCase(Locale.ROOT);
@@ -154,18 +189,11 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
                             if (fallback != null && !fallback.isBlank()) channels = List.of(fallback);
                         }
                         sender.sendMessage(ChatColor.AQUA + "twitch.channels" + ChatColor.GRAY + " = " + ChatColor.WHITE + String.join(", ", channels));
-                        return true;
-                    }
-                    case "channel" -> {
-                        String val = cfg.getString("twitch.channel", "");
-                        sender.sendMessage(ChatColor.AQUA + "twitch.channel" + ChatColor.GRAY + " = " + ChatColor.WHITE + val);
-                        return true;
                     }
                     default -> {
                         String path = switch (key) {
                             case "token", "oauth", "oauth_token" -> "twitch.oauth_token";
                             case "interval" -> "twitch.trigger_interval_seconds";
-                            case "chat_trigger" -> "twitch.chat_trigger.enabled";
                             case "debug" -> "twitch.debug";
                             case "subs" -> "twitch.triggers.subscriptions.enabled";
                             case "chat_test" -> "twitch.triggers.chat_test.enabled";
@@ -177,9 +205,8 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
                             sender.sendMessage(ChatColor.RED + "Unbekanntes Feld: " + key);
                             return true;
                         }
-                        Object val = plugin.getConfig().get(path);
+                        Object val = cfg.get(path);
                         sender.sendMessage(ChatColor.AQUA + path + ChatColor.GRAY + " = " + ChatColor.WHITE + String.valueOf(val));
-                        return true;
                     }
                 }
             }
@@ -191,13 +218,15 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
                 }
                 tim.applyConfig();
                 sender.sendMessage(ChatColor.GREEN + "Twitch (re)konfiguriert.");
-                return true;
             }
             default -> sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig twitch <set|get|reconnect> ...");
         }
         return true;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // /trconfig weights <show|set <key> <value>>
+    // ─────────────────────────────────────────────────────────────────────────
     private boolean handleWeights(CommandSender sender, String[] args) {
         if (args.length == 0) {
             sender.sendMessage(ChatColor.YELLOW + "Benutzung: /trconfig weights set <key> <gewicht> | show");
@@ -229,15 +258,62 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Usage + Tab-Completion
+    // ─────────────────────────────────────────────────────────────────────────
+
     private void sendUsage(CommandSender sender) {
-        sender.sendMessage(ChatColor.YELLOW + "Benutzung:");
-        sender.sendMessage(ChatColor.GRAY + "/trconfig get <pfad>");
-        sender.sendMessage(ChatColor.GRAY + "/trconfig set <pfad> <wert>");
-        sender.sendMessage(ChatColor.GRAY + "/trconfig reload");
-        sender.sendMessage(ChatColor.GRAY + "/trconfig apply");
-        sender.sendMessage(ChatColor.GRAY + "/trconfig twitch <set|get|reconnect> ...");
-        sender.sendMessage(ChatColor.GRAY + "/trconfig weights <show|set <key> <gewicht>>");
+        sender.sendMessage(ChatColor.YELLOW + "Usage:");
+        sender.sendMessage(ChatColor.GRAY + "  /trconfig reload" + ChatColor.WHITE + "               – Reload config.yml from disk & reconnect all");
+        sender.sendMessage(ChatColor.GRAY + "  /trconfig se reload" + ChatColor.WHITE + "            – Reload config.yml & reconnect SE only");
+        sender.sendMessage(ChatColor.GRAY + "  /trconfig se status" + ChatColor.WHITE + "            – Show SE connection info");
+        sender.sendMessage(ChatColor.GRAY + "  /trconfig twitch reconnect" + ChatColor.WHITE + "     – Reconnect Twitch");
+        sender.sendMessage(ChatColor.GRAY + "  /trconfig twitch set <key> <value>");
+        sender.sendMessage(ChatColor.GRAY + "  /trconfig weights <show|set <key> <weight>>");
+        sender.sendMessage(ChatColor.GRAY + "  /trconfig get <path>" + ChatColor.WHITE + "           – Read any config value");
+        sender.sendMessage(ChatColor.GRAY + "  /trconfig set <path> <value>" + ChatColor.WHITE + "   – Set any config value");
     }
+
+    @Override
+    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender,
+                                                @NotNull Command command,
+                                                @NotNull String alias,
+                                                @NotNull String[] args) {
+        if (!sender.hasPermission(PERM)) return Collections.emptyList();
+        if (args.length == 1) {
+            return prefixFilter(args[0], List.of("get", "set", "reload", "apply", "twitch", "se", "weights"));
+        }
+        if (args.length >= 2) {
+            switch (args[0].toLowerCase(Locale.ROOT)) {
+                case "twitch" -> {
+                    if (args.length == 2) return prefixFilter(args[1], List.of("set", "get", "reconnect"));
+                    if (args.length == 3 && (args[1].equalsIgnoreCase("set") || args[1].equalsIgnoreCase("get"))) {
+                        return prefixFilter(args[2], List.of("channels", "token", "interval", "debug",
+                                "subs", "chat_test", "bits_enabled", "bits_per_trigger"));
+                    }
+                }
+                case "se" -> {
+                    if (args.length == 2) return prefixFilter(args[1], List.of("reload", "status"));
+                }
+                case "weights" -> {
+                    if (args.length == 2) return prefixFilter(args[1], List.of("show", "set"));
+                    if (args.length == 3 && args[1].equalsIgnoreCase("set")) {
+                        return prefixFilter(args[2], RandomEventCommand.EVENT_KEYS_ORDER);
+                    }
+                }
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    private List<String> prefixFilter(String prefix, java.util.Collection<String> options) {
+        String p = prefix.toLowerCase(Locale.ROOT);
+        return options.stream().filter(o -> o.toLowerCase(Locale.ROOT).startsWith(p)).collect(Collectors.toList());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
 
     private Object parseValue(String raw) {
         String s = raw.trim();
@@ -245,12 +321,11 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
         if (s.equalsIgnoreCase("false")) return false;
         try {
             if (s.contains(".") || s.contains(",")) {
-                s = s.replace(",", ".");
-                return Double.parseDouble(s);
+                return Double.parseDouble(s.replace(",", "."));
             }
             return Integer.parseInt(s);
         } catch (NumberFormatException ignore) {
-            return raw; // String
+            return raw;
         }
     }
 
@@ -274,41 +349,5 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
             sb.append(arr[i]);
         }
         return sb.toString();
-    }
-
-    @Override
-    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender,
-                                                @NotNull Command command,
-                                                @NotNull String alias,
-                                                @NotNull String[] args) {
-        if (!sender.hasPermission(PERM)) return Collections.emptyList();
-        if (args.length == 1) {
-            return prefixFilter(args[0], List.of("get","set","reload","apply","twitch","weights"));
-        }
-        if (args.length >= 2) {
-            switch (args[0].toLowerCase(Locale.ROOT)) {
-                case "twitch" -> {
-                    if (args.length == 2) return prefixFilter(args[1], List.of("set","get","reconnect"));
-                    if (args.length == 3 && args[1].equalsIgnoreCase("set")) {
-                        return prefixFilter(args[2], List.of("channels","channel","token","interval","chat_trigger","debug","subs","chat_test","bits_enabled","bits_per_trigger"));
-                    }
-                    if (args.length == 3 && args[1].equalsIgnoreCase("get")) {
-                        return prefixFilter(args[2], List.of("channels","channel","token","interval","chat_trigger","debug","subs","chat_test","bits_enabled","bits_per_trigger"));
-                    }
-                }
-                case "weights" -> {
-                    if (args.length == 2) return prefixFilter(args[1], List.of("show","set"));
-                    if (args.length == 3 && args[1].equalsIgnoreCase("set")) {
-                        return prefixFilter(args[2], RandomEventCommand.EVENT_KEYS_ORDER);
-                    }
-                }
-            }
-        }
-        return Collections.emptyList();
-    }
-
-    private List<String> prefixFilter(String prefix, java.util.Collection<String> options) {
-        String p = prefix.toLowerCase(Locale.ROOT);
-        return options.stream().filter(o -> o.toLowerCase(Locale.ROOT).startsWith(p)).collect(Collectors.toList());
     }
 }
