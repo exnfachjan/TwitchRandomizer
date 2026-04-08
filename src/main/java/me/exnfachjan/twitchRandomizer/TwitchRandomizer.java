@@ -6,6 +6,7 @@ import me.exnfachjan.twitchRandomizer.gui.*;
 import me.exnfachjan.twitchRandomizer.i18n.Messages;
 import me.exnfachjan.twitchRandomizer.timer.TimerManager;
 import me.exnfachjan.twitchRandomizer.twitch.TwitchIntegrationManager;
+import me.exnfachjan.twitchRandomizer.twitch.StreamElementsIntegrationManager;
 import me.exnfachjan.twitchRandomizer.config.SessionConfig;
 import me.exnfachjan.twitchRandomizer.reset.ResetManager;
 import me.exnfachjan.twitchRandomizer.pause.GamePauseService;
@@ -20,6 +21,7 @@ public class TwitchRandomizer extends JavaPlugin {
 
     private TimerManager timerManager;
     private TwitchIntegrationManager twitch;
+    private StreamElementsIntegrationManager streamElements;  // <-- Feld hier oben
 
     private GamePauseService pauseService;
     private RandomEventCommand randomEventExecutor;
@@ -124,6 +126,9 @@ public class TwitchRandomizer extends JavaPlugin {
         this.twitch = new TwitchIntegrationManager(this);
         twitch.start(channels, token, enableChatTrigger);
 
+        this.streamElements = new StreamElementsIntegrationManager(this);
+        streamElements.start();
+
         PluginCommand cfgCmd = getCommand("trconfig");
         if (cfgCmd != null) {
             ConfigCommand cfg = new ConfigCommand(this);
@@ -151,6 +156,7 @@ public class TwitchRandomizer extends JavaPlugin {
     @Override
     public void onDisable() {
         if (twitch != null) twitch.stop();
+        if (streamElements != null) streamElements.stop();
         if (timerManager != null) timerManager.shutdown();
         if (messages != null) messages.savePlayerLocales();
     }
@@ -158,6 +164,7 @@ public class TwitchRandomizer extends JavaPlugin {
     public Messages getMessages() { return messages; }
     public TimerManager getTimerManager() { return timerManager; }
     public TwitchIntegrationManager getTwitch() { return twitch; }
+    public StreamElementsIntegrationManager getStreamElements() { return streamElements; }
     public RandomEventCommand getRandomEventExecutor() { return randomEventExecutor; }
     public DeathCounterManager getDeathCounter() { return deathCounter; }
     public ResetManager getResetManager() { return resetManager; }
@@ -175,6 +182,10 @@ public class TwitchRandomizer extends JavaPlugin {
                 if (randomEventExecutor != null) {
                     randomEventExecutor.reloadWeights();
                 }
+            } catch (Throwable ignored) {}
+
+            try {
+                if (streamElements != null) streamElements.applyConfig();
             } catch (Throwable ignored) {}
 
             try {

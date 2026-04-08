@@ -105,13 +105,20 @@ public class Messages {
         de.put("gui.common.save_reconnect_name", "&eSpeichern & (Re)verbinden");
         de.put("gui.common.save_reconnect_lore", java.util.List.of("&7Änderungen übernehmen"));
         de.put("gui.main.twitch_info_name", "&6Twitch-Info");
-        de.put("gui.main.twitch_info_lore", java.util.List.of("&7Channel: &f{channel}", "&7Token: &f{token_masked}", "&4Achtung: sensible Daten!", "&7Links: &fChannel setzen", "&7Rechts: &fToken setzen"));
+        de.put("gui.main.twitch_info_lore", java.util.List.of(
+                "&7Channel: &f{channel}",
+                "&7Token: &f{token_masked}",
+                "&7SE-Token: &f{se_token_masked}",
+                "&4Achtung: sensible Daten!",
+                "&7Links: &fChannel setzen",
+                "&7Rechts: &fTwitch-Token setzen",
+                "&7Shift+Rechts: &fStreamElements JWT setzen"));
         de.put("gui.main.misc_name", "&6Misc");
         de.put("gui.main.misc_lore", java.util.List.of("&7Diverse Einstellungen", "&7z. B. 'Spectator after death' & Deathcounter"));
         de.put("gui.main.debug_name", "&dDebug Menü");
         de.put("gui.main.debug_lore", java.util.List.of("&7Testtrigger verwalten:", "&7!test, !gift, !giftbomb"));
         de.put("gui.main.trigger_name", "&bTrigger");
-        de.put("gui.main.trigger_lore", java.util.List.of("&7Subs/Bits, Bits pro Trigger,", "&7Intervall anpassen"));
+        de.put("gui.main.trigger_lore", java.util.List.of("&7Subs/Bits/Donations,", "&7Intervall anpassen"));
         de.put("gui.main.weights_name", "&dEvent-Gewichte");
         de.put("gui.main.weights_lore", java.util.List.of("&7Öffne Untermenü, um Gewichte", "&7pro Event anzupassen"));
         de.put("gui.main.ui_language_name", "&6UI-Sprache/Ui-Language");
@@ -129,12 +136,19 @@ public class Messages {
         de.put("gui.trigger.bits_per_trigger_lore", java.util.List.of("&7Links/Rechts: &f±1", "&7Shift + Klick: &f±100"));
         de.put("gui.trigger.interval_name", "&bIntervall: &f{seconds}s");
         de.put("gui.trigger.interval_lore", java.util.List.of("&7Links/Rechts: &f±0.5s", "&7Shift + Klick: &f±1.0s"));
+        // StreamElements Donations
+        de.put("gui.trigger.donations_toggle", "SE-Donations (StreamElements)");
+        de.put("gui.trigger.donations_amount_name", "&bDonation pro Event: &f{value}€");
+        de.put("gui.trigger.donations_amount_lore", java.util.List.of(
+                "&7Ab welchem Betrag ein Event getriggert wird.",
+                "&7Beispiel: 5.0 = €5 = 1 Event",
+                "&7Links/Rechts: &f±0.5", "&7Shift + Klick: &f±1.0"));
         de.put("gui.debug.test_toggle", "!test erlaubt");
         de.put("gui.debug.gift_toggle", "!gift Simulation");
         de.put("gui.debug.giftbomb_toggle", "!giftbomb Simulation");
         de.put("gui.misc.spectator_toggle", "Spectator after death");
         de.put("gui.misc.deaths_name", "&bDeaths: &f{value}");
-        de.put("gui.misc.deaths_lore", java.util.List.of("&7Zählt alle Tode (persistent).", "&7Shift + Klick: &fauf 0 zurücksetzen"));
+        de.put("gui.misc.deaths_lore", java.util.List.of("&7Zählt alle Tode (persistent).", "&7Links: &f-1  &7Rechts: &f+1", "&7Shift + Klick: &fauf 0 zurücksetzen"));
         de.put("gui.misc.reset_button_name", "&cServer reset");
         de.put("gui.misc.reset_button_lore", java.util.List.of("&7Öffnet Bestätigung", "&7führt '/reset confirm' aus"));
         de.put("gui.lang.de_name", "&fDeutsch");
@@ -150,14 +164,19 @@ public class Messages {
                 "Beispiel: Kanal1, Kanal2, Kanal3");
         de.put("gui.book.page.token.text", "Ersetzte diesen Text mit den Access Token deines Bots, welchen du unter {url} erhalten kannst.");
         de.put("gui.book.page.token.link_text", "Token-Generator öffnen");
+        de.put("gui.book.page.se_token.text", "Ersetze diesen Text mit deinem StreamElements JWT-Token.\n\nDen Token findest du unter:\nstreamelements.com\n→ Mein Konto\n→ Tokens (ganz unten)");
         de.put("gui.book.page.reward", "Schreibe auf die erste Seite den EXAKTEN Namen deiner Kanalpunkte-Belohnung und signiere das Buch.");
         de.put("gui.book.chat.warn_sensitive", "§6[Hinweis] §eAchte auf sensible Daten (Channel/Token).");
         de.put("gui.book.chat.received_channel", "§7Du hast ein §fBuch & Feder§7 erhalten. Ersetze den Text in §fZeile 1§7 durch deinen §fTwitch-Nutzernamen§7 und klicke §fFertig§7.");
-        de.put("gui.book.chat.received_token", "§7Du hast ein §fBuch & Feder§7 erhalten. Ersetze den Text in §fZeile 1§7 durch dein §fAccess Token§7 und klicke §fFertig§7.");
+        de.put("gui.book.chat.received_token", "§7Du hast ein §fBuch & Feder§7 erhalten. Ersetze den Text in §fZeile 1§7 durch dein §fTwitch Access Token§7 und klicke §fFertig§7.");
+        de.put("gui.book.chat.received_se_token", "§7Du hast ein §fBuch & Feder§7 erhalten. Ersetze den Text durch deinen §fStreamElements JWT-Token§7 und klicke §fFertig§7.");
         de.put("gui.book.chat.inventory_full", "§7Inventar voll – Buch wurde auf den Boden gedroppt.");
         de.put("gui.book.chat.cancelled", "§eEingabe abgebrochen (leer).");
         de.put("gui.book.chat.saved_channel", "§aChannel gesetzt und (re)konfiguriert.");
-        de.put("gui.book.chat.saved_token", "§aToken gesetzt und (re)konfiguriert.");
+        de.put("gui.book.chat.saved_token", "§aTwitch-Token gesetzt und (re)konfiguriert.");
+        de.put("gui.book.chat.saved_se_token", "§aStreamElements JWT-Token gesetzt und (re)konfiguriert.");
+        de.put("gui.book.chat.saved_channel_list", "Twitch-Kanäle wurden gespeichert: {channels}");
+        de.put("gui.book.chat.no_valid_channels", "Keine gültigen Channelnamen erkannt.");
         de.put("toggles.on_prefix", "&aAn: &f{label}");
         de.put("toggles.off_prefix", "&8Aus: &f{label}");
         de.put("reset.confirm", "Bitte bestätige mit §e{command}");
@@ -166,25 +185,23 @@ public class Messages {
         de.put("reset.confirm_no_pending", "Kein Reset-Dialog aktiv. Starte mit §e/{command0}.");
         de.put("reset.confirm_ok", "§aReset wird ausgeführt...");
         de.put("server.reset.kick", "§cServer-Reset von §e{requester}§7. Bitte später erneut verbinden.");
-        de.put("title.reset.line1", "§cServer-Reset");
+        de.put("title.reset.line1", "§cServer Reset");
         de.put("title.reset.line2", "Bitte später erneut verbinden");
-        de.put("bossbar.floor_is_lava", "Der Boden ist Lava");
-        de.put("bossbar.slippery_ground", "Achtung Rutschgefahr");
+        de.put("bossbar.floor_is_lava", "Boden ist Lava");
+        de.put("bossbar.slippery_ground", "Rutschiger Boden");
         de.put("bossbar.no_crafting", "Crafting blockiert");
-        de.put("events.tnt_rain.solo", "TNT-Minecart-Regen geht los!");
-        de.put("events.tnt_rain.by", "{user} lässt TNT-Minecarts auf dich regnen!");
-        de.put("events.anvil_rain.solo", "Ambossregen!");
-        de.put("events.anvil_rain.by", "{user} lässt Ambosse auf dich regnen!");
-        de.put("events.skyblock.solo", "Skyblock-Challenge! Alle Chunks im Umkreis verschwinden bis zum Void.");
-        de.put("events.skyblock.by", "{user} hat den Skyblock-Modus aktiviert – alles um dich herum verschwindet!");
+        de.put("events.tnt_rain.solo", "TNT-Minecart-Regen! Es regnet TNT-Minecarts auf dich.");
+        de.put("events.tnt_rain.by", "{user} lässt es TNT-Minecarts regnen!");
+        de.put("events.anvil_rain.solo", "Amboss-Regen! Ambosse fallen auf dich.");
+        de.put("events.anvil_rain.by", "{user} lässt es Ambosse regnen!");
+        de.put("events.skyblock.solo", "Skyblock-Challenge! Alle Chunks um dich wurden bis zum Void gelöscht.");
+        de.put("events.skyblock.by", "{user} hat den Skyblock-Modus aktiviert – alles um dich verschwindet!");
         de.put("gui.weights.reset_defaults_name", "Alle Gewichte zurücksetzen");
-        de.put("gui.weights.reset_defaults_lore", java.util.List.of("Setzt alle Eventgewichte auf", "ihren Standardwert zurück."));
+        de.put("gui.weights.reset_defaults_lore", java.util.List.of("Setzt alle Event-Gewichte", "auf Standardwerte zurück."));
         de.put("event.fake_totem.given", "§eDir wurde ein Totem der Unsterblichkeit gegeben ... oder?");
         de.put("event.fake_totem.given_by", "§e{user} hat dir ein Totem der Unsterblichkeit gegeben ... oder?");
         de.put("event.fake_totem.fail", "§cDas war nur ein Fake-Totem!");
         de.put("item.minecraft.totem_of_undying", "Totem der Unsterblichkeit");
-        de.put("gui.book.chat.saved_channel_list", "Twitch-Kanäle wurden gespeichert: {channels}");
-        de.put("gui.book.chat.no_valid_channels", "Keine gültigen Channelnamen erkannt.");
         de.put("event.name.spawn_mobs", "Mobs spawnen");
         de.put("event.name.potion", "Zufälliger Trank");
         de.put("event.name.give_item", "Zufälliges Item");
@@ -220,41 +237,41 @@ public class Messages {
         en.put("commands.queue.twitch_unavailable", "&cTwitch integration not available.");
         en.put("commands.queue.added", "&aAdded to queue: &f{amount}&a. Currently in queue: &f{queue_size}");
         en.put("commands.queue.added_with_user", "&aAdded to queue: &f{amount} × {user}&a. Currently in queue: &f{queue_size}");
-        en.put("events.damage.half_heart.by", "{user} takes {hearts} hearts from you!");
+        en.put("events.damage.half_heart.by", "{user} takes away {hearts} hearts!");
         en.put("events.damage.half_heart.solo", "You lose {hearts} hearts!");
-        en.put("events.spawn.by", "{user} spawns {amount}x {entity} at you!");
-        en.put("events.spawn.solo", "{amount}x {entity} spawn at you!");
-        en.put("events.ignite.short.by", "{user} sets you on fire briefly!");
-        en.put("events.ignite.short.solo", "You are set on fire briefly!");
+        en.put("events.spawn.by", "{user} spawns {amount}x {entity} near you!");
+        en.put("events.spawn.solo", "{amount}x {entity} spawn near you!");
+        en.put("events.ignite.short.by", "{user} briefly sets you on fire!");
+        en.put("events.ignite.short.solo", "You are briefly set on fire!");
         en.put("events.fire.by", "{user} sets you on fire for {seconds}s!");
         en.put("events.fire.solo", "You are set on fire for {seconds}s!");
         en.put("events.give.item.by", "{user} gives you {amount}x {item}!");
-        en.put("events.give.item.solo", "You get {amount}x {item}!");
-        en.put("events.inventory.cleared.by", "{user} cleared {count} slots from your inventory!");
-        en.put("events.inventory.cleared.solo", "{count} slots were cleared from your inventory!");
-        en.put("events.teleport.random.by", "{user} teleported you randomly!");
+        en.put("events.give.item.solo", "You receive {amount}x {item}!");
+        en.put("events.inventory.cleared.by", "{user} clears {count} slots of your inventory!");
+        en.put("events.inventory.cleared.solo", "{count} slots of your inventory were cleared!");
+        en.put("events.teleport.random.by", "{user} teleports you randomly!");
         en.put("events.teleport.random.solo", "You were randomly teleported!");
-        en.put("events.teleport.advanced_end.by", "{user} teleported you to the End! (X:{x} Y:{y} Z:{z})");
+        en.put("events.teleport.advanced_end.by", "{user} teleports you to the End! (X:{x} Y:{y} Z:{z})");
         en.put("events.teleport.advanced_end.solo", "You were teleported to the End! (X:{x} Y:{y} Z:{z})");
         en.put("events.potion.applied.by", "{user} gives you {effect} for {seconds}s!");
         en.put("events.potion.applied.solo", "You receive {effect} for {seconds}s!");
         en.put("events.inv_shuffle.by", "{user} shuffled your inventory!");
         en.put("events.inv_shuffle.solo", "Your inventory was shuffled!");
         en.put("events.hot_potato.start_by", "{user} gave you the hot potato! ({seconds}s)");
-        en.put("events.hot_potato.start", "Hot Potato for {seconds}s!");
-        en.put("events.hot_potato.end", "Hot Potato ended.");
+        en.put("events.hot_potato.start", "Hot potato for {seconds}s!");
+        en.put("events.hot_potato.end", "The hot potato is over.");
         en.put("events.no_crafting.start_by", "{user} blocks your crafting for {seconds}s!");
         en.put("events.no_crafting.start", "Crafting blocked for {seconds}s!");
         en.put("events.no_crafting.blocked", "Crafting is currently blocked!");
         en.put("events.no_crafting.end", "You can craft again.");
-        en.put("events.safe_creepers.explode_by", "{user} caused an explosion!");
+        en.put("events.safe_creepers.explode_by", "{user} triggered an explosion!");
         en.put("events.safe_creepers.explode", "An explosion was triggered!");
         en.put("events.floor_is_lava.start_by", "{user} turned the floor into lava! ({seconds}s)");
-        en.put("events.floor_is_lava.start", "Floor is lava for {seconds}s!");
+        en.put("events.floor_is_lava.start", "The floor is lava for {seconds}s!");
         en.put("events.floor_is_lava.end", "The floor is safe again.");
-        en.put("events.nasa_call.by", "{user} is calling NASA – you're going to space!");
-        en.put("events.nasa_call.solo", "You are launched sky high!");
-        en.put("events.slippery_ground.start_by", "{user} made the ground slippery! ({seconds}s)");
+        en.put("events.nasa_call.by", "{user} sends you on a trip to space!");
+        en.put("events.nasa_call.solo", "You are launched into the air!");
+        en.put("events.slippery_ground.start_by", "{user} makes the ground slippery! ({seconds}s)");
         en.put("events.slippery_ground.start", "The ground is slippery for {seconds}s!");
         en.put("events.slippery_ground.end", "The ground is normal again.");
         en.put("events.hell_is_calling.by", "{user} calls hell – fireballs rain down!");
@@ -282,13 +299,20 @@ public class Messages {
         en.put("gui.common.save_reconnect_name", "&eSave & (Re)connect");
         en.put("gui.common.save_reconnect_lore", java.util.List.of("&7Apply changes"));
         en.put("gui.main.twitch_info_name", "&6Twitch Info");
-        en.put("gui.main.twitch_info_lore", java.util.List.of("&7Channel: &f{channel}", "&7Token: &f{token_masked}", "&4Warning: sensitive data!", "&7Left: &fSet channel", "&7Right: &fSet token"));
+        en.put("gui.main.twitch_info_lore", java.util.List.of(
+                "&7Channel: &f{channel}",
+                "&7Token: &f{token_masked}",
+                "&7SE-Token: &f{se_token_masked}",
+                "&4Warning: sensitive data!",
+                "&7Left: &fSet channel",
+                "&7Right: &fSet Twitch token",
+                "&7Shift+Right: &fSet StreamElements JWT"));
         en.put("gui.main.misc_name", "&6Misc");
         en.put("gui.main.misc_lore", java.util.List.of("&7Various settings", "&7e.g. 'Spectator after death' & Death counter"));
         en.put("gui.main.debug_name", "&dDebug Menu");
         en.put("gui.main.debug_lore", java.util.List.of("&7Manage test triggers:", "&7!test, !gift, !giftbomb"));
         en.put("gui.main.trigger_name", "&bTriggers");
-        en.put("gui.main.trigger_lore", java.util.List.of("&7Subs/Bits, Bits per trigger,", "&7Adjust interval"));
+        en.put("gui.main.trigger_lore", java.util.List.of("&7Subs/Bits/Donations,", "&7Adjust interval"));
         en.put("gui.main.weights_name", "&dEvent Weights");
         en.put("gui.main.weights_lore", java.util.List.of("&7Open submenu to adjust", "&7per-event weights"));
         en.put("gui.main.ui_language_name", "&6UI Language");
@@ -306,12 +330,19 @@ public class Messages {
         en.put("gui.trigger.bits_per_trigger_lore", java.util.List.of("&7Left/Right: &f±1", "&7Shift + Click: &f±100"));
         en.put("gui.trigger.interval_name", "&bInterval: &f{seconds}s");
         en.put("gui.trigger.interval_lore", java.util.List.of("&7Left/Right: &f±0.5s", "&7Shift + Click: &f±1.0s"));
+        // StreamElements Donations
+        en.put("gui.trigger.donations_toggle", "SE Donations (StreamElements)");
+        en.put("gui.trigger.donations_amount_name", "&bDonation per Event: &f{value}€");
+        en.put("gui.trigger.donations_amount_lore", java.util.List.of(
+                "&7Minimum donation to trigger an event.",
+                "&7Example: 5.0 = €5 = 1 event",
+                "&7Left/Right: &f±0.5", "&7Shift + Click: &f±1.0"));
         en.put("gui.debug.test_toggle", "!test allowed");
         en.put("gui.debug.gift_toggle", "!gift simulation");
         en.put("gui.debug.giftbomb_toggle", "!giftbomb simulation");
         en.put("gui.misc.spectator_toggle", "Spectator after death");
         en.put("gui.misc.deaths_name", "&bDeaths: &f{value}");
-        en.put("gui.misc.deaths_lore", java.util.List.of("&7Counts all deaths (persistent).", "&7Shift + Click: &freset to 0"));
+        en.put("gui.misc.deaths_lore", java.util.List.of("&7Counts all deaths (persistent).", "&7Left: &f-1  &7Right: &f+1", "&7Shift + Click: &freset to 0"));
         en.put("gui.misc.reset_button_name", "&cServer reset");
         en.put("gui.misc.reset_button_lore", java.util.List.of("&7Open confirmation", "&7executes '/reset confirm'"));
         en.put("gui.lang.de_name", "&fDeutsch");
@@ -327,13 +358,19 @@ public class Messages {
                 "Example: Channel1, Channel2, Channel3");
         en.put("gui.book.page.token.text", "Replace this text with your bot's access token, which you can obtain at {url}");
         en.put("gui.book.page.token.link_text", "Open Token Generator");
+        en.put("gui.book.page.se_token.text", "Replace this text with your StreamElements JWT token.\n\nFind it at:\nstreamelements.com\n→ My Account\n→ Tokens (scroll down)");
+        en.put("gui.book.page.reward", "Write the EXACT name of your channel points reward on the first page and sign the book.");
         en.put("gui.book.chat.warn_sensitive", "§6[Notice] §eBe careful with sensitive data (channel/token).");
         en.put("gui.book.chat.received_channel", "§7You received a §fBook & Quill§7. Replace the text in §fline 1§7 with your §fTwitch username§7 and click §fDone§7.");
-        en.put("gui.book.chat.received_token", "§7You received a §fBook & Quill§7. Replace the text in §fline 1§7 with your §faccess token§7 and click §fDone§7.");
+        en.put("gui.book.chat.received_token", "§7You received a §fBook & Quill§7. Replace the text in §fline 1§7 with your §fTwitch access token§7 and click §fDone§7.");
+        en.put("gui.book.chat.received_se_token", "§7You received a §fBook & Quill§7. Replace the text with your §fStreamElements JWT token§7 and click §fDone§7.");
         en.put("gui.book.chat.inventory_full", "§7Inventory full – dropped the book on the ground.");
         en.put("gui.book.chat.cancelled", "§eInput cancelled (empty).");
         en.put("gui.book.chat.saved_channel", "§aChannel set and (re)configured.");
-        en.put("gui.book.chat.saved_token", "§aToken set and (re)configured.");
+        en.put("gui.book.chat.saved_token", "§aTwitch token set and (re)configured.");
+        en.put("gui.book.chat.saved_se_token", "§aStreamElements JWT token set and (re)configured.");
+        en.put("gui.book.chat.saved_channel_list", "Twitch channels saved: {channels}");
+        en.put("gui.book.chat.no_valid_channels", "No valid channel names detected.");
         en.put("toggles.on_prefix", "&aOn: &f{label}");
         en.put("toggles.off_prefix", "&8Off: &f{label}");
         en.put("reset.confirm", "Please confirm using §e{command}");
@@ -359,14 +396,12 @@ public class Messages {
         en.put("event.fake_totem.given_by", "§e{user} gave you a Totem of Undying ... or did they?");
         en.put("event.fake_totem.fail", "§cThat was just a fake totem!");
         en.put("item.minecraft.totem_of_undying", "Totem of Undying");
-        en.put("gui.book.chat.saved_channel_list", "Twitch channels saved: {channels}");
-        en.put("gui.book.chat.no_valid_channels", "No valid channel names detected.");
         en.put("event.name.spawn_mobs", "Spawn Mobs");
         en.put("event.name.potion", "Random Potion");
         en.put("event.name.give_item", "Random Item");
         en.put("event.name.clear_inventory", "Clear Inventory");
         en.put("event.name.teleport", "Random Teleport");
-        en.put("event.name.damage_half_heart", "Lose Hearts");
+        en.put("event.name.damage_half_heart", "Take Hearts");
         en.put("event.name.fire", "Set on Fire");
         en.put("event.name.inv_shuffle", "Shuffle Inventory");
         en.put("event.name.hot_potato", "Hot Potato");
@@ -384,13 +419,6 @@ public class Messages {
     }
 
     public void load() {
-        try {
-            String m = String.valueOf(plugin.getConfig().getString("language.mode", "auto")).toLowerCase(java.util.Locale.ROOT);
-            this.mode = "manual".equals(m) ? Mode.MANUAL : Mode.AUTO;
-            String def = String.valueOf(plugin.getConfig().getString("language.default", "en"));
-            String norm = normalizeLang(def);
-            this.defaultLang = norm != null ? norm : "en";
-        } catch (Throwable ignored) { }
         try {
             org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
             store.clear();

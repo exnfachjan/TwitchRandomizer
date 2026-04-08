@@ -116,3 +116,19 @@ events:
 language:
   mode: auto # auto = Clientsprache; manual = per-Spieler (GUI oder extern)
   default: en # Fallback: de oder en
+
+# ──────────────────────────────────────────────
+# StreamElements Integration (Donations / Tips)
+# ──────────────────────────────────────────────
+# JWT-Token: StreamElements Dashboard → Mein Konto → Tokens (unten auf der Seite)
+# https://streamelements.com/dashboard/account/channels
+streamelements:
+  enabled: false
+  jwt_token: "DEIN_JWT_TOKEN_HIER"
+
+  triggers:
+    tips:
+      enabled: true
+      # Ab wie viel € / $ wird ein Event getriggert?
+      # Beispiel: 5.0 = €5 = 1 Event, €10 = 2 Events, €12 = 2 Events
+      amount_per_trigger: 5.0
