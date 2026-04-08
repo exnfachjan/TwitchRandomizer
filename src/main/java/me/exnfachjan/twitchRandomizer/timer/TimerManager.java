@@ -14,6 +14,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -45,6 +46,16 @@ public class TimerManager implements Listener {
         this.dataFile = new File(plugin.getDataFolder(), "timer.yml");
         loadState();
         startActionbarLoop();
+        // Wenn Server startet und Timer ist nicht aktiv → Partikel sofort aktivieren
+        if (!running) {
+            // Verzögerung damit der Server fertig geladen hat
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!running) {
+                    freezeTime();
+                    startParticleEffect();
+                }
+            }, 40L); // 2 Sekunden nach Start
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -117,23 +128,22 @@ public class TimerManager implements Listener {
     private void freezeTime() {
         try {
             for (org.bukkit.World world : Bukkit.getWorlds()) {
-                // Random Ticks einfrieren (kein Pflanzenwachstum, kein Feuer etc.)
                 world.setGameRule(org.bukkit.GameRule.RANDOM_TICK_SPEED, 0);
             }
         } catch (Throwable ignored) {}
 
-        // Alle Entities einfrieren (Paper-spezifisch: setFreezeTicks)
         try {
             for (org.bukkit.entity.Entity entity : Bukkit.getWorlds().stream()
                     .flatMap(w -> w.getEntities().stream())
                     .toList()) {
-                if (entity instanceof Player) continue; // Spieler nicht einfrieren
-                if (entity instanceof org.bukkit.entity.LivingEntity le) {
-                    le.setFreezeTicks(Integer.MAX_VALUE);
-                    le.setAI(false);
-                }
-                // Fahrzeuge/Projekte stoppen
+                if (entity instanceof Player) continue;
                 try { entity.setVelocity(new org.bukkit.util.Vector(0, 0, 0)); } catch (Throwable ignored2) {}
+                if (entity instanceof org.bukkit.entity.LivingEntity le) {
+                    le.setAI(false);
+                    // Gravity NICHT deaktivieren – führt zu Void-Tod bei unebenem Boden.
+                    // Invulnerability schützt vor Schaden falls sie dennoch fallen.
+                    le.setInvulnerable(true);
+                }
             }
         } catch (Throwable ignored) {}
     }
@@ -142,19 +152,17 @@ public class TimerManager implements Listener {
     private void unfreezeTime() {
         try {
             for (org.bukkit.World world : Bukkit.getWorlds()) {
-                world.setGameRule(org.bukkit.GameRule.RANDOM_TICK_SPEED, 3); // MC-Standard
+                world.setGameRule(org.bukkit.GameRule.RANDOM_TICK_SPEED, 3);
             }
         } catch (Throwable ignored) {}
 
-        // Alle Entities wieder auftauen
         try {
             for (org.bukkit.entity.Entity entity : Bukkit.getWorlds().stream()
                     .flatMap(w -> w.getEntities().stream())
                     .toList()) {
                 if (entity instanceof Player) continue;
                 if (entity instanceof org.bukkit.entity.LivingEntity le) {
-                    le.setFreezeTicks(0);
-                    // Nur AI wieder aktivieren wenn es kein "safe_creeper" o.ä. ist
+                    le.setInvulnerable(false);
                     try {
                         org.bukkit.NamespacedKey safeKey = new org.bukkit.NamespacedKey(plugin, "safe_creeper");
                         if (!le.getPersistentDataContainer().has(safeKey, org.bukkit.persistence.PersistentDataType.BYTE)) {
@@ -253,10 +261,29 @@ public class TimerManager implements Listener {
     }
 
     @EventHandler
+    public void onCreatureSpawn(CreatureSpawnEvent e) {
+        // Neu gespawnte Entities sofort einfrieren wenn Timer pausiert
+        if (!running && particleTask != null) {
+            org.bukkit.entity.LivingEntity le = e.getEntity();
+            // 1 Tick verzögern damit Bukkit das Entity fertig initialisiert hat
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!running && le.isValid()) {
+                    le.setAI(false);
+                    le.setInvulnerable(true);
+                    le.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                }
+            }, 1L);
+        }
+    }
+
+    @EventHandler
     public void onPlayerJoin(PlayerJoinEvent e) {
         Bukkit.getScheduler().runTask(plugin, () -> {
             e.getPlayer().sendActionBar(buildActionbar(e.getPlayer()));
-            // Wenn Timer pausiert: Partikel auch für neuen Spieler starten (Effekt läuft bereits)
+            // Wenn Timer gerade pausiert ist und kein Partikel-Task läuft → jetzt starten
+            if (!running && particleTask == null) {
+                startParticleEffect();
+            }
         });
     }
 
