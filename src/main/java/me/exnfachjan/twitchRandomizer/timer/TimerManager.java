@@ -96,13 +96,7 @@ public class TimerManager implements Listener {
     private void onTimerStarted() {
         stopFreezeEffects();
         // Ticks wieder auf MC-Standard (20)
-        try { Bukkit.getServer().setTicksPerSecond(20); } catch (Throwable ignored) {}
         // Ticks unfreezen via Paper API
-        try {
-            for (org.bukkit.World world : Bukkit.getWorlds()) {
-                world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, true);
-            }
-        } catch (Throwable ignored) {}
         unfreezeTime();
         playTimerSound(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
     }
@@ -119,6 +113,7 @@ public class TimerManager implements Listener {
      * daher nutzen wir das Minecart-Freeze-Approach: wir setzen den Game Rule
      * randomTickSpeed auf 0 und frieren alle lebenden Entities via Paper API ein.
      */
+    @SuppressWarnings("deprecation")
     private void freezeTime() {
         try {
             for (org.bukkit.World world : Bukkit.getWorlds()) {
@@ -143,6 +138,7 @@ public class TimerManager implements Listener {
         } catch (Throwable ignored) {}
     }
 
+    @SuppressWarnings("deprecation")
     private void unfreezeTime() {
         try {
             for (org.bukkit.World world : Bukkit.getWorlds()) {
@@ -210,7 +206,7 @@ public class TimerManager implements Listener {
             double yOffset = Math.sin(Math.toRadians(baseAngle * 2 + armOffset)) * 0.6;
 
             Location loc = center.clone().add(x, yOffset, z);
-            p.getWorld().spawnParticle(Particle.CANDLE_FLAME, loc, 1, 0, 0, 0, 0);
+            p.getWorld().spawnParticle(Particle.SMALL_FLAME, loc, 1, 0, 0, 0, 0);
 
             // Zweiter Partikel leicht versetzt für Dichte
             double angle2 = Math.toRadians(baseAngle + armOffset + 8);
@@ -218,7 +214,7 @@ public class TimerManager implements Listener {
             double z2 = Math.sin(angle2) * (radius * 0.85);
             double yOffset2 = Math.sin(Math.toRadians(baseAngle * 2 + armOffset + 8)) * 0.5;
             Location loc2 = center.clone().add(x2, yOffset2, z2);
-            p.getWorld().spawnParticle(Particle.CANDLE_FLAME, loc2, 1, 0, 0, 0, 0);
+            p.getWorld().spawnParticle(Particle.SMALL_FLAME, loc2, 1, 0, 0, 0, 0);
         }
     }
 
