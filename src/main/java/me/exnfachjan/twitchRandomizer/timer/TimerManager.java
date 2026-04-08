@@ -316,18 +316,18 @@ public class TimerManager implements Listener {
     public void onBlockBreak(BlockBreakEvent e) {
         if (running) return;
         e.setCancelled(true);
-        e.getPlayer().sendActionBar(
-            net.kyori.adventure.text.Component.text("⏸ Timer is paused!", net.kyori.adventure.text.format.NamedTextColor.RED)
-        );
+        Player p = e.getPlayer();
+        p.sendActionBar(net.kyori.adventure.text.Component.text(
+            messages.tr(p, "timer.paused_action_blocked"), net.kyori.adventure.text.format.NamedTextColor.RED));
     }
 
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent e) {
         if (running) return;
         e.setCancelled(true);
-        e.getPlayer().sendActionBar(
-            net.kyori.adventure.text.Component.text("⏸ Timer is paused!", net.kyori.adventure.text.format.NamedTextColor.RED)
-        );
+        Player p = e.getPlayer();
+        p.sendActionBar(net.kyori.adventure.text.Component.text(
+            messages.tr(p, "timer.paused_action_blocked"), net.kyori.adventure.text.format.NamedTextColor.RED));
     }
 
     @EventHandler

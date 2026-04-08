@@ -186,6 +186,7 @@ public class Messages {
         de.put("bossbar.floor_is_lava", "Boden ist Lava");
         de.put("bossbar.slippery_ground", "Rutschiger Boden");
         de.put("bossbar.no_crafting", "Crafting blockiert");
+        de.put("timer.paused_action_blocked", "⏸ Timer pausiert – keine Aktionen möglich!");
         de.put("events.tnt_rain.solo", "TNT-Minecart-Regen! Es regnet TNT-Minecarts auf dich.");
         de.put("events.tnt_rain.by", "{user} lässt es TNT-Minecarts regnen!");
         de.put("events.anvil_rain.solo", "Amboss-Regen! Ambosse fallen auf dich.");
@@ -376,6 +377,7 @@ public class Messages {
         en.put("bossbar.floor_is_lava", "The Floor is Lava");
         en.put("bossbar.slippery_ground", "Caution Slippery");
         en.put("bossbar.no_crafting", "Crafting Blocked");
+        en.put("timer.paused_action_blocked", "⏸ Timer paused – no actions allowed!");
         en.put("events.tnt_rain.solo", "It's raining TNT minecarts! TNT minecarts will rain on you.");
         en.put("events.tnt_rain.by", "{user} made it rain TNT minecarts on you!");
         en.put("events.anvil_rain.solo", "Anvil rain! Anvils will fall on you.");
@@ -410,7 +412,46 @@ public class Messages {
         en.put("event.name.equipment_shuffle", "Equipment Shuffle");
     }
 
+    // Separate Datei für player_locales – VÖLLIG unabhängig von config.yml
+    // Verhindert dass savePlayerLocales() die config.yml überschreibt
+    private java.io.File getLocalesFile() {
+        return new java.io.File(plugin.getDataFolder(), "player_locales.yml");
+    }
+
     public void load() {
+        // Spracheinstellungen aus config.yml lesen (mode, default)
+        try {
+            String m = String.valueOf(plugin.getConfig().getString("language.mode", "auto")).toLowerCase(java.util.Locale.ROOT);
+            this.mode = "manual".equals(m) ? Mode.MANUAL : Mode.AUTO;
+            String def = String.valueOf(plugin.getConfig().getString("language.default", "en"));
+            String norm = normalizeLang(def);
+            this.defaultLang = norm != null ? norm : "en";
+        } catch (Throwable ignored) {}
+
+        // player_locales aus separater Datei lesen
+        try {
+            java.io.File f = getLocalesFile();
+            if (!f.exists()) {
+                // Rückwärtskompatibilität: aus alter config.yml migrieren
+                migrateLocalesFromConfig();
+                return;
+            }
+            org.bukkit.configuration.file.YamlConfiguration yaml =
+                    org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(f);
+            store.clear();
+            for (String key : yaml.getKeys(false)) {
+                try {
+                    java.util.UUID id = java.util.UUID.fromString(key);
+                    String lang = yaml.getString(key, null);
+                    String n = normalizeLang(lang);
+                    if (n != null) store.put(id, n);
+                } catch (IllegalArgumentException ignored) {}
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    /** Einmalige Migration: player_locales aus config.yml in eigene Datei verschieben */
+    private void migrateLocalesFromConfig() {
         try {
             org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
             store.clear();
@@ -422,21 +463,29 @@ public class Messages {
                         String lang = sec.getString(key, null);
                         String n = normalizeLang(lang);
                         if (n != null) store.put(id, n);
-                    } catch (IllegalArgumentException ignored) { }
+                    } catch (IllegalArgumentException ignored) {}
+                }
+                if (!store.isEmpty()) {
+                    savePlayerLocales(); // In neue Datei schreiben
+                    // Aus config.yml entfernen
+                    cfg.set("player_locales", null);
+                    plugin.saveConfig();
+                    plugin.getLogger().info("[Messages] player_locales nach player_locales.yml migriert.");
                 }
             }
-        } catch (Throwable ignored) { }
+        } catch (Throwable ignored) {}
     }
 
     public void savePlayerLocales() {
         try {
-            org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
-            cfg.set("player_locales", null);
+            java.io.File f = getLocalesFile();
+            if (!f.getParentFile().exists()) f.getParentFile().mkdirs();
+            org.bukkit.configuration.file.YamlConfiguration yaml = new org.bukkit.configuration.file.YamlConfiguration();
             for (var e : store.entrySet()) {
-                cfg.set("player_locales." + e.getKey().toString(), e.getValue());
+                yaml.set(e.getKey().toString(), e.getValue());
             }
-            plugin.saveConfig();
-        } catch (Throwable ignored) { }
+            yaml.save(f);
+        } catch (Throwable ignored) {}
     }
 
     public String tr(Player p, String key) {
