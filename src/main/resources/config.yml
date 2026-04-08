@@ -1,46 +1,90 @@
+# ══════════════════════════════════════════════════════════════════════════════
+#  TwitchRandomizer – Configuration
+#  All values can also be adjusted via the in-game GUI (/trgui).
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  TWITCH SETUP
+# ─────────────────────────────────────────────────────────────────────────────
 twitch:
-  # Twitch-Channel (Broadcaster)
+  # Twitch channel(s) – add more lines for multiple streamers
   channels:
-    - "Channel1"
-    - "Channel2"
-    - "Channel3"
+    - exnfachjan
 
-  # OAuth Access Token im Format "oauth:xxxxxxxx..."
-  # Benötigt mind.:
-  # - chat:read                 (Chat / !test)
-  # - user:read:subscriptions   (Sub-Events)
-  # - channel:read:subscriptions (Sub-Events)
-  # - bits:read                 (Bits-Events)
-  # Den Token kannst du hier direkt erstellen: https://twitchtokengenerator.com/quick/1KRFjxyoNE
-  oauth_token: "oauth:XXXXXXX"
+  # OAuth Access Token in format "oauth:xxxxxxxx..."
+  # Required scopes:
+  #   - chat:read                  (Chat / !test)
+  #   - user:read:subscriptions    (Sub-Events)
+  #   - channel:read:subscriptions (Sub-Events)
+  #   - bits:read                  (Bits-Events)
+  # Create your token: https://twitchtokengenerator.com/quick/1KRFjxyoNE
+  oauth_token: "oauth:DEIN_TOKEN_HIER"
 
-  # Cooldown zwischen den Events (Sekunden) - Persönliche empfehlung 30 Sekunden
+  # Cooldown between events in seconds (recommended: 30s)
   trigger_interval_seconds: 30.0
 
-  # Debug: Ermöglicht das Testen der Events. Debug muss aktiv sein, damit sim_gift und sim_giftbomb funktionieren.
+  # Debug mode: Enables test triggers (!test, !gift, !giftbomb) and additional logs
   debug: false
 
-  # Aktive Auslöser
+  # Active triggers
   triggers:
+    subscriptions:
+      enabled: true
+
     bits:
       enabled: true
       bits_per_trigger: 500
 
-    subscriptions:
-      enabled: true
-
     chat_test:
       enabled: true
 
-    # Simulierte Geschenk-Subs (nur aktiv, wenn twitch.debug=true)
+    # Simulated gift subs (only active when debug: true)
     sim_gift:
       enabled: true # !gift
 
     sim_giftbomb:
       enabled: true # !giftbomb [N]
-      default_count: 5 # Standardanzahl, wenn N fehlt
+      default_count: 5
 
-# Einstellungen für Reset-Verhalten sowie Fallback-Server (BungeeCord)
+# ─────────────────────────────────────────────────────────────────────────────
+#  STREAMELEMENTS SETUP (optional)
+# ─────────────────────────────────────────────────────────────────────────────
+# JWT token: StreamElements Dashboard → My Account → Channels → JWT Token
+# https://streamelements.com/dashboard/account/channels
+#
+# For multiple streamers: Add each streamer as a separate entry under "accounts".
+# Each streamer needs their own JWT token from their SE account.
+streamelements:
+  enabled: false
+
+  # Multiple accounts (one entry per streamer)
+  accounts:
+    - channel: exnfachjan
+      jwt_token: "DEIN_SE_JWT_TOKEN_HIER"
+    # - channel: friend
+    #   jwt_token: "FRIENDS_JWT_TOKEN_HERE"
+
+  triggers:
+    tips:
+      enabled: true
+      # Minimum donation amount (€/$) to trigger an event
+      # Example: 5.0 → €5 = 1 event, €10 = 2 events, €12 = 2 events
+      amount_per_trigger: 5.0
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  CHALLENGE SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+challenge:
+  # If true: A player dies → everyone becomes spectator (challenge over)
+  auto_spectator_on_death: false
+  # Pause timer and queue when a player is on the death screen
+  pause_on_death: true
+  # Pause timer and queue when all players are in spectator mode
+  pause_if_all_spectator: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  RESET SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
 reset:
   confirm_window_seconds: 30
   randomize_seed: true
@@ -48,18 +92,21 @@ reset:
   transfer_wait_ticks: 60
   title_lead_ticks: 40
 
-# Ob der Server nach einem Reset neugestartet oder heruntergefahren wird
+# Whether the server restarts or shuts down after a reset
 restart-on-reset: false
 
-challenge:
-  # Wenn true: Stirbt ein Spieler, ist die Challenge vorbei -> alle werden Spectator.
-  auto_spectator_on_death: false
-  # Pausiert Timer/Queue wenn ein Spieler im Todesbildschirm ist
-  pause_on_death: true
-  # Pausiert Timer/Queue wenn alle Spieler Spectator sind
-  pause_if_all_spectator: true
+# ─────────────────────────────────────────────────────────────────────────────
+#  LANGUAGE
+# ─────────────────────────────────────────────────────────────────────────────
+language:
+  mode: auto # auto = detect client language | manual = same language for everyone
+  default: en # Fallback: de or en
 
-# Event-Gewichtungen (müssen NICHT exakt 100 ergeben; werden normalisiert)
+# ─────────────────────────────────────────────────────────────────────────────
+#  EVENT WEIGHTS
+#  Do not need to add up to 100 – automatically normalized.
+#  Set to 0 to disable an event.
+# ─────────────────────────────────────────────────────────────────────────────
 events:
   weights:
     spawn_mobs: 35
@@ -87,48 +134,41 @@ events:
     no_crafting:
       min_seconds: 5
       max_seconds: 15
+
     hot_potato:
       duration_seconds: 10
       mode: explode
       explosion_power: 2.0
+
     safe_creepers:
       count: 3
       radius: 2
       lifetime_seconds: 8
       powered: true
+
     floor_is_lava:
       min_seconds: 10
       max_seconds: 180
+
     slippery_ground:
       min_seconds: 10
       max_seconds: 180
+
     tnt_rain:
       duration_seconds: 30
       radius: 25
       interval_ticks: 6
+
     anvil_rain:
       duration_seconds: 30
       radius: 25
       interval_ticks: 6
+
     skyblock:
       radius: 2
 
-language:
-  mode: auto # auto = Clientsprache; manual = per-Spieler (GUI oder extern)
-  default: en # Fallback: de oder en
-
-# ──────────────────────────────────────────────
-# StreamElements Integration (Donations / Tips)
-# ──────────────────────────────────────────────
-# JWT-Token: StreamElements Dashboard → Mein Konto → Tokens (unten auf der Seite)
-# https://streamelements.com/dashboard/account/channels
-streamelements:
-  enabled: false
-  jwt_token: "DEIN_JWT_TOKEN_HIER"
-
-  triggers:
-    tips:
-      enabled: true
-      # Ab wie viel € / $ wird ein Event getriggert?
-      # Beispiel: 5.0 = €5 = 1 Event, €10 = 2 Events, €12 = 2 Events
-      amount_per_trigger: 5.0
+# ─────────────────────────────────────────────────────────────────────────────
+#  STATISTICS (managed automatically – do not edit manually)
+# ─────────────────────────────────────────────────────────────────────────────
+stats:
+  deaths: 0

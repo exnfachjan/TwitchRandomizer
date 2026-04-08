@@ -6,143 +6,169 @@ import okhttp3.*;
 import okio.ByteString;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 
 /**
  * StreamElements WebSocket Integration (via OkHttp – bereits im Classpath durch Twitch4J).
- * Verbindet sich mit wss://realtime.streamelements.com und lauscht auf Tip-Events.
- * Benötigt einen StreamElements JWT-Token (Dashboard → Mein Konto → Channels → JWT Token).
+ * Unterstützt mehrere JWT-Tokens (einen pro Streamer/Channel).
+ *
+ * Config-Format:
+ *   streamelements:
+ *     enabled: true
+ *     accounts:
+ *       - channel: exnfachjan
+ *         jwt_token: "eyJ..."
+ *       - channel: freund
+ *         jwt_token: "eyJ..."
+ *     triggers:
+ *       tips:
+ *         enabled: true
+ *         amount_per_trigger: 5.0
+ *
+ * Rückwärtskompatibel: Einzelner jwt_token auf oberster Ebene wird weiterhin unterstützt.
  */
 public class StreamElementsIntegrationManager {
 
     private static final String SE_WSS = "wss://realtime.streamelements.com/socket.io/?EIO=3&transport=websocket";
 
     private final JavaPlugin plugin;
-    // OkHttpClient wird einmal erstellt und nie neu erstellt (Singleton pro Instanz)
     private final OkHttpClient httpClient;
-    private volatile WebSocket wsSocket;
+
+    // Eine SEConnection pro Account
+    private final List<SEConnection> connections = new CopyOnWriteArrayList<>();
 
     // Config
     private boolean enabled;
-    private String jwtToken;
     private boolean tipsEnabled;
     private double amountPerTrigger;
     private boolean debug;
 
-    // Reconnect
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    private ScheduledFuture<?> reconnectTask;
-    private volatile boolean shouldReconnect = false;
-    private int reconnectAttempts = 0;
+    // Änderungs-Tracking für applyConfig
+    private boolean lastEnabled = false;
+    private List<String> lastTokens = new ArrayList<>();
 
-    // Heartbeat
-    private ScheduledFuture<?> pingTask;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public StreamElementsIntegrationManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        // Einmalig erstellen, nie wieder neu — verhindert doppelte Verbindungen
         this.httpClient = new OkHttpClient.Builder()
                 .readTimeout(0, TimeUnit.MILLISECONDS)
-                .pingInterval(0, TimeUnit.SECONDS) // OkHttp-eigenes Ping deaktivieren, wir machen es selbst
+                .pingInterval(0, TimeUnit.SECONDS)
                 .build();
     }
 
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
     // Public API
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
 
     public void start() {
         readConfig();
-        if (!enabled || jwtToken == null || jwtToken.isBlank()) {
-            if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert oder kein JWT-Token.");
+        if (!enabled) {
+            if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert.");
             return;
         }
-        shouldReconnect = true;
-        connect();
+        List<AccountEntry> accounts = readAccounts();
+        if (accounts.isEmpty()) {
+            plugin.getLogger().info("[SE] Keine JWT-Tokens konfiguriert.");
+            return;
+        }
+        for (AccountEntry acc : accounts) {
+            SEConnection conn = new SEConnection(acc.channel, acc.jwtToken);
+            connections.add(conn);
+            conn.start();
+        }
+        lastEnabled = true;
+        lastTokens = accounts.stream().map(a -> a.jwtToken).toList();
     }
 
     public void stop() {
-        shouldReconnect = false;
-        cancelReconnect();
-        cancelPing();
-        WebSocket ws = wsSocket;
-        wsSocket = null;
-        if (ws != null) {
-            try { ws.close(1000, "Plugin stopping"); } catch (Throwable ignored) {}
-        }
-        plugin.getLogger().info("[SE] StreamElements-Verbindung getrennt.");
+        for (SEConnection conn : connections) conn.stop();
+        connections.clear();
+        plugin.getLogger().info("[SE] Alle StreamElements-Verbindungen getrennt.");
     }
 
     public void applyConfig() {
+        boolean prevEnabled = this.enabled;
+        List<String> prevTokens = new ArrayList<>(this.lastTokens);
         readConfig();
+        List<AccountEntry> accounts = readAccounts();
+        List<String> newTokens = accounts.stream().map(a -> a.jwtToken).toList();
 
-        // Bestehende Verbindung sauber schließen
-        shouldReconnect = false;
-        cancelReconnect();
-        cancelPing();
-        WebSocket ws = wsSocket;
-        wsSocket = null;
-        if (ws != null) {
-            try { ws.close(1000, "Config reload"); } catch (Throwable ignored) {}
-        }
+        boolean enabledChanged = prevEnabled != this.enabled;
+        boolean tokensChanged = !prevTokens.equals(newTokens);
 
-        if (!enabled) {
-            if (debug) plugin.getLogger().info("[SE] SE-Integration deaktiviert.");
+        if (!enabledChanged && !tokensChanged) {
+            if (debug) plugin.getLogger().info("[SE] applyConfig: Keine relevante Änderung, skip.");
             return;
         }
 
-        // Kurz warten damit der alte Socket Zeit hat sich zu schließen
+        if (debug) plugin.getLogger().info("[SE] applyConfig: Änderung erkannt, neu verbinden...");
+
+        // Alle alten Verbindungen schließen
+        for (SEConnection conn : connections) conn.stop();
+        connections.clear();
+
+        if (!enabled || accounts.isEmpty()) {
+            if (debug) plugin.getLogger().info("[SE] SE deaktiviert oder keine Tokens.");
+            lastEnabled = false;
+            lastTokens = new ArrayList<>();
+            return;
+        }
+
+        // Kurz warten, dann neu verbinden
         scheduler.schedule(() -> {
-            shouldReconnect = true;
-            reconnectAttempts = 0;
-            connect();
+            for (AccountEntry acc : accounts) {
+                SEConnection conn = new SEConnection(acc.channel, acc.jwtToken);
+                connections.add(conn);
+                conn.start();
+            }
+            lastEnabled = true;
+            lastTokens = newTokens;
         }, 500, TimeUnit.MILLISECONDS);
     }
 
-    // -------------------------------------------------------------------------
-    // Intern
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
+    // Config lesen
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void readConfig() {
         this.enabled = plugin.getConfig().getBoolean("streamelements.enabled", false);
-        this.jwtToken = plugin.getConfig().getString("streamelements.jwt_token", "").trim();
         this.tipsEnabled = plugin.getConfig().getBoolean("streamelements.triggers.tips.enabled", true);
         this.amountPerTrigger = plugin.getConfig().getDouble("streamelements.triggers.tips.amount_per_trigger", 5.0);
         if (this.amountPerTrigger <= 0) this.amountPerTrigger = 5.0;
         this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
     }
 
-    private void connect() {
-        if (httpClient == null) return;
-        Request request = new Request.Builder().url(SE_WSS).build();
-        httpClient.newWebSocket(request, new SEWebSocketListener());
-    }
+    private List<AccountEntry> readAccounts() {
+        List<AccountEntry> result = new ArrayList<>();
 
-    private void scheduleReconnect() {
-        if (!shouldReconnect) return;
-        cancelReconnect();
-        long delay = Math.min(5L * (1L << Math.min(reconnectAttempts, 3)), 60L);
-        reconnectAttempts++;
-        plugin.getLogger().info("[SE] Reconnect in " + delay + "s (Versuch " + reconnectAttempts + ")...");
-        reconnectTask = scheduler.schedule(this::connect, delay, TimeUnit.SECONDS);
-    }
-
-    private void cancelReconnect() {
-        if (reconnectTask != null && !reconnectTask.isDone()) {
-            reconnectTask.cancel(false);
-            reconnectTask = null;
+        // Neues Format: streamelements.accounts Liste
+        List<Map<?, ?>> accountList = plugin.getConfig().getMapList("streamelements.accounts");
+        if (accountList != null && !accountList.isEmpty()) {
+            for (Map<?, ?> entry : accountList) {
+                String channel = String.valueOf(entry.getOrDefault("channel", "unknown"));
+                String token = String.valueOf(entry.getOrDefault("jwt_token", ""));
+                if (token != null && !token.isBlank() && !token.equals("null")) {
+                    result.add(new AccountEntry(channel, token.trim()));
+                }
+            }
         }
+
+        // Rückwärtskompatibilität: einzelner jwt_token auf oberster Ebene
+        if (result.isEmpty()) {
+            String single = plugin.getConfig().getString("streamelements.jwt_token", "");
+            if (single != null && !single.isBlank()) {
+                result.add(new AccountEntry("default", single.trim()));
+            }
+        }
+
+        return result;
     }
 
-    private void cancelPing() {
-        if (pingTask != null && !pingTask.isDone()) {
-            pingTask.cancel(false);
-            pingTask = null;
-        }
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Hilfsmethoden
+    // ─────────────────────────────────────────────────────────────────────────
 
     private boolean isTimerRunning() {
         try {
@@ -159,82 +185,6 @@ public class StreamElementsIntegrationManager {
         if (plugin instanceof TwitchRandomizer t) return t.getTwitch();
         return null;
     }
-
-    /**
-     * Parst eingehende Socket.IO-Nachrichten.
-     * Typen: 0=connect-info, 2=ping, 42=event-array
-     */
-    private void handleMessage(String raw, WebSocket ws) {
-        if (debug) plugin.getLogger().info("[SE] <<< " + raw);
-
-        // Socket.IO Handshake (Typ 0)
-        if (raw.startsWith("0")) {
-            String authMsg = "42[\"authenticate\",{\"method\":\"jwt\",\"token\":\"" + jwtToken + "\"}]";
-            ws.send(authMsg);
-            if (debug) plugin.getLogger().info("[SE] Auth gesendet.");
-            // Ping-Task starten
-            cancelPing();
-            pingTask = scheduler.scheduleAtFixedRate(() -> {
-                if (wsSocket != null) wsSocket.send("2");
-            }, 25, 25, TimeUnit.SECONDS);
-            return;
-        }
-
-        // Ping → Pong
-        if (raw.equals("2")) {
-            ws.send("3");
-            return;
-        }
-
-        // Socket.IO Event: 42["name", {...}]
-        if (!raw.startsWith("42")) return;
-        String content = raw.substring(2);
-
-        if (content.contains("\"authenticated\"")) {
-            plugin.getLogger().info("[SE] Erfolgreich authentifiziert!");
-            reconnectAttempts = 0;
-            return;
-        }
-
-        if (content.contains("\"unauthorized\"")) {
-            plugin.getLogger().severe("[SE] Authentifizierung fehlgeschlagen! JWT-Token prüfen.");
-            shouldReconnect = false;
-            return;
-        }
-
-        if (!tipsEnabled) return;
-        if (!content.contains("\"tip\"") && !content.contains("\"donation\"")) return;
-
-        String username = extractJsonString(content, "username");
-        if (username == null || username.isBlank()) username = "StreamElementsTip";
-
-        double amount = extractJsonDouble(content, "amount");
-
-        if (debug) plugin.getLogger().info("[SE] Tip von " + username + ": " + amount
-                + " (amountPerTrigger=" + amountPerTrigger + ")");
-
-        if (amount < amountPerTrigger) {
-            if (debug) plugin.getLogger().info("[SE] Tip zu gering, ignoriert.");
-            return;
-        }
-
-        if (!isTimerRunning()) {
-            if (debug) plugin.getLogger().info("[SE] Timer läuft nicht, Tip ignoriert.");
-            return;
-        }
-
-        int count = (int) (amount / amountPerTrigger);
-        TwitchIntegrationManager twitch = getTwitch();
-        if (twitch != null) {
-            twitch.enqueueMultiple(count, username);
-            plugin.getLogger().info("[SE] Tip: " + username + " -> " + amount
-                    + " -> +" + count + " Event(s) in Queue.");
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Einfaches JSON-Parsing (keine externe Lib nötig)
-    // -------------------------------------------------------------------------
 
     private String extractJsonString(String json, String key) {
         String search = "\"" + key + "\":\"";
@@ -263,54 +213,183 @@ public class StreamElementsIntegrationManager {
         try { return Double.parseDouble(json.substring(start, end)); } catch (Exception e) { return 0.0; }
     }
 
-    // -------------------------------------------------------------------------
-    // OkHttp WebSocket Listener
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
+    // Account-Datenhaltung
+    // ─────────────────────────────────────────────────────────────────────────
 
-    private class SEWebSocketListener extends WebSocketListener {
+    private record AccountEntry(String channel, String jwtToken) {}
 
-        @Override
-        public void onOpen(WebSocket webSocket, Response response) {
-            wsSocket = webSocket;
-            plugin.getLogger().info("[SE] WebSocket verbunden.");
+    // ─────────────────────────────────────────────────────────────────────────
+    // SEConnection – eine WebSocket-Verbindung pro Account
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private class SEConnection {
+        private final String channelName;
+        private final String jwtToken;
+        private volatile WebSocket wsSocket;
+        private volatile boolean shouldReconnect = false;
+        private int reconnectAttempts = 0;
+        private ScheduledFuture<?> reconnectTask;
+        private ScheduledFuture<?> pingTask;
+
+        SEConnection(String channelName, String jwtToken) {
+            this.channelName = channelName;
+            this.jwtToken = jwtToken;
         }
 
-        @Override
-        public void onMessage(WebSocket webSocket, String text) {
-            handleMessage(text, webSocket);
+        void start() {
+            shouldReconnect = true;
+            connect();
         }
 
-        @Override
-        public void onMessage(WebSocket webSocket, ByteString bytes) {
-            handleMessage(bytes.utf8(), webSocket);
-        }
-
-        @Override
-        public void onClosing(WebSocket webSocket, int code, String reason) {
-            webSocket.close(1000, null);
-        }
-
-        @Override
-        public void onClosed(WebSocket webSocket, int code, String reason) {
-            // Nur reagieren wenn dies noch die aktive Verbindung ist
-            if (wsSocket != webSocket && wsSocket != null) return;
-            wsSocket = null;
+        void stop() {
+            shouldReconnect = false;
+            cancelReconnect();
             cancelPing();
-            if (code == 1000) {
-                // Sauberes Schließen (von uns initiiert) – kein Reconnect nötig
+            WebSocket ws = wsSocket;
+            wsSocket = null;
+            if (ws != null) {
+                try { ws.close(1000, "Plugin stopping"); } catch (Throwable ignored) {}
+            }
+        }
+
+        private void connect() {
+            Request request = new Request.Builder().url(SE_WSS).build();
+            httpClient.newWebSocket(request, new SEWebSocketListener());
+        }
+
+        private void scheduleReconnect() {
+            if (!shouldReconnect) return;
+            cancelReconnect();
+            long delay = Math.min(5L * (1L << Math.min(reconnectAttempts, 3)), 60L);
+            reconnectAttempts++;
+            plugin.getLogger().info("[SE:" + channelName + "] Reconnect in " + delay + "s (Versuch " + reconnectAttempts + ")...");
+            reconnectTask = scheduler.schedule(this::connect, delay, TimeUnit.SECONDS);
+        }
+
+        private void cancelReconnect() {
+            if (reconnectTask != null && !reconnectTask.isDone()) {
+                reconnectTask.cancel(false);
+                reconnectTask = null;
+            }
+        }
+
+        private void cancelPing() {
+            if (pingTask != null && !pingTask.isDone()) {
+                pingTask.cancel(false);
+                pingTask = null;
+            }
+        }
+
+        private void handleMessage(String raw, WebSocket ws) {
+            if (debug) plugin.getLogger().info("[SE:" + channelName + "] <<< " + raw);
+
+            if (raw.startsWith("0")) {
+                String authMsg = "42[\"authenticate\",{\"method\":\"jwt\",\"token\":\"" + jwtToken + "\"}]";
+                ws.send(authMsg);
+                if (debug) plugin.getLogger().info("[SE:" + channelName + "] Auth gesendet.");
+                cancelPing();
+                pingTask = scheduler.scheduleAtFixedRate(() -> {
+                    if (wsSocket != null) wsSocket.send("2");
+                }, 25, 25, TimeUnit.SECONDS);
                 return;
             }
-            plugin.getLogger().warning("[SE] Verbindung getrennt (Code " + code + "): " + reason);
-            scheduleReconnect();
+
+            if (raw.equals("2")) {
+                ws.send("3");
+                return;
+            }
+
+            if (!raw.startsWith("42")) return;
+            String content = raw.substring(2);
+
+            if (content.contains("\"authenticated\"")) {
+                plugin.getLogger().info("[SE:" + channelName + "] Erfolgreich authentifiziert!");
+                reconnectAttempts = 0;
+                return;
+            }
+
+            if (content.contains("\"unauthorized\"")) {
+                plugin.getLogger().severe("[SE:" + channelName + "] Authentifizierung fehlgeschlagen! JWT-Token prüfen.");
+                shouldReconnect = false;
+                return;
+            }
+
+            if (!tipsEnabled) return;
+            if (!content.contains("\"tip\"") && !content.contains("\"donation\"")) return;
+            // event:update ignorieren (nur das eigentliche "event" verarbeiten)
+            if (content.contains("\"event:update\"")) return;
+
+            String username = extractJsonString(content, "username");
+            if (username == null || username.isBlank()) username = "StreamElementsTip";
+            // Blau markieren (donation-Rolle)
+            String taggedUsername = "role:donation:" + username;
+
+            double amount = extractJsonDouble(content, "amount");
+
+            if (debug) plugin.getLogger().info("[SE:" + channelName + "] Tip von " + username + ": " + amount
+                    + " (amountPerTrigger=" + amountPerTrigger + ")");
+
+            if (amount < amountPerTrigger) {
+                if (debug) plugin.getLogger().info("[SE:" + channelName + "] Tip zu gering, ignoriert.");
+                return;
+            }
+
+            if (!isTimerRunning()) {
+                if (debug) plugin.getLogger().info("[SE:" + channelName + "] Timer läuft nicht, Tip ignoriert.");
+                return;
+            }
+
+            int count = (int) (amount / amountPerTrigger);
+            TwitchIntegrationManager twitch = getTwitch();
+            if (twitch != null) {
+                twitch.enqueueMultiple(count, taggedUsername);
+                plugin.getLogger().info("[SE:" + channelName + "] Tip: " + username + " -> " + amount
+                        + " -> +" + count + " Event(s) in Queue.");
+            }
         }
 
-        @Override
-        public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-            if (wsSocket != webSocket && wsSocket != null) return;
-            wsSocket = null;
-            cancelPing();
-            plugin.getLogger().warning("[SE] WebSocket-Fehler: " + t.getMessage());
-            scheduleReconnect();
+        private class SEWebSocketListener extends WebSocketListener {
+
+            @Override
+            public void onOpen(WebSocket webSocket, Response response) {
+                wsSocket = webSocket;
+                plugin.getLogger().info("[SE:" + channelName + "] WebSocket verbunden.");
+            }
+
+            @Override
+            public void onMessage(WebSocket webSocket, String text) {
+                handleMessage(text, webSocket);
+            }
+
+            @Override
+            public void onMessage(WebSocket webSocket, ByteString bytes) {
+                handleMessage(bytes.utf8(), webSocket);
+            }
+
+            @Override
+            public void onClosing(WebSocket webSocket, int code, String reason) {
+                webSocket.close(1000, null);
+            }
+
+            @Override
+            public void onClosed(WebSocket webSocket, int code, String reason) {
+                if (wsSocket != webSocket && wsSocket != null) return;
+                wsSocket = null;
+                cancelPing();
+                if (code == 1000) return; // Sauberes Schließen von uns
+                plugin.getLogger().warning("[SE:" + channelName + "] Verbindung getrennt (Code " + code + "): " + reason);
+                scheduleReconnect();
+            }
+
+            @Override
+            public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+                if (wsSocket != webSocket && wsSocket != null) return;
+                wsSocket = null;
+                cancelPing();
+                plugin.getLogger().warning("[SE:" + channelName + "] WebSocket-Fehler: " + t.getMessage());
+                scheduleReconnect();
+            }
         }
     }
 }

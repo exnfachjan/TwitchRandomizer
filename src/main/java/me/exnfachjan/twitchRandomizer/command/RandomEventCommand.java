@@ -153,6 +153,7 @@ public class RandomEventCommand implements CommandExecutor {
                     case "broadcaster" -> ChatColor.RED.toString();
                     case "moderator"   -> ChatColor.GREEN.toString();
                     case "vip"         -> ChatColor.LIGHT_PURPLE.toString();
+                    case "donation"    -> ChatColor.AQUA.toString();  // SE-Donations = Blau
                     default            -> ChatColor.WHITE.toString();
                 };
                 return color + name + ChatColor.RESET;
