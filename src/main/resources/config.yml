@@ -47,21 +47,12 @@ twitch:
       default_count: 5
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  STREAMELEMENTS SETUP (optional)
+#  STREAMELEMENTS SETUP
 # ─────────────────────────────────────────────────────────────────────────────
-# JWT tokens are stored in "streamelements.yml" (in the plugin folder).
-# That file is never touched by the plugin's auto-save, so tokens are safe.
-# Edit streamelements.yml manually, then run /trconfig se reload ingame.
-streamelements:
-  # Master switch (can also be toggled via /trgui → Trigger menu)
-  enabled: false
-
-  triggers:
-    tips:
-      enabled: true
-      # Minimum donation amount (€/$) to trigger an event
-      # Example: 5.0 → €5 = 1 event, €10 = 2 events, €12 = 2 events
-      amount_per_trigger: 5.0
+# All StreamElements settings (enabled, JWT tokens, amount_per_trigger) are
+# stored in "streamelements.yml" in the plugin folder.
+# That file is never touched by the plugin's auto-save.
+# Edit it manually or use /trgui → Trigger menu, then /trconfig se reload.
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CHALLENGE SETTINGS

@@ -57,16 +57,13 @@ public class StreamElementsIntegrationManager {
 
     public void start() {
         SEConfig cfg = loadSEFile();
-        boolean guiEnabled = plugin.getConfig().getBoolean("streamelements.enabled", false);
-        this.enabled = cfg.enabled && guiEnabled;
+        this.enabled = cfg.enabled;
         this.tipsEnabled = cfg.tipsEnabled;
-        this.amountPerTrigger = plugin.getConfig().getDouble(
-                "streamelements.triggers.tips.amount_per_trigger", cfg.amountPerTrigger);
+        this.amountPerTrigger = cfg.amountPerTrigger;
         this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
 
         if (!enabled) {
-            if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert (streamelements.yml oder config.yml).");
-            plugin.getLogger().info("[SE] SE disabled. streamelements.yml enabled=" + cfg.enabled + ", config.yml enabled=" + guiEnabled);
+            if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert (streamelements.yml).");
             return;
         }
         List<AccountEntry> accounts = cfg.accounts;
@@ -92,18 +89,14 @@ public class StreamElementsIntegrationManager {
         this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
         SEConfig cfg = loadSEFile();
 
-        // enabled = streamelements.yml UND config.yml müssen beide true sein.
-        // GUI-Toggle schreibt in config.yml; JWT/accounts stehen in streamelements.yml.
-        boolean guiEnabled = plugin.getConfig().getBoolean("streamelements.enabled", false);
-        boolean effectiveEnabled = cfg.enabled && guiEnabled;
-
         boolean prevEnabled = this.enabled;
         List<String> newTokens = cfg.accounts.stream().map(a -> a.jwtToken).toList();
 
-        boolean enabledChanged = prevEnabled != effectiveEnabled;
+        boolean enabledChanged = prevEnabled != cfg.enabled;
         boolean tokensChanged = !lastTokens.equals(newTokens);
+        boolean amountChanged = this.amountPerTrigger != cfg.amountPerTrigger;
 
-        if (!enabledChanged && !tokensChanged) {
+        if (!enabledChanged && !tokensChanged && !amountChanged) {
             if (debug) plugin.getLogger().info("[SE] applyConfig: Keine relevante Änderung, skip.");
             return;
         }
@@ -113,11 +106,9 @@ public class StreamElementsIntegrationManager {
         for (SEConnection conn : connections) conn.stop();
         connections.clear();
 
-        this.enabled = effectiveEnabled;
+        this.enabled = cfg.enabled;
         this.tipsEnabled = cfg.tipsEnabled;
-        // amount_per_trigger aus config.yml (GUI-gesteuert) hat Vorrang
-        this.amountPerTrigger = plugin.getConfig().getDouble(
-                "streamelements.triggers.tips.amount_per_trigger", cfg.amountPerTrigger);
+        this.amountPerTrigger = cfg.amountPerTrigger;
 
         if (!enabled || cfg.accounts.isEmpty()) {
             if (debug) plugin.getLogger().info("[SE] SE deaktiviert oder keine Tokens.");
@@ -135,6 +126,58 @@ public class StreamElementsIntegrationManager {
             }
             lastTokens = newTokens;
         }, 500, TimeUnit.MILLISECONDS);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Schreibzugriff auf streamelements.yml (für GUI-Toggle und Slider)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Setzt den enabled-Wert in streamelements.yml und reconnectet SE.
+     * Wird vom GUI-Toggle aufgerufen.
+     */
+    public boolean getEnabled() {
+        return loadSEFile().enabled;
+    }
+
+    public void setEnabled(boolean value) {
+        rewriteFileLine("enabled:", "enabled: " + value);
+        applyConfig();
+    }
+
+    public double getAmountPerTrigger() {
+        return loadSEFile().amountPerTrigger;
+    }
+
+    public void setAmountPerTrigger(double value) {
+        // Auf 1 Nachkommastelle runden
+        double rounded = Math.round(value * 10.0) / 10.0;
+        rewriteFileLine("amount_per_trigger:", "amount_per_trigger: " + rounded);
+        this.amountPerTrigger = rounded;
+    }
+
+    /**
+     * Ersetzt eine Zeile in streamelements.yml die mit dem Prefix beginnt.
+     */
+    private void rewriteFileLine(String linePrefix, String newLine) {
+        if (!seFile.exists()) { ensureFileExists(); }
+        try {
+            java.util.List<String> lines = java.nio.file.Files.readAllLines(seFile.toPath(), StandardCharsets.UTF_8);
+            java.util.List<String> out = new java.util.ArrayList<>();
+            boolean replaced = false;
+            for (String line : lines) {
+                if (line.trim().startsWith(linePrefix) && !line.trim().startsWith("#")) {
+                    out.add(newLine);
+                    replaced = true;
+                } else {
+                    out.add(line);
+                }
+            }
+            if (!replaced) out.add(newLine); // Zeile nicht gefunden → anhängen
+            java.nio.file.Files.write(seFile.toPath(), out, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            plugin.getLogger().warning("[SE] Konnte streamelements.yml nicht schreiben: " + e.getMessage());
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

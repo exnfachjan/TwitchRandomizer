@@ -166,8 +166,15 @@ public class ConfigGui {
                 i18n.tr(p, "gui.trigger.subs_toggle")));
         inv.setItem(11, toggle(p, MenuType.TRIGGER, "twitch.triggers.bits.enabled",
                 i18n.tr(p, "gui.trigger.bits_toggle")));
-        inv.setItem(13, toggle(p, MenuType.TRIGGER, "streamelements.enabled",
-                i18n.tr(p, "gui.trigger.donations_toggle")));
+        // SE-Toggle liest enabled direkt aus streamelements.yml
+        boolean seEnabled = plugin.getStreamElements() != null && plugin.getStreamElements().getEnabled();
+        {
+            Material mat = seEnabled ? Material.LIME_DYE : Material.GRAY_DYE;
+            Map<String, String> phSE = Map.of("label", i18n.tr(p, "gui.trigger.donations_toggle"));
+            String name = i18n.tr(p, seEnabled ? "toggles.on_prefix" : "toggles.off_prefix", phSE);
+            ItemStack seToggleItem = item(mat, name, List.of(ChatColor.GRAY + "Klick/Click to toggle"));
+            inv.setItem(13, tag(MenuType.TRIGGER, seToggleItem, "toggle", "streamelements.enabled", null));
+        }
 
         // Row 1: Wert-Buttons
         int bpt = Math.max(1, cfg.getInt("twitch.triggers.bits.bits_per_trigger", 500));
@@ -178,7 +185,9 @@ public class ConfigGui {
                         i18n.trList(p, "gui.trigger.bits_per_trigger_lore")),
                 "adjust_int_bits", "twitch.triggers.bits.bits_per_trigger", null));
 
-        double donAmt = cfg.getDouble("streamelements.triggers.tips.amount_per_trigger", 5.0);
+        double donAmt = plugin.getStreamElements() != null
+                ? plugin.getStreamElements().getAmountPerTrigger()
+                : cfg.getDouble("streamelements.triggers.tips.amount_per_trigger", 5.0);
         Map<String, String> phDon = Map.of("value", String.format(Locale.US, "%.1f", donAmt));
         inv.setItem(16, tag(MenuType.TRIGGER,
                 item(Material.SUNFLOWER,

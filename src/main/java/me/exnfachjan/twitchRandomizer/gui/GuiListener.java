@@ -127,17 +127,23 @@ public class GuiListener implements Listener {
                     p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.edit");
                     return;
                 }
-                FileConfiguration cfg = plugin.getConfig();
-                boolean cur = cfg.getBoolean(path, false);
-                cfg.set(path, !cur);
-                // SE-Master-Toggle: streamelements.enabled steuert auch den Tips-Toggle mit
+                // SE-Toggle: direkt in streamelements.yml schreiben
                 if ("streamelements.enabled".equals(path)) {
-                    cfg.set("streamelements.triggers.tips.enabled", !cur);
+                    var se = plugin.getStreamElements();
+                    if (se != null) {
+                        boolean cur = se.getEnabled();
+                        se.setEnabled(!cur);
+                        p.sendMessage(ChatColor.GREEN + "StreamElements: " + ChatColor.WHITE + (!cur ? "enabled" : "disabled"));
+                    }
+                } else {
+                    FileConfiguration cfg = plugin.getConfig();
+                    boolean cur = cfg.getBoolean(path, false);
+                    cfg.set(path, !cur);
+                    try { plugin.saveConfig(); } catch (Throwable ignored) {}
+                    try { plugin.applyDynamicConfig(); } catch (Throwable ignored) {}
+                    p.sendMessage(ChatColor.GREEN + "Umschalter: " + ChatColor.AQUA + path + ChatColor.GRAY + " = " + ChatColor.WHITE + !cur);
                 }
-                try { plugin.saveConfig(); } catch (Throwable ignored) {}
-                try { plugin.applyDynamicConfig(); } catch (Throwable ignored) {}
                 refreshMenu(type, p);
-                p.sendMessage(ChatColor.GREEN + "Umschalter: " + ChatColor.AQUA + path + ChatColor.GRAY + " = " + ChatColor.WHITE + !cur);
             }
 
             case "adjust_int_bits" -> {
@@ -181,14 +187,11 @@ public class GuiListener implements Listener {
                 }
                 double step  = e.isShiftClick() ? 1.0 : 0.5;
                 double delta = e.isRightClick() ? +step : -step;
-                FileConfiguration cfg = plugin.getConfig();
-                double cur = cfg.getDouble(path, 5.0);
+                var se = plugin.getStreamElements();
+                double cur = se != null ? se.getAmountPerTrigger() : 5.0;
                 double val = Math.max(0.5, cur + delta);
-                // Auf 1 Nachkommastelle runden
                 val = Math.round(val * 10.0) / 10.0;
-                cfg.set(path, val);
-                try { plugin.saveConfig(); } catch (Throwable ignored) {}
-                try { plugin.applyDynamicConfig(); } catch (Throwable ignored) {}
+                if (se != null) se.setAmountPerTrigger(val);
                 refreshMenu(type, p);
                 p.sendMessage(ChatColor.GREEN + "Donation/Trigger: " + ChatColor.WHITE + cur + ChatColor.GRAY + " -> " + ChatColor.AQUA + val);
             }
