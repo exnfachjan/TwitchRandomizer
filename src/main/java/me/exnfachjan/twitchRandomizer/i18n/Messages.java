@@ -136,6 +136,7 @@ public class Messages {
         de.put("gui.trigger.interval_name", "&bIntervall: &f{seconds}s");
         de.put("gui.trigger.interval_lore", java.util.List.of("&7Links/Rechts: &f±0.5s", "&7Shift + Klick: &f±1.0s"));
         // StreamElements Donations
+        de.put("gui.trigger.se_enabled_toggle", "SE-Verbindung (StreamElements an/aus)");
         de.put("gui.trigger.donations_toggle", "SE-Donations (StreamElements)");
         de.put("gui.trigger.donations_amount_name", "&bDonation pro Event: &f{value}€");
         de.put("gui.trigger.donations_amount_lore", java.util.List.of(
@@ -326,6 +327,7 @@ public class Messages {
         en.put("gui.trigger.interval_name", "&bInterval: &f{seconds}s");
         en.put("gui.trigger.interval_lore", java.util.List.of("&7Left/Right: &f±0.5s", "&7Shift + Click: &f±1.0s"));
         // StreamElements Donations
+        en.put("gui.trigger.se_enabled_toggle", "SE Connection (StreamElements on/off)");
         en.put("gui.trigger.donations_toggle", "SE Donations (StreamElements)");
         en.put("gui.trigger.donations_amount_name", "&bDonation per Event: &f{value}€");
         en.put("gui.trigger.donations_amount_lore", java.util.List.of(
