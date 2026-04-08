@@ -57,13 +57,16 @@ public class StreamElementsIntegrationManager {
 
     public void start() {
         SEConfig cfg = loadSEFile();
-        this.enabled = cfg.enabled;
+        boolean guiEnabled = plugin.getConfig().getBoolean("streamelements.enabled", false);
+        this.enabled = cfg.enabled && guiEnabled;
         this.tipsEnabled = cfg.tipsEnabled;
-        this.amountPerTrigger = cfg.amountPerTrigger;
+        this.amountPerTrigger = plugin.getConfig().getDouble(
+                "streamelements.triggers.tips.amount_per_trigger", cfg.amountPerTrigger);
         this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
 
         if (!enabled) {
-            if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert (streamelements.yml).");
+            if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert (streamelements.yml oder config.yml).");
+            plugin.getLogger().info("[SE] SE disabled. streamelements.yml enabled=" + cfg.enabled + ", config.yml enabled=" + guiEnabled);
             return;
         }
         List<AccountEntry> accounts = cfg.accounts;
@@ -88,10 +91,16 @@ public class StreamElementsIntegrationManager {
     public void applyConfig() {
         this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
         SEConfig cfg = loadSEFile();
+
+        // enabled = streamelements.yml UND config.yml müssen beide true sein.
+        // GUI-Toggle schreibt in config.yml; JWT/accounts stehen in streamelements.yml.
+        boolean guiEnabled = plugin.getConfig().getBoolean("streamelements.enabled", false);
+        boolean effectiveEnabled = cfg.enabled && guiEnabled;
+
         boolean prevEnabled = this.enabled;
         List<String> newTokens = cfg.accounts.stream().map(a -> a.jwtToken).toList();
 
-        boolean enabledChanged = prevEnabled != cfg.enabled;
+        boolean enabledChanged = prevEnabled != effectiveEnabled;
         boolean tokensChanged = !lastTokens.equals(newTokens);
 
         if (!enabledChanged && !tokensChanged) {
@@ -104,11 +113,14 @@ public class StreamElementsIntegrationManager {
         for (SEConnection conn : connections) conn.stop();
         connections.clear();
 
-        this.enabled = cfg.enabled;
+        this.enabled = effectiveEnabled;
         this.tipsEnabled = cfg.tipsEnabled;
-        this.amountPerTrigger = cfg.amountPerTrigger;
+        // amount_per_trigger aus config.yml (GUI-gesteuert) hat Vorrang
+        this.amountPerTrigger = plugin.getConfig().getDouble(
+                "streamelements.triggers.tips.amount_per_trigger", cfg.amountPerTrigger);
 
         if (!enabled || cfg.accounts.isEmpty()) {
+            if (debug) plugin.getLogger().info("[SE] SE deaktiviert oder keine Tokens.");
             lastTokens = new ArrayList<>();
             return;
         }
