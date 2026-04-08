@@ -100,7 +100,7 @@ public class GuiListener implements Listener {
                     p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.timer.stop");
                     return;
                 }
-                try { plugin.getTimerManager().pause(); } catch (Throwable ignored) {}
+                try { plugin.getTimerManager().stop(); } catch (Throwable ignored) {}
                 refreshMenu(type, p);
             }
             case "timer_reset" -> {
@@ -230,7 +230,7 @@ public class GuiListener implements Listener {
                 } else if (e.isRightClick()) {
                     plugin.getDeathCounter().increment();
                 } else {
-                    plugin.getDeathCounter().decrement();
+                    plugin.getDeathCounter().set(plugin.getDeathCounter().get() - 1);
                 }
                 plugin.getDeathCounter().broadcastActionbar();
                 refreshMenu(type, p);

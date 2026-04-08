@@ -2,26 +2,27 @@ package me.exnfachjan.twitchRandomizer.twitch;
 
 import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
 import me.exnfachjan.twitchRandomizer.timer.TimerManager;
+import okhttp3.*;
+import okio.ByteString;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import javax.websocket.*;
-import java.net.URI;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * StreamElements WebSocket Integration.
+ * StreamElements WebSocket Integration (via OkHttp – bereits im Classpath durch Twitch4J).
  * Verbindet sich mit wss://realtime.streamelements.com und lauscht auf Tip-Events.
- * Benötigt einen StreamElements JWT-Token (Account → Settings → Tokens).
+ * Benötigt einen StreamElements JWT-Token (Dashboard → Mein Konto → Channels → JWT Token).
  */
 public class StreamElementsIntegrationManager {
 
     private static final String SE_WSS = "wss://realtime.streamelements.com/socket.io/?EIO=3&transport=websocket";
 
     private final JavaPlugin plugin;
-    private Session wsSession;
+    private OkHttpClient httpClient;
+    private WebSocket wsSocket;
 
     // Config
     private boolean enabled;
@@ -36,7 +37,7 @@ public class StreamElementsIntegrationManager {
     private volatile boolean shouldReconnect = false;
     private int reconnectAttempts = 0;
 
-    // Heartbeat (Socket.IO ping/pong)
+    // Heartbeat
     private ScheduledFuture<?> pingTask;
 
     public StreamElementsIntegrationManager(JavaPlugin plugin) {
@@ -53,6 +54,9 @@ public class StreamElementsIntegrationManager {
             if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert oder kein JWT-Token.");
             return;
         }
+        httpClient = new OkHttpClient.Builder()
+                .readTimeout(0, TimeUnit.MILLISECONDS)
+                .build();
         shouldReconnect = true;
         connect();
     }
@@ -61,16 +65,47 @@ public class StreamElementsIntegrationManager {
         shouldReconnect = false;
         cancelReconnect();
         cancelPing();
-        closeSession();
-        scheduler.shutdownNow();
+        if (wsSocket != null) {
+            wsSocket.close(1000, "Plugin stopping");
+            wsSocket = null;
+        }
+        if (httpClient != null) {
+            httpClient.dispatcher().executorService().shutdown();
+            httpClient = null;
+        }
         plugin.getLogger().info("[SE] StreamElements-Verbindung getrennt.");
     }
 
     public void applyConfig() {
-        stop();
-        // Neuen Scheduler-Pool wurde schon shutdownNow'd — wir müssen neu starten,
-        // also direkt reconnect via start()
-        start();
+        readConfig();
+
+        if (!enabled) {
+            if (wsSocket != null) {
+                shouldReconnect = false;
+                cancelReconnect();
+                cancelPing();
+                wsSocket.close(1000, "Disabled");
+                wsSocket = null;
+            }
+            return;
+        }
+
+        // Neu verbinden (Token könnte sich geändert haben)
+        if (wsSocket != null) {
+            shouldReconnect = false;
+            cancelReconnect();
+            cancelPing();
+            wsSocket.close(1000, "Config reload");
+            wsSocket = null;
+        }
+        if (httpClient == null) {
+            httpClient = new OkHttpClient.Builder()
+                    .readTimeout(0, TimeUnit.MILLISECONDS)
+                    .build();
+        }
+        shouldReconnect = true;
+        reconnectAttempts = 0;
+        connect();
     }
 
     // -------------------------------------------------------------------------
@@ -87,20 +122,14 @@ public class StreamElementsIntegrationManager {
     }
 
     private void connect() {
-        try {
-            WebSocketContainer container = ContainerProvider.getWebSocketContainer();
-            container.connectToServer(new SEEndpoint(), URI.create(SE_WSS));
-            // Session wird in onOpen gesetzt
-        } catch (Exception e) {
-            plugin.getLogger().warning("[SE] Verbindung fehlgeschlagen: " + e.getMessage());
-            scheduleReconnect();
-        }
+        if (httpClient == null) return;
+        Request request = new Request.Builder().url(SE_WSS).build();
+        httpClient.newWebSocket(request, new SEWebSocketListener());
     }
 
     private void scheduleReconnect() {
         if (!shouldReconnect) return;
         cancelReconnect();
-        // Exponential Backoff: 5s, 10s, 20s, 40s, max 60s
         long delay = Math.min(5L * (1L << Math.min(reconnectAttempts, 3)), 60L);
         reconnectAttempts++;
         plugin.getLogger().info("[SE] Reconnect in " + delay + "s (Versuch " + reconnectAttempts + ")...");
@@ -121,13 +150,6 @@ public class StreamElementsIntegrationManager {
         }
     }
 
-    private void closeSession() {
-        if (wsSession != null && wsSession.isOpen()) {
-            try { wsSession.close(); } catch (Exception ignored) {}
-        }
-        wsSession = null;
-    }
-
     private boolean isTimerRunning() {
         try {
             if (plugin instanceof TwitchRandomizer t) {
@@ -145,37 +167,35 @@ public class StreamElementsIntegrationManager {
     }
 
     /**
-     * Parst eingehende Socket.IO / StreamElements JSON-Nachrichten.
-     * Socket.IO Nachrichten haben ein numerisches Präfix:
-     *   0  = connect-info
-     *   2  = ping → wir antworten mit 3 (pong)
-     *   42 = event array: ["event-name", {data}]
+     * Parst eingehende Socket.IO-Nachrichten.
+     * Typen: 0=connect-info, 2=ping, 42=event-array
      */
-    private void handleMessage(String raw, Session session) {
+    private void handleMessage(String raw, WebSocket ws) {
         if (debug) plugin.getLogger().info("[SE] <<< " + raw);
 
-        // Socket.IO Handshake: Typ 0 = Verbindungsinfo
+        // Socket.IO Handshake (Typ 0)
         if (raw.startsWith("0")) {
-            // Authentifizieren
             String authMsg = "42[\"authenticate\",{\"method\":\"jwt\",\"token\":\"" + jwtToken + "\"}]";
-            sendWs(session, authMsg);
+            ws.send(authMsg);
             if (debug) plugin.getLogger().info("[SE] Auth gesendet.");
+            // Ping-Task starten
+            cancelPing();
+            pingTask = scheduler.scheduleAtFixedRate(() -> {
+                if (wsSocket != null) wsSocket.send("2");
+            }, 25, 25, TimeUnit.SECONDS);
             return;
         }
 
         // Ping → Pong
         if (raw.equals("2")) {
-            sendWs(session, "3");
+            ws.send("3");
             return;
         }
 
         // Socket.IO Event: 42["name", {...}]
         if (!raw.startsWith("42")) return;
+        String content = raw.substring(2);
 
-        // Einfaches String-Parsing ohne externe JSON-Lib
-        String content = raw.substring(2); // Präfix "42" entfernen
-
-        // Event-Name extrahieren
         if (content.contains("\"authenticated\"")) {
             plugin.getLogger().info("[SE] Erfolgreich authentifiziert!");
             reconnectAttempts = 0;
@@ -183,20 +203,17 @@ public class StreamElementsIntegrationManager {
         }
 
         if (content.contains("\"unauthorized\"")) {
-            plugin.getLogger().severe("[SE] Authentifizierung fehlgeschlagen! Bitte JWT-Token prüfen.");
-            shouldReconnect = false; // Kein Reconnect bei falschem Token
+            plugin.getLogger().severe("[SE] Authentifizierung fehlgeschlagen! JWT-Token prüfen.");
+            shouldReconnect = false;
             return;
         }
 
-        // Tip-Event prüfen
         if (!tipsEnabled) return;
         if (!content.contains("\"tip\"") && !content.contains("\"donation\"")) return;
 
-        // Username extrahieren: "username":"..."
         String username = extractJsonString(content, "username");
         if (username == null || username.isBlank()) username = "StreamElementsTip";
 
-        // Betrag extrahieren: "amount":12.5
         double amount = extractJsonDouble(content, "amount");
 
         if (debug) plugin.getLogger().info("[SE] Tip von " + username + ": " + amount
@@ -221,22 +238,10 @@ public class StreamElementsIntegrationManager {
         }
     }
 
-    private void sendWs(Session session, String msg) {
-        try {
-            if (session != null && session.isOpen()) {
-                session.getBasicRemote().sendText(msg);
-                if (debug) plugin.getLogger().info("[SE] >>> " + msg);
-            }
-        } catch (Exception e) {
-            plugin.getLogger().warning("[SE] Senden fehlgeschlagen: " + e.getMessage());
-        }
-    }
-
     // -------------------------------------------------------------------------
     // Einfaches JSON-Parsing (keine externe Lib nötig)
     // -------------------------------------------------------------------------
 
-    /** Extrahiert "key":"value" aus einem JSON-String. */
     private String extractJsonString(String json, String key) {
         String search = "\"" + key + "\":\"";
         int idx = json.indexOf(search);
@@ -247,13 +252,11 @@ public class StreamElementsIntegrationManager {
         return json.substring(start, end);
     }
 
-    /** Extrahiert "key":12.5 aus einem JSON-String. */
     private double extractJsonDouble(String json, String key) {
         String search = "\"" + key + "\":";
         int idx = json.indexOf(search);
         if (idx < 0) return 0.0;
         int start = idx + search.length();
-        // Manche Werte kommen als "amount":"5.00" (String) statt Zahl
         if (start < json.length() && json.charAt(start) == '"') {
             String strVal = extractJsonString(json, key);
             if (strVal != null) {
@@ -261,44 +264,52 @@ public class StreamElementsIntegrationManager {
             }
             return 0.0;
         }
-        // Numerischer Wert
         int end = start;
         while (end < json.length() && (Character.isDigit(json.charAt(end)) || json.charAt(end) == '.')) end++;
         try { return Double.parseDouble(json.substring(start, end)); } catch (Exception e) { return 0.0; }
     }
 
     // -------------------------------------------------------------------------
-    // WebSocket Endpoint (innere Klasse)
+    // OkHttp WebSocket Listener
     // -------------------------------------------------------------------------
 
-    @ClientEndpoint
-    public class SEEndpoint {
+    private class SEWebSocketListener extends WebSocketListener {
 
-        @OnOpen
-        public void onOpen(Session session) {
-            wsSession = session;
+        @Override
+        public void onOpen(WebSocket webSocket, Response response) {
+            wsSocket = webSocket;
             plugin.getLogger().info("[SE] WebSocket verbunden.");
-            // Socket.IO Ping alle 25 Sekunden senden
-            cancelPing();
-            pingTask = scheduler.scheduleAtFixedRate(() -> sendWs(session, "2"), 25, 25, TimeUnit.SECONDS);
         }
 
-        @OnMessage
-        public void onMessage(String message, Session session) {
-            handleMessage(message, session);
+        @Override
+        public void onMessage(WebSocket webSocket, String text) {
+            handleMessage(text, webSocket);
         }
 
-        @OnClose
-        public void onClose(Session session, CloseReason reason) {
-            wsSession = null;
+        @Override
+        public void onMessage(WebSocket webSocket, ByteString bytes) {
+            handleMessage(bytes.utf8(), webSocket);
+        }
+
+        @Override
+        public void onClosing(WebSocket webSocket, int code, String reason) {
+            webSocket.close(1000, null);
+        }
+
+        @Override
+        public void onClosed(WebSocket webSocket, int code, String reason) {
+            wsSocket = null;
             cancelPing();
-            plugin.getLogger().warning("[SE] Verbindung getrennt: " + reason.getReasonPhrase());
+            plugin.getLogger().warning("[SE] Verbindung getrennt (Code " + code + "): " + reason);
             scheduleReconnect();
         }
 
-        @OnError
-        public void onError(Session session, Throwable error) {
-            plugin.getLogger().warning("[SE] WebSocket-Fehler: " + error.getMessage());
+        @Override
+        public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+            wsSocket = null;
+            cancelPing();
+            plugin.getLogger().warning("[SE] WebSocket-Fehler: " + t.getMessage());
+            scheduleReconnect();
         }
     }
 }

@@ -22,6 +22,8 @@ dependencies {
     implementation "com.github.twitch4j:twitch4j:1.25.0"
     implementation "com.github.twitch4j:twitch4j-auth:1.25.0"
     implementation "com.github.twitch4j:twitch4j-common:1.25.0"
+    // OkHttp ist bereits transitiv über Twitch4J im Classpath –
+    // kein separates Dependency nötig für StreamElements WebSocket.
 }
 
 def targetJavaVersion = 21
@@ -41,7 +43,6 @@ tasks.withType(JavaCompile).configureEach {
     }
 }
 
-// Plugin-Resources (plugin.yml)
 processResources {
     def props = [version: version]
     inputs.properties props
@@ -51,7 +52,6 @@ processResources {
     }
 }
 
-// Shadow: Erzeuge ein Fat-JAR und nutze es beim Run-Server
 tasks.named('shadowJar') {
     archiveClassifier.set('')
 }
@@ -64,9 +64,7 @@ tasks.named('build') {
     dependsOn tasks.named('shadowJar')
 }
 
-// run-paper soll das Shadow-JAR als Plugin laden
 tasks.named('runServer') {
     minecraftVersion("1.21.11")
-    // füge das shadowJar dem Plugins-Ordner des Test-Servers hinzu
     pluginJars.from(tasks.named('shadowJar'))
 }

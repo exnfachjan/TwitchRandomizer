@@ -299,7 +299,7 @@ public class ConfigGui {
                 "challenge.auto_spectator_on_death",
                 i18n.tr(p, "gui.misc.spectator_toggle")));
 
-        int deaths = plugin.getDeathCounter() != null ? plugin.getDeathCounter().getCount() : 0;
+        int deaths = plugin.getDeathCounter() != null ? plugin.getDeathCounter().get() : 0;
         Map<String, String> ph = Map.of("value", String.valueOf(deaths));
         inv.setItem(13, tag(MenuType.MISC,
                 item(Material.SKELETON_SKULL,
