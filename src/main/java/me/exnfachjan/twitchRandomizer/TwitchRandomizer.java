@@ -170,32 +170,38 @@ public class TwitchRandomizer extends JavaPlugin {
     public ResetManager getResetManager() { return resetManager; }
     public SessionConfig getSessionConfig() { return sessionConfig; }
 
+    // Debounce: applyDynamicConfig mehrfach kurz hintereinander → nur 1x ausführen
+    private volatile long lastApplyRequestMs = 0L;
+    private volatile boolean applyPending = false;
+
     public void applyDynamicConfig() {
-        org.bukkit.Bukkit.getScheduler().runTask(this, () -> {
-            try {
-                if (twitch != null) {
-                    twitch.applyConfig();
-                }
-            } catch (Throwable ignored) {}
+        lastApplyRequestMs = System.currentTimeMillis();
+        if (applyPending) return; // Bereits ein Aufruf geplant
+        applyPending = true;
 
-            try {
-                if (randomEventExecutor != null) {
-                    randomEventExecutor.reloadWeights();
-                }
-            } catch (Throwable ignored) {}
+        // 200ms warten – alle weiteren Aufrufe in diesem Fenster werden zusammengefasst
+        org.bukkit.Bukkit.getScheduler().runTaskLaterAsynchronously(this, () -> {
+            applyPending = false;
+            org.bukkit.Bukkit.getScheduler().runTask(this, () -> {
+                try {
+                    if (twitch != null) twitch.applyConfig();
+                } catch (Throwable ignored) {}
 
-            try {
-                if (streamElements != null) streamElements.applyConfig();
-            } catch (Throwable ignored) {}
+                try {
+                    if (randomEventExecutor != null) randomEventExecutor.reloadWeights();
+                } catch (Throwable ignored) {}
 
-            try {
-                if (messages != null) {
-                    messages.load();
+                try {
+                    if (streamElements != null) streamElements.applyConfig();
+                } catch (Throwable ignored) {}
+
+                try {
+                    if (messages != null) messages.load();
+                } catch (Throwable e) {
+                    getLogger().warning("i18n reload failed: " + e.getMessage());
                 }
-            } catch (Throwable e) {
-                getLogger().warning("i18n reload failed: " + e.getMessage());
-            }
-        });
+            });
+        }, 4L); // 4 Ticks = ~200ms Debounce-Fenster
     }
 
     // ==== Reset Confirmation API ====

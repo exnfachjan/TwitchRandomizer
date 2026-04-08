@@ -116,15 +116,22 @@ public class StreamElementsIntegrationManager {
             return;
         }
 
-        // Kurz warten, dann neu verbinden
+        // Kurz warten, dann neu verbinden – synchronized um Race Conditions zu vermeiden
+        final List<AccountEntry> accountsToConnect = accounts;
+        final List<String> tokensToSet = newTokens;
         scheduler.schedule(() -> {
-            for (AccountEntry acc : accounts) {
+            // Doppelstart verhindern: nur starten wenn connections noch leer
+            if (!connections.isEmpty()) {
+                if (debug) plugin.getLogger().info("[SE] applyConfig: Verbindungen bereits aktiv, skip.");
+                return;
+            }
+            for (AccountEntry acc : accountsToConnect) {
                 SEConnection conn = new SEConnection(acc.channel, acc.jwtToken);
                 connections.add(conn);
                 conn.start();
             }
             lastEnabled = true;
-            lastTokens = newTokens;
+            lastTokens = tokensToSet;
         }, 500, TimeUnit.MILLISECONDS);
     }
 
@@ -165,7 +172,17 @@ public class StreamElementsIntegrationManager {
             }
         }
 
-        return result;
+        // Doppelte Tokens entfernen (gleicher Token = gleicher Account)
+        List<AccountEntry> deduped = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (AccountEntry e : result) {
+            if (seen.add(e.jwtToken())) {
+                deduped.add(e);
+            } else {
+                plugin.getLogger().warning("[SE] Doppelter JWT-Token für '" + e.channel() + "' ignoriert.");
+            }
+        }
+        return deduped;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
