@@ -284,9 +284,8 @@ public class GuiListener implements Listener {
 
     @EventHandler
     public void onInvClose(InventoryCloseEvent e) {
-        Inventory top = e.getView().getTopInventory();
-        if (!gui.isOurInventory(top)) return;
-        doAutoSave();
+        // Kein automatisches Speichern beim Schließen – nur der "Speichern & Verbinden"-Button
+        // speichert aktiv. Dadurch wird die config.yml nicht bei jedem GUI-Schließen überschrieben.
     }
 
     private void doAutoSave() {

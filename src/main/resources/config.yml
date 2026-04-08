@@ -9,7 +9,7 @@
 twitch:
   # Twitch channel(s) – add more lines for multiple streamers
   channels:
-    - exnfachjan
+    - YOUR_TWITCH_CHANNEL
 
   # OAuth Access Token in format "oauth:xxxxxxxx..."
   # Required scopes:
@@ -59,7 +59,7 @@ streamelements:
 
   # Multiple accounts (one entry per streamer)
   accounts:
-    - channel: exnfachjan
+    - channel: YOUR_TWITCH_CHANNEL
       jwt_token: "DEIN_SE_JWT_TOKEN_HIER"
     # - channel: friend
     #   jwt_token: "FRIENDS_JWT_TOKEN_HERE"

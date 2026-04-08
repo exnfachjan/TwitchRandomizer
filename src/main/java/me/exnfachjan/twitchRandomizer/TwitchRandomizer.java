@@ -155,10 +155,17 @@ public class TwitchRandomizer extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // Pending Debounce-Task cancellen damit kein async Save nach Shutdown läuft
+        applyPending = false;
+        org.bukkit.Bukkit.getScheduler().cancelTasks(this);
+
         if (twitch != null) twitch.stop();
         if (streamElements != null) streamElements.stop();
         if (timerManager != null) timerManager.shutdown();
         if (messages != null) messages.savePlayerLocales();
+
+        // Config einmal synchron speichern um Race Condition beim Shutdown zu vermeiden
+        try { saveConfig(); } catch (Throwable ignored) {}
     }
 
     public Messages getMessages() { return messages; }
