@@ -147,8 +147,10 @@ public class StreamElementsIntegrationManager {
         List<Map<?, ?>> accountList = plugin.getConfig().getMapList("streamelements.accounts");
         if (accountList != null && !accountList.isEmpty()) {
             for (Map<?, ?> entry : accountList) {
-                String channel = String.valueOf(entry.getOrDefault("channel", "unknown"));
-                String token = String.valueOf(entry.getOrDefault("jwt_token", ""));
+                Object channelObj = entry.get("channel");
+                Object tokenObj = entry.get("jwt_token");
+                String channel = (channelObj != null) ? String.valueOf(channelObj) : "unknown";
+                String token = (tokenObj != null) ? String.valueOf(tokenObj) : "";
                 if (token != null && !token.isBlank() && !token.equals("null")) {
                     result.add(new AccountEntry(channel, token.trim()));
                 }
