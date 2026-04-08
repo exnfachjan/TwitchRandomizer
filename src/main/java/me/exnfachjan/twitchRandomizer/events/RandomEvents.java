@@ -60,13 +60,11 @@ public class RandomEvents implements Listener {
     private final Random rng = new Random();
     private final Set<UUID> skyblockLocked = new HashSet<>();
 
-    // Für Boden-Events
     private final Map<UUID, BukkitTask> groundTasks = new HashMap<>();
     private final Set<UUID> slipperyActive = new HashSet<>();
     private final Set<UUID> lavaActive = new HashSet<>();
     private final Map<UUID, BossBar> eventBossbars = new HashMap<>();
 
-    // Bossbar für NoCrafting
     private final Map<UUID, BossBar> noCraftBossbars = new HashMap<>();
     private final Map<UUID, BukkitTask> noCraftTasks = new HashMap<>();
 
@@ -88,8 +86,6 @@ public class RandomEvents implements Listener {
         Long until = noCraftUntil.get(p.getUniqueId());
         return until != null && System.currentTimeMillis() <= until;
     }
-
-    // ===== No Crafting Events (mit Bossbar) =====
 
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPrepare(PrepareItemCraftEvent e) {
@@ -203,10 +199,6 @@ public class RandomEvents implements Listener {
             bar.removeAll();
         }
     }
-
-    // ====== Events ======
-
-    // === FAKE TOTEM EVENT ===
 
     public void triggerFakeTotem(Player p, String byUser) {
         ItemStack fakeTotem = new ItemStack(Material.TOTEM_OF_UNDYING);
@@ -448,16 +440,14 @@ public class RandomEvents implements Listener {
             online.teleport(p.getLocation());
         }
 
-        // FIX: Chunk-Clearing aufteilen um TPS-Drops zu vermeiden
         List<int[]> chunksToDelete = new ArrayList<>();
         for (int cx = -chunkRadius; cx <= chunkRadius; cx++) {
             for (int cz = -chunkRadius; cz <= chunkRadius; cz++) {
-                if (cx == 0 && cz == 0) continue; // Spieler-Chunk behalten
+                if (cx == 0 && cz == 0) continue;
                 chunksToDelete.add(new int[]{playerChunk.getX() + cx, playerChunk.getZ() + cz});
             }
         }
 
-        // Verarbeite 2 Chunks pro Tick, um den Server nicht einzufrieren
         new BukkitRunnable() {
             int index = 0;
             @Override
@@ -513,12 +503,7 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    /**
-     * FIX: Teleport findet jetzt ein sicheres Y-Level am Ziel,
-     * statt den Spieler auf dem aktuellen Y in die Erde zu teleportieren.
-     */
     public void triggerTeleport(Player p, String byUser) {
-        // 0,001% Wahrscheinlichkeit für Advanced End
         if (rng.nextInt(100_000) == 0) {
             World endWorld = Bukkit.getWorld("world_the_end");
             if (endWorld != null) {
@@ -543,7 +528,6 @@ public class RandomEvents implements Listener {
         int x = rng.nextInt(3000) - 1500;
         int z = rng.nextInt(3000) - 1500;
 
-        // FIX: Finde sicheres Y am Zielort statt das aktuelle Y zu nehmen
         int y = findSafeY(w, x, z);
 
         setAirCube(w, x, y, z);
@@ -558,13 +542,9 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    /**
-     * Findet ein sicheres Y-Level: Höchster solider Block + 1 (Oberfläche).
-     */
     private int findSafeY(World w, int x, int z) {
         int maxY = w.getMaxHeight() - 1;
         int minY = w.getMinHeight();
-        // Von oben nach unten suchen
         for (int y = maxY; y > minY; y--) {
             Block block = w.getBlockAt(x, y, z);
             Block above = w.getBlockAt(x, y + 1, z);
@@ -572,7 +552,6 @@ public class RandomEvents implements Listener {
                 return y + 1;
             }
         }
-        // Fallback: Oberfläche nicht gefunden, nehme 64
         return Math.max(minY + 1, 64);
     }
 
@@ -591,8 +570,8 @@ public class RandomEvents implements Listener {
     }
 
     public void triggerDamageHalfHeart(Player p, String byUser) {
-        int hearts = 3 + rng.nextInt(6); // 3-8 Herzen
-        double damage = hearts * 2.0;    // 1 Herz = 2 HP
+        int hearts = 3 + rng.nextInt(6);
+        double damage = hearts * 2.0;
         double hp = p.getHealth();
         if (hp > 1.0) p.setHealth(Math.max(1.0, hp - damage));
         Map<String, String> ph = new HashMap<>();
@@ -625,11 +604,6 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    /**
-     * Creeper-Angriff: 6 Creeper werden wie eine Uhr um den Spieler platziert (12, 2, 4, 6, 8, 10 Uhr).
-     * Spieler wird festgehalten bis die Creeper explodieren. Kein Schaden, kein Block-Damage, kein Knockback.
-     * Creeper haben keine AI — sie stehen still und werden manuell gezündet.
-     */
     public void triggerSafeCreepers(Player p, String byUser) {
         FileConfiguration cfg = plugin.getConfig();
         int radius = Math.max(1, cfg.getInt("events.settings.safe_creepers.radius", 2));
@@ -638,7 +612,6 @@ public class RandomEvents implements Listener {
         Location center = p.getLocation();
         NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
 
-        // Uhrzeiten: 12, 2, 4, 6, 8, 10 → gleichmäßig alle 60°
         double[] angles = {0, 60, 120, 180, 240, 300};
 
         List<Creeper> spawnedCreepers = new ArrayList<>();
@@ -653,15 +626,11 @@ public class RandomEvents implements Listener {
             if (powered) {
                 creeper.setPowered(true);
             }
-            // Tag als safe markieren
             creeper.getPersistentDataContainer().set(safeKey, PersistentDataType.BYTE, (byte) 1);
-
-            // AI komplett deaktivieren — Creeper steht still
             creeper.setAI(false);
             creeper.setCustomName("§c⚠ Creeper");
             creeper.setCustomNameVisible(true);
 
-            // Creeper manuell zum Spieler drehen (lookAt funktioniert nicht ohne AI)
             Location creeperLoc = creeper.getLocation();
             double dx = center.getX() - creeperLoc.getX();
             double dz = center.getZ() - creeperLoc.getZ();
@@ -676,39 +645,32 @@ public class RandomEvents implements Listener {
             spawnedCreepers.add(creeper);
         }
 
-        // Spieler festhalten — kurze Dauer, nur bis Explosion (ca. 3s)
         p.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
         p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20 * 4, 127, false, false, false));
         p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 20 * 4, 128, false, false, false));
 
-        // Nach 1.5 Sekunden: Creeper explodieren lassen (sofort, nicht über ignite/fuse)
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             for (Creeper c : spawnedCreepers) {
                 if (c.isValid() && !c.isDead()) {
-                    // Sofort explodieren — explode() triggert die Explosion ohne Fuse-Delay
                     c.explode();
                 }
             }
-            // Effekte SOFORT bei Explosion entfernen
             p.removePotionEffect(PotionEffectType.SLOWNESS);
             p.removePotionEffect(PotionEffectType.JUMP_BOOST);
-            // Velocity auf 0 setzen um Knockback zu verhindern
             Bukkit.getScheduler().runTask(plugin, () -> {
                 p.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
             });
-        }, 30L); // 1.5 Sekunden
+        }, 30L);
 
-        // Sicherheits-Cleanup nach 5 Sekunden
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             for (Creeper c : spawnedCreepers) {
                 if (c.isValid() && !c.isDead()) {
                     c.remove();
                 }
             }
-            // Sicherheitshalber nochmal Effekte entfernen
             p.removePotionEffect(PotionEffectType.SLOWNESS);
             p.removePotionEffect(PotionEffectType.JUMP_BOOST);
-        }, 100L); // 5 Sekunden
+        }, 100L);
 
         Map<String, String> ph = new HashMap<>();
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
@@ -716,7 +678,6 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    /** Verhindert Block-Zerstörung durch safe Creeper. */
     @EventHandler
     public void onSafeCreeperExplode(EntityExplodeEvent event) {
         if (!(event.getEntity() instanceof Creeper creeper)) return;
@@ -725,7 +686,6 @@ public class RandomEvents implements Listener {
         event.blockList().clear();
     }
 
-    /** Verhindert Spieler-/Entity-Schaden und Knockback durch safe Creeper. */
     @EventHandler
     public void onSafeCreeperDamage(EntityDamageByEntityEvent event) {
         Entity damager = event.getDamager();
@@ -733,7 +693,6 @@ public class RandomEvents implements Listener {
         NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
         if (!creeper.getPersistentDataContainer().has(safeKey, PersistentDataType.BYTE)) return;
         event.setCancelled(true);
-        // Knockback verhindern: Velocity des Opfers auf 0 setzen im nächsten Tick
         if (event.getEntity() instanceof Player victim) {
             Bukkit.getScheduler().runTask(plugin, () -> {
                 victim.setVelocity(new org.bukkit.util.Vector(0, victim.getVelocity().getY() > 0 ? 0 : victim.getVelocity().getY(), 0));
@@ -741,7 +700,6 @@ public class RandomEvents implements Listener {
         }
     }
 
-    // ==== Floor is Lava (mit Boden-Restore) ====
     public void triggerFloorIsLava(Player p, String byUser) {
         if (isAnyGroundEventActive(p)) return;
         FileConfiguration cfg = plugin.getConfig();
@@ -798,7 +756,6 @@ public class RandomEvents implements Listener {
         groundTasks.put(p.getUniqueId(), task);
     }
 
-    // ==== Slippery Ground ====
     public void triggerSlipperyGround(Player p, String byUser) {
         if (isAnyGroundEventActive(p)) return;
         FileConfiguration cfg = plugin.getConfig();
@@ -990,7 +947,6 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    // === Bossbar & Boden-Event-Helpers ===
     private void showEventBossbar(Player p, String eventKey, int totalSeconds) {
         cancelEventBossbar(p);
         String title = i18n.tr(p, "bossbar." + eventKey) + " \u2013 " + totalSeconds + "s";
@@ -1039,8 +995,7 @@ public class RandomEvents implements Listener {
         }
         return sb.toString();
     }
-    
-// --- Equipment Tier-Stufen ---
+
     private static final Material[][] TOOL_TIERS = {
             {Material.WOODEN_SWORD, Material.STONE_SWORD, Material.IRON_SWORD, Material.DIAMOND_SWORD, Material.NETHERITE_SWORD},
             {Material.WOODEN_PICKAXE, Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE},
@@ -1063,13 +1018,6 @@ public class RandomEvents implements Listener {
         return null;
     }
 
-    /**
-     * Jedes Tool und Rüstungsteil im Inventar bekommt random
-     * eine Stufe hoch (Upgrade) oder eine Stufe runter (Downgrade).
-     * Ist es schon auf max (Netherite) → kann nur downgraden.
-     * Ist es schon auf min (Wood/Leather) → kann nur upgraden.
-     * Enchantments bleiben erhalten.
-     */
     public void triggerEquipmentShuffle(Player p, String byUser) {
         PlayerInventory inv = p.getInventory();
 
@@ -1079,7 +1027,7 @@ public class RandomEvents implements Listener {
 
             Material mat = item.getType();
             Material[] tierArray = findTierArray(mat);
-            if (tierArray == null) continue; // Kein tiered Item → überspringen
+            if (tierArray == null) continue;
 
             int currentIndex = -1;
             for (int i = 0; i < tierArray.length; i++) {
@@ -1087,7 +1035,6 @@ public class RandomEvents implements Listener {
             }
             if (currentIndex == -1) continue;
 
-            // Bestimme ob Upgrade oder Downgrade
             boolean canUpgrade = currentIndex < tierArray.length - 1;
             boolean canDowngrade = currentIndex > 0;
 
@@ -1095,7 +1042,6 @@ public class RandomEvents implements Listener {
             String changeType;
 
             if (canUpgrade && canDowngrade) {
-                // Beides möglich → 50/50
                 if (rng.nextBoolean()) {
                     newIndex = currentIndex + 1;
                     changeType = "upgrade";
@@ -1104,20 +1050,17 @@ public class RandomEvents implements Listener {
                     changeType = "downgrade";
                 }
             } else if (canUpgrade) {
-                // Nur Upgrade möglich (z.B. Wooden → Stone)
                 newIndex = currentIndex + 1;
                 changeType = "upgrade";
             } else if (canDowngrade) {
-                // Nur Downgrade möglich (z.B. Netherite → Diamond)
                 newIndex = currentIndex - 1;
                 changeType = "downgrade";
             } else {
-                continue; // Sollte nie passieren (nur 1 Tier-Stufe)
+                continue;
             }
 
             Material newMat = tierArray[newIndex];
 
-            // Neues Item erstellen, Enchantments + Meta beibehalten
             ItemStack newItem = new ItemStack(newMat, item.getAmount());
             if (item.hasItemMeta()) {
                 org.bukkit.inventory.meta.ItemMeta oldMeta = item.getItemMeta();
@@ -1133,7 +1076,6 @@ public class RandomEvents implements Listener {
             }
             inv.setItem(slot, newItem);
 
-            // Detail-Nachricht pro geändertem Item
             Map<String, String> detailPh = new HashMap<>();
             detailPh.put("item", pretty(mat.name()));
             detailPh.put("new_item", pretty(newMat.name()));
@@ -1142,7 +1084,6 @@ public class RandomEvents implements Listener {
 
         p.updateInventory();
 
-        // Haupt-Nachricht
         Map<String, String> ph = new HashMap<>();
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         String key = (byUser != null && !byUser.isBlank())
@@ -1150,5 +1091,4 @@ public class RandomEvents implements Listener {
                 : "events.equipment_shuffle.solo";
         p.sendMessage(i18n.tr(p, key, ph));
     }
-
 }

@@ -12,17 +12,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/**
- * StreamElements WebSocket Integration.
- *
- * JWT-Tokens werden aus "streamelements.yml" im Plugin-Ordner gelesen –
- * diese Datei wird NIE von Bukkit's saveConfig() überschrieben.
- *
- * Format der streamelements.yml:
- *   enabled: true
- *   accounts: "exnfachjan:JWT1;freund:JWT2"
- *   amount_per_trigger: 5.0
- */
 public class StreamElementsIntegrationManager {
 
     private static final String SE_WSS = "wss://realtime.streamelements.com/socket.io/?EIO=3&transport=websocket";
@@ -34,7 +23,6 @@ public class StreamElementsIntegrationManager {
     private final List<SEConnection> connections = new CopyOnWriteArrayList<>();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
-    // Gecachte Config-Werte
     private boolean enabled = false;
     private boolean tipsEnabled = true;
     private double amountPerTrigger = 5.0;
@@ -50,10 +38,6 @@ public class StreamElementsIntegrationManager {
                 .build();
         ensureFileExists();
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Public API
-    // ─────────────────────────────────────────────────────────────────────────
 
     public void start() {
         SEConfig cfg = loadSEFile();
@@ -128,14 +112,6 @@ public class StreamElementsIntegrationManager {
         }, 500, TimeUnit.MILLISECONDS);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Schreibzugriff auf streamelements.yml (für GUI-Toggle und Slider)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Setzt den enabled-Wert in streamelements.yml und reconnectet SE.
-     * Wird vom GUI-Toggle aufgerufen.
-     */
     public boolean getEnabled() {
         return loadSEFile().enabled;
     }
@@ -150,20 +126,16 @@ public class StreamElementsIntegrationManager {
     }
 
     public void setAmountPerTrigger(double value) {
-        // Auf 1 Nachkommastelle runden
         double rounded = Math.round(value * 10.0) / 10.0;
         rewriteFileLine("amount_per_trigger:", "amount_per_trigger: " + rounded);
         this.amountPerTrigger = rounded;
     }
 
-    /**
-     * Ersetzt eine Zeile in streamelements.yml die mit dem Prefix beginnt.
-     */
     private void rewriteFileLine(String linePrefix, String newLine) {
         if (!seFile.exists()) { ensureFileExists(); }
         try {
-            java.util.List<String> lines = java.nio.file.Files.readAllLines(seFile.toPath(), StandardCharsets.UTF_8);
-            java.util.List<String> out = new java.util.ArrayList<>();
+            List<String> lines = Files.readAllLines(seFile.toPath(), StandardCharsets.UTF_8);
+            List<String> out = new ArrayList<>();
             boolean replaced = false;
             for (String line : lines) {
                 if (line.trim().startsWith(linePrefix) && !line.trim().startsWith("#")) {
@@ -173,16 +145,12 @@ public class StreamElementsIntegrationManager {
                     out.add(line);
                 }
             }
-            if (!replaced) out.add(newLine); // Zeile nicht gefunden → anhängen
-            java.nio.file.Files.write(seFile.toPath(), out, StandardCharsets.UTF_8);
+            if (!replaced) out.add(newLine);
+            Files.write(seFile.toPath(), out, StandardCharsets.UTF_8);
         } catch (Exception e) {
             plugin.getLogger().warning("[SE] Konnte streamelements.yml nicht schreiben: " + e.getMessage());
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // streamelements.yml direkt lesen (niemals Bukkit saveConfig verwenden)
-    // ─────────────────────────────────────────────────────────────────────────
 
     private void ensureFileExists() {
         if (seFile.exists()) return;
@@ -227,7 +195,6 @@ public class StreamElementsIntegrationManager {
                     result.amountPerTrigger = parseDouble(line.substring("amount_per_trigger:".length()), 5.0);
                 } else if (line.startsWith("accounts:")) {
                     String raw = line.substring("accounts:".length()).trim();
-                    // Anführungszeichen entfernen
                     if (raw.startsWith("\"") && raw.endsWith("\"")) raw = raw.substring(1, raw.length() - 1);
                     else if (raw.startsWith("'") && raw.endsWith("'")) raw = raw.substring(1, raw.length() - 1);
                     result.accounts = parseAccounts(raw);
@@ -272,10 +239,6 @@ public class StreamElementsIntegrationManager {
         catch (Exception e) { return def; }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Hilfsklassen
-    // ─────────────────────────────────────────────────────────────────────────
-
     private static class SEConfig {
         boolean enabled = false;
         boolean tipsEnabled = true;
@@ -284,10 +247,6 @@ public class StreamElementsIntegrationManager {
     }
 
     private record AccountEntry(String channel, String jwtToken) {}
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Timer-Check
-    // ─────────────────────────────────────────────────────────────────────────
 
     private boolean isTimerRunning() {
         try {
@@ -329,10 +288,6 @@ public class StreamElementsIntegrationManager {
         while (end < json.length() && (Character.isDigit(json.charAt(end)) || json.charAt(end) == '.')) end++;
         try { return Double.parseDouble(json.substring(start, end)); } catch (Exception e) { return 0.0; }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // SEConnection
-    // ─────────────────────────────────────────────────────────────────────────
 
     private class SEConnection {
         private final String channelName;

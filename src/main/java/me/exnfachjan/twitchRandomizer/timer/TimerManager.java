@@ -40,7 +40,6 @@ public class TimerManager implements Listener {
     private final File dataFile;
     private long lastAutosaveSecond = 0;
 
-    // Freeze & Particle
     private BukkitTask particleTask = null;
     private double particleAngle = 0.0;
 
@@ -50,8 +49,6 @@ public class TimerManager implements Listener {
         this.dataFile = new File(plugin.getDataFolder(), "timer.yml");
         loadState();
         startActionbarLoop();
-        // Wenn Server startet und Timer nicht aktiv → nach dem ersten Tick einfrieren
-        // (Entities sind zu diesem Zeitpunkt noch nicht geladen, daher runTaskLater)
         if (!running) {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (!running) {
@@ -61,10 +58,6 @@ public class TimerManager implements Listener {
             }, 1L);
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Public API
-    // ─────────────────────────────────────────────────────────────────────────
 
     public void start() {
         if (!running) {
@@ -91,7 +84,7 @@ public class TimerManager implements Listener {
         elapsedSeconds = 0;
         showOnce();
         if (wasRunning) onTimerStopped();
-        else stopFreezeEffects(); // Auch bei reset aufräumen
+        else stopFreezeEffects();
         saveState();
     }
 
@@ -104,14 +97,8 @@ public class TimerManager implements Listener {
         if (task != null) { task.cancel(); task = null; }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Freeze & Partikel Effekte
-    // ─────────────────────────────────────────────────────────────────────────
-
     private void onTimerStarted() {
         stopFreezeEffects();
-        // Ticks wieder auf MC-Standard (20)
-        // Ticks unfreezen via Paper API
         unfreezeTime();
         playTimerSound(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
     }
@@ -122,12 +109,6 @@ public class TimerManager implements Listener {
         playTimerSound(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 0.8f);
     }
 
-    /**
-     * Friert alle Entities und Ticks ein via Paper's setFrozenTicks / world tick speed.
-     * Paper 1.21 unterstützt world.setSimulationDistance(0) nicht zuverlässig,
-     * daher nutzen wir das Minecart-Freeze-Approach: wir setzen den Game Rule
-     * randomTickSpeed auf 0 und frieren alle lebenden Entities via Paper API ein.
-     */
     @SuppressWarnings("deprecation")
     private void freezeTime() {
         try {
@@ -144,8 +125,6 @@ public class TimerManager implements Listener {
                 try { entity.setVelocity(new org.bukkit.util.Vector(0, 0, 0)); } catch (Throwable ignored2) {}
                 if (entity instanceof org.bukkit.entity.LivingEntity le) {
                     le.setAI(false);
-                    // Gravity NICHT deaktivieren – führt zu Void-Tod bei unebenem Boden.
-                    // Invulnerability schützt vor Schaden falls sie dennoch fallen.
                     le.setInvulnerable(true);
                 }
             }
@@ -180,9 +159,6 @@ public class TimerManager implements Listener {
         } catch (Throwable ignored) {}
     }
 
-    /**
-     * Spiralförmige Kerzen-Partikel um alle Online-Spieler (außer Spectator).
-     */
     private void startParticleEffect() {
         stopParticleTask();
         particleAngle = 0.0;
@@ -196,31 +172,28 @@ public class TimerManager implements Listener {
                     if (p.getGameMode() == GameMode.SPECTATOR) continue;
                     spawnSpiralParticles(p, particleAngle);
                 }
-                particleAngle += 15.0; // Rotationsgeschwindigkeit
+                particleAngle += 15.0;
                 if (particleAngle >= 360.0) particleAngle -= 360.0;
             }
-        }.runTaskTimer(plugin, 0L, 1L); // Jeden Tick für flüssige Spirale
+        }.runTaskTimer(plugin, 0L, 1L);
     }
 
     private void spawnSpiralParticles(Player p, double baseAngle) {
         Location center = p.getLocation().add(0, 1.0, 0);
         double radius = 1.3;
-        int arms = 3; // Anzahl Spiralarme
+        int arms = 3;
 
         for (int arm = 0; arm < arms; arm++) {
             double armOffset = (360.0 / arms) * arm;
             double angle = Math.toRadians(baseAngle + armOffset);
 
-            // Hauptpartikel
             double x = Math.cos(angle) * radius;
             double z = Math.sin(angle) * radius;
-            // Y-Offset: Sinuswelle für Hoch-Runter-Bewegung
             double yOffset = Math.sin(Math.toRadians(baseAngle * 2 + armOffset)) * 0.6;
 
             Location loc = center.clone().add(x, yOffset, z);
             p.getWorld().spawnParticle(Particle.SMALL_FLAME, loc, 1, 0, 0, 0, 0);
 
-            // Zweiter Partikel leicht versetzt für Dichte
             double angle2 = Math.toRadians(baseAngle + armOffset + 8);
             double x2 = Math.cos(angle2) * (radius * 0.85);
             double z2 = Math.sin(angle2) * (radius * 0.85);
@@ -248,10 +221,6 @@ public class TimerManager implements Listener {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Events
-    // ─────────────────────────────────────────────────────────────────────────
-
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent e) {
         Bukkit.getScheduler().runTask(plugin, () -> {
@@ -266,7 +235,6 @@ public class TimerManager implements Listener {
 
     @EventHandler
     public void onCreatureSpawn(CreatureSpawnEvent e) {
-        // Neu gespawnte Entities sofort einfrieren wenn Timer pausiert
         if (!running) {
             org.bukkit.entity.LivingEntity le = e.getEntity();
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -281,8 +249,6 @@ public class TimerManager implements Listener {
 
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent e) {
-        // Wenn ein Chunk geladen wird während der Timer pausiert ist,
-        // alle Entities im Chunk einfrieren (passiert beim Joinen/Teleportieren)
         if (!running) {
             org.bukkit.Chunk chunk = e.getChunk();
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -300,15 +266,10 @@ public class TimerManager implements Listener {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Pause-Schutz: kein Schaden, kein Block-Abbau/Platzieren wenn Timer pausiert
-    // ─────────────────────────────────────────────────────────────────────────
-
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGH, ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent e) {
-        if (running) return; // Timer läuft → normal
-        if (e.getEntity() instanceof Player) return; // Spieler dürfen Schaden nehmen
-        // Alle Entities (Mobs, Tiere etc.) sind während der Pause unbesiegbar
+        if (running) return;
+        if (e.getEntity() instanceof Player) return;
         e.setCancelled(true);
     }
 
@@ -335,22 +296,15 @@ public class TimerManager implements Listener {
         Bukkit.getScheduler().runTask(plugin, () -> {
             e.getPlayer().sendActionBar(buildActionbar(e.getPlayer()));
             if (!running) {
-                // Partikel-Task starten falls noch nicht aktiv
                 if (particleTask == null) {
                     startParticleEffect();
                 }
-                // Alle Entities in der Welt des Spielers nochmal einfrieren —
-                // es könnten seit dem Server-Start neue gespawnt sein
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (!running) freezeTime();
                 }, 5L);
             }
         });
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Internal: Actionbar Loop
-    // ─────────────────────────────────────────────────────────────────────────
 
     private void startActionbarLoop() {
         task = new BukkitRunnable() {
@@ -434,10 +388,6 @@ public class TimerManager implements Listener {
     private void showOnce() {
         broadcastActionBar();
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Persistence
-    // ─────────────────────────────────────────────────────────────────────────
 
     private void loadState() {
         if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();

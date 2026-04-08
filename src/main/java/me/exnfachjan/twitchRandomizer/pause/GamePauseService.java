@@ -17,15 +17,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Tracks "global pause" conditions such as death screen or all players being spectators.
- * Timer increments and Twitch queue processing should respect isPaused().
- */
 public final class GamePauseService implements Listener {
 
     private final TwitchRandomizer plugin;
 
-    // Players currently in the death screen (PlayerDeathEvent -> PlayerRespawnEvent)
     private final Set<UUID> inDeathScreen = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private final boolean pauseOnDeath;
@@ -44,20 +39,13 @@ public final class GamePauseService implements Listener {
         return false;
     }
 
-    /**
-     * FIX: Vorher stand hier "return !any || true;" was IMMER true ergab (auch am Anfang der Schleife).
-     * Logik: Wenn die Schleife durchläuft ohne false zu returnen, sind alle Spectator.
-     * Wenn niemand online ist, wird ebenfalls pausiert.
-     */
     private boolean allOnlineAreSpectator() {
-        if (Bukkit.getOnlinePlayers().isEmpty()) return true; // Niemand online → pausieren
+        if (Bukkit.getOnlinePlayers().isEmpty()) return true;
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (p.getGameMode() != GameMode.SPECTATOR) return false;
         }
-        return true; // Alle online sind Spectator
+        return true;
     }
-
-    // ==== Events ====
 
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent e) {

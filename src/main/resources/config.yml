@@ -9,7 +9,7 @@
 twitch:
   # Twitch channel(s) – add more lines for multiple streamers
   channels:
-    - exnfachjan
+    - YOUR_CHANNEL_HERE
 
   # OAuth Access Token in format "oauth:xxxxxxxx..."
   # Required scopes:
@@ -18,7 +18,7 @@ twitch:
   #   - channel:read:subscriptions (Sub-Events)
   #   - bits:read                  (Bits-Events)
   # Create your token: https://twitchtokengenerator.com/quick/1KRFjxyoNE
-  oauth_token: "oauth:DEIN_TOKEN_HIER"
+  oauth_token: "YOUR_TOKEN_HERE"
 
   # Cooldown between events in seconds (recommended: 30s)
   trigger_interval_seconds: 30.0

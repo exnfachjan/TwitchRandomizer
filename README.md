@@ -1,5 +1,8 @@
 # TwitchRandomizer
 
+[![Modrinth](https://img.shields.io/badge/Modrinth-exnfachjanTTV-1bd96a?logo=modrinth&logoColor=white)](https://modrinth.com/user/exnfachjanTTV)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings interactive, randomized challenges to your server... all controlled by your Twitch viewers! It seamlessly integrates your Minecraft gameplay with Twitch chat, letting your audience influence and trigger in-game events in real time.
 
 ---
@@ -10,8 +13,11 @@ TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings intera
   Twitch viewers can trigger random events by subscribing or donating bits to your channel!
 
 - **Play this Challenge with your Twitch Friends:**  
-  The plugin can read subscriptions and bits from multiple Twitch accounts. So you can play this challenge with your Twitch friends!  
-  **_Shared Chat might not work properly!_**
+  The plugin can read subscriptions and bits from multiple Twitch accounts — including StreamElements donations. So you can play this challenge with your Twitch friends!  
+  **_Shared Chat may work, but seamless functionality is not guaranteed._**
+
+- **StreamElements Donation Integration:**  
+  Donations via StreamElements trigger in-game events. Supports multiple streamer accounts simultaneously. Configuration is done exclusively via `streamelements.yml` in the plugin folder — reload in-game with `/trconfig se reload`.
 
 - **Twitch Role Colors:**  
   Viewer names appear color-coded in Minecraft chat — Broadcaster (red), Moderator (green), VIP (pink), and regular viewers (white).
@@ -27,6 +33,9 @@ TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings intera
 
 - **Pause System:**  
   Timer and queue automatically pause when a player is in the death screen or when all players are in spectator mode. Fully configurable.
+
+- **Pause Aura:**  
+  When the timer is paused, a spiral flame particle aura appears around all online players — a clear visual indicator that the challenge is on hold.
 
 - **Graphical Interface (GUI):**  
   Tweak plugin settings, manage event weights, control the timer, and configure behaviors directly from an in-game GUI. Perfect for easy setup without any OP permissions!
@@ -76,6 +85,7 @@ Optional commands (not necessary, because you can manage everything seamlessly f
 | **anvil_rain**        | Anvils fall from the sky                                                          |
 | **skyblock**          | All surrounding chunks get deleted — instant Skyblock!                            |
 | **fake_totem**        | Receive a Totem of Undying that doesn't actually work                             |
+| **equipment_shuffle** | All tiered tools and armor in your inventory are randomly upgraded or downgraded  |
 
 ---
 
@@ -94,10 +104,29 @@ You can configure the plugin through the config.yml or without OP permissions di
      You can get your OAuth token here: https://twitchtokengenerator.com/quick/1KRFjxyoNE  
      Make sure the following scopes are active: `bits.read`, `chat:read`, `channel:read:subscriptions` and `user:read:subscriptions`.
 
-3. **Reload/Restart:**  
+3. **Configure StreamElements (optional):**  
+   Edit `plugins/TwitchRandomizer/streamelements.yml` — this file is created automatically on first start and is **never overwritten** by the plugin.
+
+   ```yaml
+   enabled: true
+   accounts: "YOUR_CHANNEL:YOUR_JWT_TOKEN"
+   amount_per_trigger: 5.0
+   tips_enabled: true
+   ```
+
+   For multiple streamers, separate entries with a semicolon:
+
+   ```yaml
+   accounts: "Channel1:JWT1;Channel2:JWT2"
+   ```
+
+   Get your JWT token from: https://streamelements.com/dashboard/account/channels  
+   After editing the file, apply it in-game with `/trconfig se reload` — no server restart required.
+
+4. **Reload/Restart:**  
    If you use the GUI, you don't need to restart the server.
 
-4. **Set up your trigger**  
+5. **Set up your trigger**  
    You can test your connection. With the test triggers enabled (find them in the `Debug Menu`), you can simulate events like a sub (`!test`), a gift sub (`!gift`), or a sub gift bomb (`!giftbomb [N]`).
 
    **MAKE SURE YOUR TIMER IS RUNNING! OTHERWISE, YOU CAN'T ADD EVENTS TO THE QUEUE THROUGH TWITCH!**
@@ -128,6 +157,20 @@ The GUI uses sensible permission checks for each action.
 - Minecraft Paper server 1.21+
 - Java 21 or newer
 - Twitch account (at least affiliate) and OAuth token for chat integration
+
+---
+
+## 📋 Changelog
+
+### v1.4.0
+
+- **New event: `equipment_shuffle`** — All tiered tools and armor in the inventory are randomly upgraded or downgraded by one tier. Enchantments, display names, and lore are preserved.
+- **StreamElements donation integration** — Donations via StreamElements now trigger in-game events. Configured exclusively through `streamelements.yml` (never touched by the plugin's auto-save). Supports multiple streamer accounts simultaneously. Reload in-game with `/trconfig se reload` — no restart required.
+- **Pause aura** — A spiral flame particle effect is displayed around all online players while the timer is paused, making the paused state clearly visible at a glance.
+
+### v1.3.1
+
+- Initial public release.
 
 ---
 

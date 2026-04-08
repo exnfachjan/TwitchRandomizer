@@ -89,11 +89,11 @@ public class RandomEventCommand implements CommandExecutor {
             if (events.isNoCraftingActive(player)) noCraftingActive = true;
         }
         if (anyGroundActive) {
-            weightsForPick[11] = 0; // floor_is_lava
-            weightsForPick[13] = 0; // slippery_ground
+            weightsForPick[11] = 0;
+            weightsForPick[13] = 0;
         }
         if (noCraftingActive) {
-            weightsForPick[9] = 0; // no_crafting
+            weightsForPick[9] = 0;
         }
 
         int totalWeight = 0;
@@ -153,7 +153,7 @@ public class RandomEventCommand implements CommandExecutor {
                     case "broadcaster" -> ChatColor.RED.toString();
                     case "moderator"   -> ChatColor.GREEN.toString();
                     case "vip"         -> ChatColor.LIGHT_PURPLE.toString();
-                    case "donation"    -> ChatColor.AQUA.toString();  // SE-Donations = Blau
+                    case "donation"    -> ChatColor.AQUA.toString();
                     default            -> ChatColor.WHITE.toString();
                 };
                 return color + name + ChatColor.RESET;

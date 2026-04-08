@@ -34,15 +34,12 @@ public class TwitchIntegrationManager {
     private List<String> currentChannels = new ArrayList<>();
     private String currentToken = null;
 
-    // Toggles
     private boolean subsEnabled;
     private boolean chatTriggerEnabled;
 
-    // Bits-Trigger
     private boolean bitsEnabled;
     private int bitsPerTrigger;
 
-    // Chat-/Sim-Triggers
     private static final String TEST_TRIGGER = "!test";
     private static final String CMD_GIFT = "!gift";
     private static final String CMD_GIFTBOMB = "!giftbomb";
@@ -50,29 +47,24 @@ public class TwitchIntegrationManager {
     private boolean simGiftBombEnabled;
     private int simGiftBombDefaultCount;
 
-    // Queue + Worker
     private final Queue<String> commandQueue = new ConcurrentLinkedQueue<>();
     private BukkitTask queueWorker;
 
     private boolean queueLoaded = false;
 
-    // Cooldown (Ticks) zwischen Dispatches
     private int gapTicks = 20;
     private int ticksSinceLastDispatch = 0;
     private boolean cooledAndReady = true;
 
     private boolean debug = false;
 
-    // Persistenz
     private final File queueFile;
 
-    // FIX: Thread-safe Set statt normalem HashSet für Deathscreen-Tracking
     private final Set<UUID> deathScreenPlayers = ConcurrentHashMap.newKeySet();
 
     public TwitchIntegrationManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.queueFile = new File(plugin.getDataFolder(), "queue.txt");
-        // Listener für Deathscreen
         Bukkit.getPluginManager().registerEvents(new Listener() {
             @EventHandler
             public void onPlayerDeath(PlayerDeathEvent event) {
@@ -91,7 +83,6 @@ public class TwitchIntegrationManager {
 
     private boolean isAnyPlayerInDeathScreen() {
         if (deathScreenPlayers.isEmpty()) return false;
-        // Cleanup: Spieler die nicht mehr tot sind entfernen
         deathScreenPlayers.removeIf(uuid -> {
             Player p = Bukkit.getPlayer(uuid);
             return p == null || !p.isDead();
@@ -121,7 +112,6 @@ public class TwitchIntegrationManager {
             return;
         }
 
-        // === Config lesen ===
         this.subsEnabled = plugin.getConfig().getBoolean("twitch.triggers.subscriptions.enabled", true);
         this.chatTriggerEnabled = plugin.getConfig().getBoolean("twitch.triggers.chat_test.enabled", legacyChatTriggerFlag);
 
@@ -141,7 +131,6 @@ public class TwitchIntegrationManager {
         this.simGiftBombEnabled = plugin.getConfig().getBoolean("twitch.triggers.sim_giftbomb.enabled", false);
         this.simGiftBombDefaultCount = Math.max(1, plugin.getConfig().getInt("twitch.triggers.sim_giftbomb.default_count", 5));
 
-        // === Client bauen ===
         OAuth2Credential chatCredential = buildCredential(normToken);
         this.twitchClient = TwitchClientBuilder.builder()
                 .withEnableChat(true)
@@ -164,13 +153,11 @@ public class TwitchIntegrationManager {
         plugin.getLogger().info("Sim-Trigger: gift=" + simGiftEnabled
                 + ", giftbomb=" + simGiftBombEnabled + " (default_count=" + simGiftBombDefaultCount + ")");
 
-        // Queue laden (nur einmal pro Serverlauf)
         if (!queueLoaded) {
             loadQueue();
             queueLoaded = true;
         }
 
-        // Subs
         twitchClient.getEventManager().onEvent(SubscriptionEvent.class, event -> {
             if (!subsEnabled) return;
             if (!isTimerRunningOrDeathscreen()) return;
@@ -178,7 +165,6 @@ public class TwitchIntegrationManager {
             enqueue("randomevent " + user);
         });
 
-        // Bits / Cheers
         twitchClient.getEventManager().onEvent(CheerEvent.class, event -> {
             if (!bitsEnabled) return;
             if (!isTimerRunningOrDeathscreen()) return;
@@ -197,7 +183,6 @@ public class TwitchIntegrationManager {
             if (debug) plugin.getLogger().info("[Twitch] Cheer: " + user + " -> " + bits + " bits -> +" + count + " Events (queue=" + commandQueue.size() + ")");
         });
 
-        // Chat: !test, !gift, !giftbomb
         twitchClient.getEventManager().onEvent(ChannelMessageEvent.class, event -> {
             if (!isTimerRunningOrDeathscreen()) return;
 
@@ -235,7 +220,6 @@ public class TwitchIntegrationManager {
             }
         });
 
-        // Worker starten
         startQueueWorker();
     }
 
@@ -312,13 +296,8 @@ public class TwitchIntegrationManager {
         return false;
     }
 
-    /**
-     * FIX: Queue-Worker läuft jetzt alle 2 Ticks statt jeden Tick (Performance).
-     * FIX: Deathscreen-Pause verwendet thread-safe Set.
-     */
     private void startQueueWorker() {
         this.queueWorker = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            // Pausiere, wenn jemand im Deathscreen ist
             if (isAnyPlayerInDeathScreen()) {
                 return;
             }
@@ -369,7 +348,6 @@ public class TwitchIntegrationManager {
                 return;
             }
 
-            // FIX: Cooldown-Tracking um 2 Ticks erhöhen (da Worker alle 2 Ticks läuft)
             if (ticksSinceLastDispatch < gapTicks) ticksSinceLastDispatch += 2;
             else cooledAndReady = true;
 
@@ -385,7 +363,7 @@ public class TwitchIntegrationManager {
 
             saveQueueAsync();
 
-        }, 1L, 2L); // FIX: Alle 2 Ticks statt jeden Tick
+        }, 1L, 2L);
     }
 
     private String resolveAuthorFromChat(ChannelMessageEvent event) {
@@ -402,7 +380,6 @@ public class TwitchIntegrationManager {
             } else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
                 name = event.getUser().getName();
             }
-            // Rolle aus badges-Tag lesen
             role = resolveTwitchRoleFromIRC(event.getMessageEvent());
         } catch (Throwable ignored) {}
         return colorizeByRole(name, role);
@@ -443,14 +420,9 @@ public class TwitchIntegrationManager {
         return colorizeByRole(name, role);
     }
 
-    /**
-     * Liest die Twitch-Rolle aus dem badges-Tag des IRC-Events.
-     * Gibt "broadcaster", "moderator", "vip" oder "" zurück.
-     */
     private String resolveTwitchRoleFromIRC(Object msgEvent) {
         if (msgEvent == null) return "";
         try {
-            // badges-Tag enthält z.B. "broadcaster/1,subscriber/12" oder "moderator/1,subscriber/3"
             java.lang.reflect.Method m = msgEvent.getClass().getMethod("getTagValue", String.class);
             @SuppressWarnings("unchecked")
             java.util.Optional<String> opt = (java.util.Optional<String>) m.invoke(msgEvent, "badges");
@@ -464,11 +436,6 @@ public class TwitchIntegrationManager {
         return "";
     }
 
-    /**
-     * Kodiert die Twitch-Rolle als Prefix im Usernamen.
-     * Format: "role:ROLLE:Username" — wird im RandomEventCommand wieder geparst.
-     * So bleiben keine §-Codes im Command/Queue-String.
-     */
     private String colorizeByRole(String name, String role) {
         if (role != null && !role.isEmpty()) {
             return "role:" + role + ":" + name;

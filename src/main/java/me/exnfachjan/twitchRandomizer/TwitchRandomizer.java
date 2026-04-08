@@ -21,7 +21,7 @@ public class TwitchRandomizer extends JavaPlugin {
 
     private TimerManager timerManager;
     private TwitchIntegrationManager twitch;
-    private StreamElementsIntegrationManager streamElements;  // <-- Feld hier oben
+    private StreamElementsIntegrationManager streamElements;
 
     private GamePauseService pauseService;
     private RandomEventCommand randomEventExecutor;
@@ -31,14 +31,9 @@ public class TwitchRandomizer extends JavaPlugin {
     private SessionConfig sessionConfig;
     private ResetManager resetManager;
 
-    // ==== Reset-Bestätigung (In-Memory) ====
     private long resetConfirmUntilMs = 0L;
     private String resetConfirmRequester = null;
 
-    /**
-     * Gibt die Default-Event-Gewichte zurück, wie sie im Projekt verwendet werden sollen.
-     * Diese Werte sind hartcodiert und können NICHT über die config.yml überschrieben werden!
-     */
     public Map<String, Integer> getDefaultWeights() {
         Map<String, Integer> defaults = new HashMap<>();
         defaults.put("spawn_mobs", 35);
@@ -112,7 +107,6 @@ public class TwitchRandomizer extends JavaPlugin {
         PluginCommand resetCmd = getCommand("reset");
         if (resetCmd != null) resetCmd.setExecutor(new ResetCommand(this));
 
-        // Mehrere Channels unterstützen
         List<String> channels = getConfig().getStringList("twitch.channels");
         if (channels == null || channels.isEmpty()) {
             String single = getConfig().getString("twitch.channel", "");
@@ -148,14 +142,12 @@ public class TwitchRandomizer extends JavaPlugin {
         PluginCommand trguiCmd = getCommand("trgui");
         if (trguiCmd != null) trguiCmd.setExecutor(new TrGuiCommand(this, configGui));
 
-        // /gui als Alias für trgui
         PluginCommand guiCmd = getCommand("gui");
         if (guiCmd != null) guiCmd.setExecutor(new TrGuiCommand(this, configGui));
     }
 
     @Override
     public void onDisable() {
-        // Pending Debounce-Task cancellen damit kein async Save nach Shutdown läuft
         applyPending = false;
         org.bukkit.Bukkit.getScheduler().cancelTasks(this);
 
@@ -164,7 +156,6 @@ public class TwitchRandomizer extends JavaPlugin {
         if (timerManager != null) timerManager.shutdown();
         if (messages != null) messages.savePlayerLocales();
 
-        // Config einmal synchron speichern um Race Condition beim Shutdown zu vermeiden
         try { saveConfig(); } catch (Throwable ignored) {}
     }
 
@@ -177,16 +168,14 @@ public class TwitchRandomizer extends JavaPlugin {
     public ResetManager getResetManager() { return resetManager; }
     public SessionConfig getSessionConfig() { return sessionConfig; }
 
-    // Debounce: applyDynamicConfig mehrfach kurz hintereinander → nur 1x ausführen
     private volatile long lastApplyRequestMs = 0L;
     private volatile boolean applyPending = false;
 
     public void applyDynamicConfig() {
         lastApplyRequestMs = System.currentTimeMillis();
-        if (applyPending) return; // Bereits ein Aufruf geplant
+        if (applyPending) return;
         applyPending = true;
 
-        // 200ms warten – alle weiteren Aufrufe in diesem Fenster werden zusammengefasst
         org.bukkit.Bukkit.getScheduler().runTaskLaterAsynchronously(this, () -> {
             applyPending = false;
             org.bukkit.Bukkit.getScheduler().runTask(this, () -> {
@@ -208,10 +197,9 @@ public class TwitchRandomizer extends JavaPlugin {
                     getLogger().warning("i18n reload failed: " + e.getMessage());
                 }
             });
-        }, 4L); // 4 Ticks = ~200ms Debounce-Fenster
+        }, 4L);
     }
 
-    // ==== Reset Confirmation API ====
     public synchronized void startResetConfirmation(String requester, int windowSeconds) {
         if (windowSeconds < 1) windowSeconds = 1;
         this.resetConfirmUntilMs = System.currentTimeMillis() + windowSeconds * 1000L;
@@ -240,6 +228,5 @@ public class TwitchRandomizer extends JavaPlugin {
     public GamePauseService getPauseService() { return pauseService; }
 
     public void onGlobalPauseStateChanged(boolean paused) {
-        // No-op: Timer tick/actionbar already reflect pause via GamePauseService.
     }
 }
