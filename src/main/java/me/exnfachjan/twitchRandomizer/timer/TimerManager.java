@@ -15,6 +15,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -46,15 +47,15 @@ public class TimerManager implements Listener {
         this.dataFile = new File(plugin.getDataFolder(), "timer.yml");
         loadState();
         startActionbarLoop();
-        // Wenn Server startet und Timer ist nicht aktiv → Partikel sofort aktivieren
+        // Wenn Server startet und Timer nicht aktiv → nach dem ersten Tick einfrieren
+        // (Entities sind zu diesem Zeitpunkt noch nicht geladen, daher runTaskLater)
         if (!running) {
-            // Verzögerung damit der Server fertig geladen hat
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (!running) {
                     freezeTime();
                     startParticleEffect();
                 }
-            }, 40L); // 2 Sekunden nach Start
+            }, 1L);
         }
     }
 
@@ -263,9 +264,8 @@ public class TimerManager implements Listener {
     @EventHandler
     public void onCreatureSpawn(CreatureSpawnEvent e) {
         // Neu gespawnte Entities sofort einfrieren wenn Timer pausiert
-        if (!running && particleTask != null) {
+        if (!running) {
             org.bukkit.entity.LivingEntity le = e.getEntity();
-            // 1 Tick verzögern damit Bukkit das Entity fertig initialisiert hat
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (!running && le.isValid()) {
                     le.setAI(false);
@@ -277,12 +277,40 @@ public class TimerManager implements Listener {
     }
 
     @EventHandler
+    public void onChunkLoad(ChunkLoadEvent e) {
+        // Wenn ein Chunk geladen wird während der Timer pausiert ist,
+        // alle Entities im Chunk einfrieren (passiert beim Joinen/Teleportieren)
+        if (!running) {
+            org.bukkit.Chunk chunk = e.getChunk();
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!running) {
+                    for (org.bukkit.entity.Entity entity : chunk.getEntities()) {
+                        if (entity instanceof Player) continue;
+                        try { entity.setVelocity(new org.bukkit.util.Vector(0, 0, 0)); } catch (Throwable ignored) {}
+                        if (entity instanceof org.bukkit.entity.LivingEntity le) {
+                            le.setAI(false);
+                            le.setInvulnerable(true);
+                        }
+                    }
+                }
+            }, 2L);
+        }
+    }
+
+    @EventHandler
     public void onPlayerJoin(PlayerJoinEvent e) {
         Bukkit.getScheduler().runTask(plugin, () -> {
             e.getPlayer().sendActionBar(buildActionbar(e.getPlayer()));
-            // Wenn Timer gerade pausiert ist und kein Partikel-Task läuft → jetzt starten
-            if (!running && particleTask == null) {
-                startParticleEffect();
+            if (!running) {
+                // Partikel-Task starten falls noch nicht aktiv
+                if (particleTask == null) {
+                    startParticleEffect();
+                }
+                // Alle Entities in der Welt des Spielers nochmal einfrieren —
+                // es könnten seit dem Server-Start neue gespawnt sein
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (!running) freezeTime();
+                }, 5L);
             }
         });
     }
