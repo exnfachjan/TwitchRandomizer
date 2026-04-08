@@ -92,26 +92,26 @@ language:
 # ─────────────────────────────────────────────────────────────────────────────
 events:
   weights:
-    spawn_mobs: 35
-    potion: 15
-    give_item: 20
-    clear_inventory: 4
-    teleport: 5
-    damage_half_heart: 10
+    spawn_mobs: 18
+    potion: 16
+    give_item: 12
+    inv_shuffle: 10
+    damage_half_heart: 12
     fire: 10
-    inv_shuffle: 8
-    hot_potato: 7
+    nasa_call: 8
+    hell_is_calling: 8
+    safe_creepers: 7
+    floor_is_lava: 8
+    slippery_ground: 7
+    hot_potato: 6
+    tnt_rain: 6
+    anvil_rain: 5
     no_crafting: 6
-    safe_creepers: 5
-    floor_is_lava: 7
-    nasa_call: 5
-    slippery_ground: 6
-    hell_is_calling: 6
-    tnt_rain: 4
-    anvil_rain: 6
-    skyblock: 7
-    fake_totem: 5
     equipment_shuffle: 8
+    teleport: 5
+    fake_totem: 5
+    clear_inventory: 4
+    skyblock: 5
 
   settings:
     no_crafting:
