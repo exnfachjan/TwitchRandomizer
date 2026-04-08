@@ -167,6 +167,7 @@ The GUI uses sensible permission checks for each action.
 - **New event: `equipment_shuffle`** — All tiered tools and armor in the inventory are randomly upgraded or downgraded by one tier. Enchantments, display names, and lore are preserved.
 - **StreamElements donation integration** — Donations via StreamElements now trigger in-game events. Configured exclusively through `streamelements.yml` (never touched by the plugin's auto-save). Supports multiple streamer accounts simultaneously. Reload in-game with `/trconfig se reload` — no restart required.
 - **Pause aura** — A spiral flame particle effect is displayed around all online players while the timer is paused, making the paused state clearly visible at a glance.
+- **Weights:** small default value change
 
 ### v1.3.1
 
