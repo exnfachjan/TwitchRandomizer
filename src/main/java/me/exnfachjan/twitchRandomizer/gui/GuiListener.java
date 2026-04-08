@@ -31,7 +31,7 @@ public class GuiListener implements Listener {
 
     private static final String TOKEN_URL = "https://twitchtokengenerator.com/quick/1KRFjxyoNE";
 
-    private enum EditType { CHANNEL, TOKEN, SE_TOKEN }
+    private enum EditType { CHANNEL, TOKEN }
 
     private final Map<UUID, EditType> pending = new ConcurrentHashMap<>();
     private final Map<UUID, Long> pendingSince = new ConcurrentHashMap<>();
@@ -100,7 +100,7 @@ public class GuiListener implements Listener {
                     p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.timer.stop");
                     return;
                 }
-                try { plugin.getTimerManager().stop(); } catch (Throwable ignored) {}
+                try { plugin.getTimerManager().pause(); } catch (Throwable ignored) {}
                 refreshMenu(type, p);
             }
             case "timer_reset" -> {
@@ -230,7 +230,7 @@ public class GuiListener implements Listener {
                 } else if (e.isRightClick()) {
                     plugin.getDeathCounter().increment();
                 } else {
-                    plugin.getDeathCounter().set(plugin.getDeathCounter().get() - 1);
+                    plugin.getDeathCounter().decrement();
                 }
                 plugin.getDeathCounter().broadcastActionbar();
                 refreshMenu(type, p);
@@ -261,13 +261,7 @@ public class GuiListener implements Listener {
                 }
 
                 EditType edit;
-                if (e.isShiftClick() && e.isRightClick()) {
-                    edit = EditType.SE_TOKEN;
-                } else if (e.isRightClick()) {
-                    edit = EditType.TOKEN;
-                } else {
-                    edit = EditType.CHANNEL;
-                }
+                EditType edit = e.isRightClick() ? EditType.TOKEN : EditType.CHANNEL;
 
                 p.closeInventory();
                 p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.warn_sensitive"));
@@ -275,7 +269,6 @@ public class GuiListener implements Listener {
                 String chatKey = switch (edit) {
                     case CHANNEL  -> "gui.book.chat.received_channel";
                     case TOKEN    -> "gui.book.chat.received_token";
-                    case SE_TOKEN -> "gui.book.chat.received_se_token";
                 };
                 p.sendMessage(plugin.getMessages().tr(p, chatKey));
 
@@ -371,15 +364,6 @@ public class GuiListener implements Listener {
                 cfg.set("twitch.oauth_token", token);
                 p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.saved_token"));
             }
-            case SE_TOKEN -> {
-                String jwt = text.trim();
-                // Anführungszeichen entfernen falls vorhanden
-                if (jwt.length() >= 2 && jwt.startsWith("\"") && jwt.endsWith("\"")) {
-                    jwt = jwt.substring(1, jwt.length() - 1).trim();
-                }
-                cfg.set("streamelements.jwt_token", jwt);
-                p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.saved_se_token"));
-            }
         }
 
         try { plugin.saveConfig(); } catch (Throwable ignored) {}
@@ -462,7 +446,6 @@ public class GuiListener implements Listener {
                 case CHANNEL  -> plugin.getMessages().tr(p, "gui.book.page.channel");
                 case TOKEN    -> plugin.getMessages().tr(p, "gui.book.page.token.text",
                         java.util.Map.of("url", TOKEN_URL));
-                case SE_TOKEN -> plugin.getMessages().tr(p, "gui.book.page.se_token.text");
             };
             meta.addPage(pageText);
 

@@ -108,11 +108,10 @@ public class Messages {
         de.put("gui.main.twitch_info_lore", java.util.List.of(
                 "&7Channel: &f{channel}",
                 "&7Token: &f{token_masked}",
-                "&7SE-Token: &f{se_token_masked}",
                 "&4Achtung: sensible Daten!",
                 "&7Links: &fChannel setzen",
-                "&7Rechts: &fTwitch-Token setzen",
-                "&7Shift+Rechts: &fStreamElements JWT setzen"));
+                "&7Rechts: &fToken setzen",
+                "&7SE-JWT: &8Nur über config.yml"));
         de.put("gui.main.misc_name", "&6Misc");
         de.put("gui.main.misc_lore", java.util.List.of("&7Diverse Einstellungen", "&7z. B. 'Spectator after death' & Deathcounter"));
         de.put("gui.main.debug_name", "&dDebug Menü");
@@ -164,17 +163,14 @@ public class Messages {
                 "Beispiel: Kanal1, Kanal2, Kanal3");
         de.put("gui.book.page.token.text", "Ersetzte diesen Text mit den Access Token deines Bots, welchen du unter {url} erhalten kannst.");
         de.put("gui.book.page.token.link_text", "Token-Generator öffnen");
-        de.put("gui.book.page.se_token.text", "Ersetze diesen Text mit deinem StreamElements JWT-Token.\n\nDen Token findest du unter:\nstreamelements.com\n→ Mein Konto\n→ Tokens (ganz unten)");
         de.put("gui.book.page.reward", "Schreibe auf die erste Seite den EXAKTEN Namen deiner Kanalpunkte-Belohnung und signiere das Buch.");
         de.put("gui.book.chat.warn_sensitive", "§6[Hinweis] §eAchte auf sensible Daten (Channel/Token).");
         de.put("gui.book.chat.received_channel", "§7Du hast ein §fBuch & Feder§7 erhalten. Ersetze den Text in §fZeile 1§7 durch deinen §fTwitch-Nutzernamen§7 und klicke §fFertig§7.");
         de.put("gui.book.chat.received_token", "§7Du hast ein §fBuch & Feder§7 erhalten. Ersetze den Text in §fZeile 1§7 durch dein §fTwitch Access Token§7 und klicke §fFertig§7.");
-        de.put("gui.book.chat.received_se_token", "§7Du hast ein §fBuch & Feder§7 erhalten. Ersetze den Text durch deinen §fStreamElements JWT-Token§7 und klicke §fFertig§7.");
         de.put("gui.book.chat.inventory_full", "§7Inventar voll – Buch wurde auf den Boden gedroppt.");
         de.put("gui.book.chat.cancelled", "§eEingabe abgebrochen (leer).");
         de.put("gui.book.chat.saved_channel", "§aChannel gesetzt und (re)konfiguriert.");
         de.put("gui.book.chat.saved_token", "§aTwitch-Token gesetzt und (re)konfiguriert.");
-        de.put("gui.book.chat.saved_se_token", "§aStreamElements JWT-Token gesetzt und (re)konfiguriert.");
         de.put("gui.book.chat.saved_channel_list", "Twitch-Kanäle wurden gespeichert: {channels}");
         de.put("gui.book.chat.no_valid_channels", "Keine gültigen Channelnamen erkannt.");
         de.put("toggles.on_prefix", "&aAn: &f{label}");
@@ -302,11 +298,10 @@ public class Messages {
         en.put("gui.main.twitch_info_lore", java.util.List.of(
                 "&7Channel: &f{channel}",
                 "&7Token: &f{token_masked}",
-                "&7SE-Token: &f{se_token_masked}",
                 "&4Warning: sensitive data!",
                 "&7Left: &fSet channel",
-                "&7Right: &fSet Twitch token",
-                "&7Shift+Right: &fSet StreamElements JWT"));
+                "&7Right: &fSet token",
+                "&7SE-JWT: &8Via config.yml only"));
         en.put("gui.main.misc_name", "&6Misc");
         en.put("gui.main.misc_lore", java.util.List.of("&7Various settings", "&7e.g. 'Spectator after death' & Death counter"));
         en.put("gui.main.debug_name", "&dDebug Menu");
@@ -358,17 +353,14 @@ public class Messages {
                 "Example: Channel1, Channel2, Channel3");
         en.put("gui.book.page.token.text", "Replace this text with your bot's access token, which you can obtain at {url}");
         en.put("gui.book.page.token.link_text", "Open Token Generator");
-        en.put("gui.book.page.se_token.text", "Replace this text with your StreamElements JWT token.\n\nFind it at:\nstreamelements.com\n→ My Account\n→ Tokens (scroll down)");
         en.put("gui.book.page.reward", "Write the EXACT name of your channel points reward on the first page and sign the book.");
         en.put("gui.book.chat.warn_sensitive", "§6[Notice] §eBe careful with sensitive data (channel/token).");
         en.put("gui.book.chat.received_channel", "§7You received a §fBook & Quill§7. Replace the text in §fline 1§7 with your §fTwitch username§7 and click §fDone§7.");
         en.put("gui.book.chat.received_token", "§7You received a §fBook & Quill§7. Replace the text in §fline 1§7 with your §fTwitch access token§7 and click §fDone§7.");
-        en.put("gui.book.chat.received_se_token", "§7You received a §fBook & Quill§7. Replace the text with your §fStreamElements JWT token§7 and click §fDone§7.");
         en.put("gui.book.chat.inventory_full", "§7Inventory full – dropped the book on the ground.");
         en.put("gui.book.chat.cancelled", "§eInput cancelled (empty).");
         en.put("gui.book.chat.saved_channel", "§aChannel set and (re)configured.");
         en.put("gui.book.chat.saved_token", "§aTwitch token set and (re)configured.");
-        en.put("gui.book.chat.saved_se_token", "§aStreamElements JWT token set and (re)configured.");
         en.put("gui.book.chat.saved_channel_list", "Twitch channels saved: {channels}");
         en.put("gui.book.chat.no_valid_channels", "No valid channel names detected.");
         en.put("toggles.on_prefix", "&aOn: &f{label}");

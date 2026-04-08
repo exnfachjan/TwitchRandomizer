@@ -77,12 +77,10 @@ public class ConfigGui {
                 ? "(leer/empty)" : String.join(", ", channels);
 
         String token = String.valueOf(cfg.getString("twitch.oauth_token", ""));
-        String seToken = String.valueOf(cfg.getString("streamelements.jwt_token", ""));
 
         Map<String, String> ph = new HashMap<>();
         ph.put("channel", channelDisplay);
         ph.put("token_masked", token.isBlank() ? "(leer/empty)" : mask(token));
-        ph.put("se_token_masked", seToken.isBlank() ? "(nicht gesetzt)" : mask(seToken));
 
         // Slot 0: Twitch-Info Buch
         inv.setItem(0, tag(MenuType.MAIN,
@@ -299,7 +297,7 @@ public class ConfigGui {
                 "challenge.auto_spectator_on_death",
                 i18n.tr(p, "gui.misc.spectator_toggle")));
 
-        int deaths = plugin.getDeathCounter() != null ? plugin.getDeathCounter().get() : 0;
+        int deaths = plugin.getDeathCounter() != null ? plugin.getDeathCounter().getCount() : 0;
         Map<String, String> ph = Map.of("value", String.valueOf(deaths));
         inv.setItem(13, tag(MenuType.MISC,
                 item(Material.SKELETON_SKULL,
