@@ -166,9 +166,7 @@ public class ConfigGui {
                 i18n.tr(p, "gui.trigger.subs_toggle")));
         inv.setItem(11, toggle(p, MenuType.TRIGGER, "twitch.triggers.bits.enabled",
                 i18n.tr(p, "gui.trigger.bits_toggle")));
-        inv.setItem(12, toggle(p, MenuType.TRIGGER, "streamelements.enabled",
-                i18n.tr(p, "gui.trigger.se_enabled_toggle")));
-        inv.setItem(13, toggle(p, MenuType.TRIGGER, "streamelements.triggers.tips.enabled",
+        inv.setItem(13, toggle(p, MenuType.TRIGGER, "streamelements.enabled",
                 i18n.tr(p, "gui.trigger.donations_toggle")));
 
         // Row 1: Wert-Buttons

@@ -130,6 +130,10 @@ public class GuiListener implements Listener {
                 FileConfiguration cfg = plugin.getConfig();
                 boolean cur = cfg.getBoolean(path, false);
                 cfg.set(path, !cur);
+                // SE-Master-Toggle: streamelements.enabled steuert auch den Tips-Toggle mit
+                if ("streamelements.enabled".equals(path)) {
+                    cfg.set("streamelements.triggers.tips.enabled", !cur);
+                }
                 try { plugin.saveConfig(); } catch (Throwable ignored) {}
                 try { plugin.applyDynamicConfig(); } catch (Throwable ignored) {}
                 refreshMenu(type, p);
