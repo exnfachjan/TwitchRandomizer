@@ -21,8 +21,9 @@ public class StreamElementsIntegrationManager {
     private static final String SE_WSS = "wss://realtime.streamelements.com/socket.io/?EIO=3&transport=websocket";
 
     private final JavaPlugin plugin;
-    private OkHttpClient httpClient;
-    private WebSocket wsSocket;
+    // OkHttpClient wird einmal erstellt und nie neu erstellt (Singleton pro Instanz)
+    private final OkHttpClient httpClient;
+    private volatile WebSocket wsSocket;
 
     // Config
     private boolean enabled;
@@ -42,6 +43,11 @@ public class StreamElementsIntegrationManager {
 
     public StreamElementsIntegrationManager(JavaPlugin plugin) {
         this.plugin = plugin;
+        // Einmalig erstellen, nie wieder neu — verhindert doppelte Verbindungen
+        this.httpClient = new OkHttpClient.Builder()
+                .readTimeout(0, TimeUnit.MILLISECONDS)
+                .pingInterval(0, TimeUnit.SECONDS) // OkHttp-eigenes Ping deaktivieren, wir machen es selbst
+                .build();
     }
 
     // -------------------------------------------------------------------------
@@ -54,9 +60,6 @@ public class StreamElementsIntegrationManager {
             if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert oder kein JWT-Token.");
             return;
         }
-        httpClient = new OkHttpClient.Builder()
-                .readTimeout(0, TimeUnit.MILLISECONDS)
-                .build();
         shouldReconnect = true;
         connect();
     }
@@ -65,13 +68,10 @@ public class StreamElementsIntegrationManager {
         shouldReconnect = false;
         cancelReconnect();
         cancelPing();
-        if (wsSocket != null) {
-            wsSocket.close(1000, "Plugin stopping");
-            wsSocket = null;
-        }
-        if (httpClient != null) {
-            httpClient.dispatcher().executorService().shutdown();
-            httpClient = null;
+        WebSocket ws = wsSocket;
+        wsSocket = null;
+        if (ws != null) {
+            try { ws.close(1000, "Plugin stopping"); } catch (Throwable ignored) {}
         }
         plugin.getLogger().info("[SE] StreamElements-Verbindung getrennt.");
     }
@@ -79,33 +79,27 @@ public class StreamElementsIntegrationManager {
     public void applyConfig() {
         readConfig();
 
+        // Bestehende Verbindung sauber schließen
+        shouldReconnect = false;
+        cancelReconnect();
+        cancelPing();
+        WebSocket ws = wsSocket;
+        wsSocket = null;
+        if (ws != null) {
+            try { ws.close(1000, "Config reload"); } catch (Throwable ignored) {}
+        }
+
         if (!enabled) {
-            if (wsSocket != null) {
-                shouldReconnect = false;
-                cancelReconnect();
-                cancelPing();
-                wsSocket.close(1000, "Disabled");
-                wsSocket = null;
-            }
+            if (debug) plugin.getLogger().info("[SE] SE-Integration deaktiviert.");
             return;
         }
 
-        // Neu verbinden (Token könnte sich geändert haben)
-        if (wsSocket != null) {
-            shouldReconnect = false;
-            cancelReconnect();
-            cancelPing();
-            wsSocket.close(1000, "Config reload");
-            wsSocket = null;
-        }
-        if (httpClient == null) {
-            httpClient = new OkHttpClient.Builder()
-                    .readTimeout(0, TimeUnit.MILLISECONDS)
-                    .build();
-        }
-        shouldReconnect = true;
-        reconnectAttempts = 0;
-        connect();
+        // Kurz warten damit der alte Socket Zeit hat sich zu schließen
+        scheduler.schedule(() -> {
+            shouldReconnect = true;
+            reconnectAttempts = 0;
+            connect();
+        }, 500, TimeUnit.MILLISECONDS);
     }
 
     // -------------------------------------------------------------------------
@@ -298,14 +292,21 @@ public class StreamElementsIntegrationManager {
 
         @Override
         public void onClosed(WebSocket webSocket, int code, String reason) {
+            // Nur reagieren wenn dies noch die aktive Verbindung ist
+            if (wsSocket != webSocket && wsSocket != null) return;
             wsSocket = null;
             cancelPing();
+            if (code == 1000) {
+                // Sauberes Schließen (von uns initiiert) – kein Reconnect nötig
+                return;
+            }
             plugin.getLogger().warning("[SE] Verbindung getrennt (Code " + code + "): " + reason);
             scheduleReconnect();
         }
 
         @Override
         public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+            if (wsSocket != webSocket && wsSocket != null) return;
             wsSocket = null;
             cancelPing();
             plugin.getLogger().warning("[SE] WebSocket-Fehler: " + t.getMessage());
