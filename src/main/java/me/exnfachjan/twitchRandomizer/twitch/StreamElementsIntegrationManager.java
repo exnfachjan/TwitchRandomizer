@@ -26,7 +26,7 @@ import java.util.concurrent.*;
  *         enabled: true
  *         amount_per_trigger: 5.0
  *
- * Rückwärtskompatibel: Einzelner jwt_token auf oberster Ebene wird weiterhin unterstützt.
+ * Format: accounts: "Channel1:JWT1;Channel2:JWT2"
  */
 public class StreamElementsIntegrationManager {
 
@@ -150,29 +150,27 @@ public class StreamElementsIntegrationManager {
     private List<AccountEntry> readAccounts() {
         List<AccountEntry> result = new ArrayList<>();
 
-        // Neues Format: streamelements.accounts Liste
-        List<Map<?, ?>> accountList = plugin.getConfig().getMapList("streamelements.accounts");
-        if (accountList != null && !accountList.isEmpty()) {
-            for (Map<?, ?> entry : accountList) {
-                Object channelObj = entry.get("channel");
-                Object tokenObj = entry.get("jwt_token");
-                String channel = (channelObj != null) ? String.valueOf(channelObj) : "unknown";
-                String token = (tokenObj != null) ? String.valueOf(tokenObj) : "";
-                if (token != null && !token.isBlank() && !token.equals("null")) {
-                    result.add(new AccountEntry(channel, token.trim()));
+        // Format: "Channel1:JWT1;Channel2:JWT2"
+        String raw = plugin.getConfig().getString("streamelements.accounts", "");
+        if (raw != null && !raw.isBlank()) {
+            String[] entries = raw.split(";");
+            for (String entry : entries) {
+                entry = entry.trim();
+                if (entry.isBlank()) continue;
+                int colon = entry.indexOf(':');
+                if (colon <= 0 || colon >= entry.length() - 1) {
+                    plugin.getLogger().warning("[SE] Ungültiger Eintrag in streamelements.accounts (Format: Channel:JWT): " + entry);
+                    continue;
+                }
+                String channel = entry.substring(0, colon).trim();
+                String token = entry.substring(colon + 1).trim();
+                if (!token.isBlank()) {
+                    result.add(new AccountEntry(channel, token));
                 }
             }
         }
 
-        // Rückwärtskompatibilität: einzelner jwt_token auf oberster Ebene
-        if (result.isEmpty()) {
-            String single = plugin.getConfig().getString("streamelements.jwt_token", "");
-            if (single != null && !single.isBlank()) {
-                result.add(new AccountEntry("default", single.trim()));
-            }
-        }
-
-        // Doppelte Tokens entfernen (gleicher Token = gleicher Account)
+        // Doppelte Tokens deduplizieren
         List<AccountEntry> deduped = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (AccountEntry e : result) {

@@ -55,14 +55,8 @@ twitch:
 # For multiple streamers: Add each streamer as a separate entry under "accounts".
 # Each streamer needs their own JWT token from their SE account.
 streamelements:
-  enabled: false
-
-  # Multiple accounts (one entry per streamer)
-  accounts:
-    - channel: YOUR_TWITCH_CHANNEL
-      jwt_token: "DEIN_SE_JWT_TOKEN_HIER"
-    # - channel: friend
-    #   jwt_token: "FRIENDS_JWT_TOKEN_HERE"
+  enabled: true
+  accounts: "exnfachjan:eyJhbGci..."
 
   triggers:
     tips:
