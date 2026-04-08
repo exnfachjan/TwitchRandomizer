@@ -16,6 +16,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -295,6 +298,36 @@ public class TimerManager implements Listener {
                 }
             }, 2L);
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Pause-Schutz: kein Schaden, kein Block-Abbau/Platzieren wenn Timer pausiert
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGH, ignoreCancelled = true)
+    public void onEntityDamage(EntityDamageEvent e) {
+        if (running) return; // Timer läuft → normal
+        if (e.getEntity() instanceof Player) return; // Spieler dürfen Schaden nehmen
+        // Alle Entities (Mobs, Tiere etc.) sind während der Pause unbesiegbar
+        e.setCancelled(true);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGH, ignoreCancelled = true)
+    public void onBlockBreak(BlockBreakEvent e) {
+        if (running) return;
+        e.setCancelled(true);
+        e.getPlayer().sendActionBar(
+            net.kyori.adventure.text.Component.text("⏸ Timer is paused!", net.kyori.adventure.text.format.NamedTextColor.RED)
+        );
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGH, ignoreCancelled = true)
+    public void onBlockPlace(BlockPlaceEvent e) {
+        if (running) return;
+        e.setCancelled(true);
+        e.getPlayer().sendActionBar(
+            net.kyori.adventure.text.Component.text("⏸ Timer is paused!", net.kyori.adventure.text.format.NamedTextColor.RED)
+        );
     }
 
     @EventHandler
