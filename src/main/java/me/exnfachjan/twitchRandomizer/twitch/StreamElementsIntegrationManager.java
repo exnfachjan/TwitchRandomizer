@@ -6,61 +6,61 @@ import okhttp3.*;
 import okio.ByteString;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 
+/**
+ * StreamElements donation integration via WebSocket.
+ * Config is supplied by DonationsManager (from donations.yml).
+ */
 public class StreamElementsIntegrationManager {
 
     private static final String SE_WSS = "wss://realtime.streamelements.com/socket.io/?EIO=3&transport=websocket";
-    private static final String SE_FILE = "streamelements.yml";
 
     private final JavaPlugin plugin;
-    private final File seFile;
     private final OkHttpClient httpClient;
     private final List<SEConnection> connections = new CopyOnWriteArrayList<>();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     private boolean enabled = false;
-    private boolean tipsEnabled = true;
     private double amountPerTrigger = 5.0;
     private boolean debug = false;
     private List<String> lastTokens = new ArrayList<>();
+    private String lastAccounts = "";
 
     public StreamElementsIntegrationManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.seFile = new File(plugin.getDataFolder(), SE_FILE);
         this.httpClient = new OkHttpClient.Builder()
                 .readTimeout(0, TimeUnit.MILLISECONDS)
                 .pingInterval(0, TimeUnit.SECONDS)
                 .build();
-        ensureFileExists();
     }
 
-    public void start() {
-        SEConfig cfg = loadSEFile();
-        this.enabled = cfg.enabled;
-        this.tipsEnabled = cfg.tipsEnabled;
-        this.amountPerTrigger = cfg.amountPerTrigger;
-        this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
+    // ─────────────────────────────────────────────────────────────────────────
+    // Public API
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public void start(boolean enabled, String accounts, double amountPerTrigger, boolean debug) {
+        this.enabled = enabled;
+        this.amountPerTrigger = amountPerTrigger;
+        this.debug = debug;
+        this.lastAccounts = accounts == null ? "" : accounts;
 
         if (!enabled) {
-            if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert (streamelements.yml).");
+            if (debug) plugin.getLogger().info("[SE] StreamElements deaktiviert (donations.yml).");
             return;
         }
-        List<AccountEntry> accounts = cfg.accounts;
-        if (accounts.isEmpty()) {
-            plugin.getLogger().info("[SE] Keine JWT-Tokens in streamelements.yml konfiguriert.");
+        List<AccountEntry> parsed = parseAccounts(accounts);
+        if (parsed.isEmpty()) {
+            plugin.getLogger().info("[SE] Keine JWT-Tokens in donations.yml konfiguriert.");
             return;
         }
-        for (AccountEntry acc : accounts) {
+        for (AccountEntry acc : parsed) {
             SEConnection conn = new SEConnection(acc.channel, acc.jwtToken);
             connections.add(conn);
             conn.start();
         }
-        lastTokens = accounts.stream().map(a -> a.jwtToken).toList();
+        lastTokens = parsed.stream().map(a -> a.jwtToken).toList();
     }
 
     public void stop() {
@@ -69,142 +69,32 @@ public class StreamElementsIntegrationManager {
         plugin.getLogger().info("[SE] Alle StreamElements-Verbindungen getrennt.");
     }
 
-    public void applyConfig() {
-        this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
-        SEConfig cfg = loadSEFile();
+    public void applyConfig(boolean enabled, String accounts, double amountPerTrigger, boolean debug) {
+        this.debug = debug;
+        String acc = accounts == null ? "" : accounts;
 
-        boolean prevEnabled = this.enabled;
-        List<String> newTokens = cfg.accounts.stream().map(a -> a.jwtToken).toList();
+        boolean enabledChanged = this.enabled != enabled;
+        boolean accountsChanged = !Objects.equals(this.lastAccounts, acc);
+        boolean amountChanged = this.amountPerTrigger != amountPerTrigger;
 
-        boolean enabledChanged = prevEnabled != cfg.enabled;
-        boolean tokensChanged = !lastTokens.equals(newTokens);
-        boolean amountChanged = this.amountPerTrigger != cfg.amountPerTrigger;
-
-        if (!enabledChanged && !tokensChanged && !amountChanged) {
-            if (debug) plugin.getLogger().info("[SE] applyConfig: Keine relevante Änderung, skip.");
+        // Amount only change: just update value, no reconnect needed
+        if (!enabledChanged && !accountsChanged) {
+            this.amountPerTrigger = amountPerTrigger;
+            if (debug && amountChanged) plugin.getLogger().info("[SE] amountPerTrigger aktualisiert: " + amountPerTrigger);
             return;
         }
 
         if (debug) plugin.getLogger().info("[SE] applyConfig: Änderung erkannt, neu verbinden...");
-
-        for (SEConnection conn : connections) conn.stop();
-        connections.clear();
-
-        this.enabled = cfg.enabled;
-        this.tipsEnabled = cfg.tipsEnabled;
-        this.amountPerTrigger = cfg.amountPerTrigger;
-
-        if (!enabled || cfg.accounts.isEmpty()) {
-            if (debug) plugin.getLogger().info("[SE] SE deaktiviert oder keine Tokens.");
-            lastTokens = new ArrayList<>();
-            return;
-        }
-
-        final List<AccountEntry> toConnect = cfg.accounts;
-        scheduler.schedule(() -> {
-            if (!connections.isEmpty()) return;
-            for (AccountEntry acc : toConnect) {
-                SEConnection conn = new SEConnection(acc.channel, acc.jwtToken);
-                connections.add(conn);
-                conn.start();
-            }
-            lastTokens = newTokens;
-        }, 500, TimeUnit.MILLISECONDS);
+        stop();
+        start(enabled, accounts, amountPerTrigger, debug);
     }
 
-    public boolean getEnabled() {
-        return loadSEFile().enabled;
-    }
+    public boolean getEnabled() { return enabled; }
+    public double getAmountPerTrigger() { return amountPerTrigger; }
 
-    public void setEnabled(boolean value) {
-        rewriteFileLine("enabled:", "enabled: " + value);
-        applyConfig();
-    }
-
-    public double getAmountPerTrigger() {
-        return loadSEFile().amountPerTrigger;
-    }
-
-    public void setAmountPerTrigger(double value) {
-        double rounded = Math.round(value * 10.0) / 10.0;
-        rewriteFileLine("amount_per_trigger:", "amount_per_trigger: " + rounded);
-        this.amountPerTrigger = rounded;
-    }
-
-    private void rewriteFileLine(String linePrefix, String newLine) {
-        if (!seFile.exists()) { ensureFileExists(); }
-        try {
-            List<String> lines = Files.readAllLines(seFile.toPath(), StandardCharsets.UTF_8);
-            List<String> out = new ArrayList<>();
-            boolean replaced = false;
-            for (String line : lines) {
-                if (line.trim().startsWith(linePrefix) && !line.trim().startsWith("#")) {
-                    out.add(newLine);
-                    replaced = true;
-                } else {
-                    out.add(line);
-                }
-            }
-            if (!replaced) out.add(newLine);
-            Files.write(seFile.toPath(), out, StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            plugin.getLogger().warning("[SE] Konnte streamelements.yml nicht schreiben: " + e.getMessage());
-        }
-    }
-
-    private void ensureFileExists() {
-        if (seFile.exists()) return;
-        if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
-        try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(
-                new FileOutputStream(seFile), StandardCharsets.UTF_8))) {
-            pw.println("# StreamElements Configuration");
-            pw.println("# This file is NOT managed by the plugin automatically.");
-            pw.println("# Edit it manually and run /trconfig se reload ingame.");
-            pw.println("#");
-            pw.println("# JWT Token: StreamElements Dashboard -> My Account -> Channels -> JWT Token");
-            pw.println("# https://streamelements.com/dashboard/account/channels");
-            pw.println("#");
-            pw.println("# For multiple streamers use semicolons:");
-            pw.println("# accounts: \"Channel1:JWT1;Channel2:JWT2\"");
-            pw.println();
-            pw.println("enabled: false");
-            pw.println("accounts: \"YOUR_CHANNEL:YOUR_JWT_TOKEN\"");
-            pw.println("amount_per_trigger: 5.0");
-            pw.println("tips_enabled: true");
-            plugin.getLogger().info("[SE] streamelements.yml erstellt. Bitte JWT-Token eintragen.");
-        } catch (Exception e) {
-            plugin.getLogger().warning("[SE] Konnte streamelements.yml nicht erstellen: " + e.getMessage());
-        }
-    }
-
-    private SEConfig loadSEFile() {
-        SEConfig result = new SEConfig();
-        if (!seFile.exists()) { ensureFileExists(); return result; }
-
-        try {
-            List<String> lines = Files.readAllLines(seFile.toPath(), StandardCharsets.UTF_8);
-            for (String line : lines) {
-                line = line.trim();
-                if (line.startsWith("#") || line.isBlank()) continue;
-
-                if (line.startsWith("enabled:")) {
-                    result.enabled = parseBool(line.substring("enabled:".length()));
-                } else if (line.startsWith("tips_enabled:")) {
-                    result.tipsEnabled = parseBool(line.substring("tips_enabled:".length()));
-                } else if (line.startsWith("amount_per_trigger:")) {
-                    result.amountPerTrigger = parseDouble(line.substring("amount_per_trigger:".length()), 5.0);
-                } else if (line.startsWith("accounts:")) {
-                    String raw = line.substring("accounts:".length()).trim();
-                    if (raw.startsWith("\"") && raw.endsWith("\"")) raw = raw.substring(1, raw.length() - 1);
-                    else if (raw.startsWith("'") && raw.endsWith("'")) raw = raw.substring(1, raw.length() - 1);
-                    result.accounts = parseAccounts(raw);
-                }
-            }
-        } catch (Exception e) {
-            plugin.getLogger().warning("[SE] Fehler beim Lesen von streamelements.yml: " + e.getMessage());
-        }
-        return result;
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
 
     private List<AccountEntry> parseAccounts(String raw) {
         List<AccountEntry> result = new ArrayList<>();
@@ -229,24 +119,6 @@ public class StreamElementsIntegrationManager {
         }
         return result;
     }
-
-    private boolean parseBool(String s) {
-        return "true".equalsIgnoreCase(s.trim());
-    }
-
-    private double parseDouble(String s, double def) {
-        try { return Double.parseDouble(s.trim().replace(",", ".")); }
-        catch (Exception e) { return def; }
-    }
-
-    private static class SEConfig {
-        boolean enabled = false;
-        boolean tipsEnabled = true;
-        double amountPerTrigger = 5.0;
-        List<AccountEntry> accounts = new ArrayList<>();
-    }
-
-    private record AccountEntry(String channel, String jwtToken) {}
 
     private boolean isTimerRunning() {
         try {
@@ -288,6 +160,12 @@ public class StreamElementsIntegrationManager {
         while (end < json.length() && (Character.isDigit(json.charAt(end)) || json.charAt(end) == '.')) end++;
         try { return Double.parseDouble(json.substring(start, end)); } catch (Exception e) { return 0.0; }
     }
+
+    private record AccountEntry(String channel, String jwtToken) {}
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SE Connection
+    // ─────────────────────────────────────────────────────────────────────────
 
     private class SEConnection {
         private final String channelName;
@@ -349,9 +227,16 @@ public class StreamElementsIntegrationManager {
             if (!raw.startsWith("42")) return;
 
             String content = raw.substring(2);
-            if (content.contains("\"authenticated\"")) { plugin.getLogger().info("[SE:" + channelName + "] Erfolgreich authentifiziert!"); reconnectAttempts = 0; return; }
-            if (content.contains("\"unauthorized\"")) { plugin.getLogger().severe("[SE:" + channelName + "] Auth fehlgeschlagen! JWT-Token prüfen."); shouldReconnect = false; return; }
-            if (!tipsEnabled) return;
+            if (content.contains("\"authenticated\"")) {
+                plugin.getLogger().info("[SE:" + channelName + "] Erfolgreich authentifiziert!");
+                reconnectAttempts = 0;
+                return;
+            }
+            if (content.contains("\"unauthorized\"")) {
+                plugin.getLogger().severe("[SE:" + channelName + "] Auth fehlgeschlagen! JWT-Token prüfen.");
+                shouldReconnect = false;
+                return;
+            }
             if (!content.contains("\"tip\"") && !content.contains("\"donation\"")) return;
             if (content.contains("\"event:update\"")) return;
 
@@ -361,10 +246,16 @@ public class StreamElementsIntegrationManager {
             double amount = extractJsonDouble(content, "amount");
 
             if (debug) plugin.getLogger().info("[SE:" + channelName + "] Tip von " + username + ": " + amount + " (min=" + amountPerTrigger + ")");
-            if (amount < amountPerTrigger) { if (debug) plugin.getLogger().info("[SE:" + channelName + "] Zu gering, ignoriert."); return; }
-            if (!isTimerRunning()) { if (debug) plugin.getLogger().info("[SE:" + channelName + "] Timer läuft nicht, ignoriert."); return; }
+            if (amount < amountPerTrigger) {
+                if (debug) plugin.getLogger().info("[SE:" + channelName + "] Zu gering, ignoriert.");
+                return;
+            }
+            if (!isTimerRunning()) {
+                if (debug) plugin.getLogger().info("[SE:" + channelName + "] Timer läuft nicht, ignoriert.");
+                return;
+            }
 
-            int count = (int) (amount / amountPerTrigger);
+            int count = (int) Math.ceil(amount / amountPerTrigger);
             TwitchIntegrationManager twitch = getTwitch();
             if (twitch != null) {
                 twitch.enqueueMultiple(count, taggedUsername);

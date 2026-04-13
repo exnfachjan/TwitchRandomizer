@@ -1,6 +1,6 @@
 name: TwitchRandomizer
 main: me.exnfachjan.twitchRandomizer.TwitchRandomizer
-version: 1.4.0
+version: 1.4.1
 api-version: "1.21"
 
 commands:
@@ -57,7 +57,6 @@ commands:
     permission: twitchrandomizer.zmd
 
 permissions:
-  # Commands
   twitchrandomizer.randomevent:
     default: op
   twitchrandomizer.timer:
@@ -75,7 +74,6 @@ permissions:
   twitchrandomizer.zmd:
     default: op
 
-  # GUI Super-Node
   twitchrandomizer.gui:
     description: Vollzugriff auf das GUI (öffnen + alle Aktionen)
     default: op
@@ -85,7 +83,6 @@ permissions:
       twitchrandomizer.admin.*: true
       twitchrandomizer.timer.*: true
 
-  # Granulare GUI-Nodes
   twitchrandomizer.gui.open:
     description: GUI öffnen (z. B. /trgui, /gui)
     default: op
@@ -108,7 +105,6 @@ permissions:
   twitchrandomizer.admin.twitch:
     default: op
 
-  # Timer granular
   twitchrandomizer.timer.*:
     default: op
     children:

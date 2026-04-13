@@ -111,7 +111,7 @@ public class Messages {
                 "&4Achtung: sensible Daten!",
                 "&7Links: &fChannel setzen",
                 "&7Rechts: &fToken setzen",
-                "&7SE-JWT: &8Nur über config.yml"));
+                "&7Donations: &8Nur über donations.yml"));
         de.put("gui.main.misc_name", "&6Misc");
         de.put("gui.main.misc_lore", java.util.List.of("&7Diverse Einstellungen", "&7z. B. 'Spectator after death' & Deathcounter"));
         de.put("gui.main.debug_name", "&dDebug Menü");
@@ -131,17 +131,31 @@ public class Messages {
         de.put("gui.main.close", "&cSchließen");
         de.put("gui.trigger.subs_toggle", "Subscriptions");
         de.put("gui.trigger.bits_toggle", "Bits (Cheer)");
-        de.put("gui.trigger.bits_per_trigger_name", "&bBits pro Trigger: &f{value}");
-        de.put("gui.trigger.bits_per_trigger_lore", java.util.List.of("&7Links/Rechts: &f±1", "&7Shift + Klick: &f±100"));
         de.put("gui.trigger.interval_name", "&bIntervall: &f{seconds}s");
         de.put("gui.trigger.interval_lore", java.util.List.of("&7Links/Rechts: &f±0.5s", "&7Shift + Klick: &f±1.0s"));
-        // StreamElements Donations
-        de.put("gui.trigger.donations_toggle", "SE-Donations (StreamElements)");
-        de.put("gui.trigger.donations_amount_name", "&bDonation pro Event: &f{value}€");
-        de.put("gui.trigger.donations_amount_lore", java.util.List.of(
-                "&7Ab welchem Betrag ein Event getriggert wird.",
-                "&7Beispiel: 5.0 = €5 = 1 Event",
-                "&7Links/Rechts: &f±0.5", "&7Shift + Klick: &f±1.0"));
+        // Donations (StreamElements + Tipeeestream)
+        de.put("gui.trigger.se_toggle", "StreamElements Donations");
+        de.put("gui.trigger.tipeee_toggle", "Tipeeestream Donations");
+        de.put("gui.trigger.value_name", "&bWert/Event: &f{euro}€  |  {bits} Bits");
+        de.put("gui.trigger.value_lore", java.util.List.of(
+                "&7Universal-Währung: wie viel pro Event.",
+                "&7Standard: &f5€ = 500 Bits = 1 Sub = 1 Event",
+                "&7Min. hardcoded: &f1€ / 100 Bits",
+                "&7Abgeleitet:",
+                "&7  Bits/Event  = &f{bits}",
+                "&7  Events/Sub  = &f{sub_events}",
+                "&7Links: &f-0.5€  &7Rechts: &f+0.5€",
+                "&7Shift + Klick: &f±1.0€"));
+        de.put("gui.trigger.sub_info_name", "&71 Sub = &f{sub_events} Event(s)");
+        de.put("gui.trigger.sub_info_lore", java.util.List.of(
+                "&7Sub-Wert: &f5€ (fest bei Twitch)",
+                "&7Bei aktuellem Wert ({euro}€/Event):",
+                "&7ceil(5 / {euro}) = &f{sub_events} Events"));
+        de.put("gui.trigger.bits_info_name", "&7100 Bits = 1€ → &f{bits} Bits/Event");
+        de.put("gui.trigger.bits_info_lore", java.util.List.of(
+                "&7Bits/Event = euro_per_event × 100",
+                "&7Aktuell: &f{euro}€ × 100 = {bits} Bits",
+                "&7Minimum: &f100 Bits (1€)"));
         de.put("gui.debug.test_toggle", "!test erlaubt");
         de.put("gui.debug.gift_toggle", "!gift Simulation");
         de.put("gui.debug.giftbomb_toggle", "!giftbomb Simulation");
@@ -302,7 +316,7 @@ public class Messages {
                 "&4Warning: sensitive data!",
                 "&7Left: &fSet channel",
                 "&7Right: &fSet token",
-                "&7SE-JWT: &8Via config.yml only"));
+                "&7Donations: &8Via donations.yml only"));
         en.put("gui.main.misc_name", "&6Misc");
         en.put("gui.main.misc_lore", java.util.List.of("&7Various settings", "&7e.g. 'Spectator after death' & Death counter"));
         en.put("gui.main.debug_name", "&dDebug Menu");
@@ -322,17 +336,31 @@ public class Messages {
         en.put("gui.main.close", "&cClose");
         en.put("gui.trigger.subs_toggle", "Subscriptions");
         en.put("gui.trigger.bits_toggle", "Bits (Cheer)");
-        en.put("gui.trigger.bits_per_trigger_name", "&bBits per Trigger: &f{value}");
-        en.put("gui.trigger.bits_per_trigger_lore", java.util.List.of("&7Left/Right: &f±1", "&7Shift + Click: &f±100"));
         en.put("gui.trigger.interval_name", "&bInterval: &f{seconds}s");
         en.put("gui.trigger.interval_lore", java.util.List.of("&7Left/Right: &f±0.5s", "&7Shift + Click: &f±1.0s"));
-        // StreamElements Donations
-        en.put("gui.trigger.donations_toggle", "SE Donations (StreamElements)");
-        en.put("gui.trigger.donations_amount_name", "&bDonation per Event: &f{value}€");
-        en.put("gui.trigger.donations_amount_lore", java.util.List.of(
-                "&7Minimum donation to trigger an event.",
-                "&7Example: 5.0 = €5 = 1 event",
-                "&7Left/Right: &f±0.5", "&7Shift + Click: &f±1.0"));
+        // Donations (StreamElements + Tipeeestream)
+        en.put("gui.trigger.se_toggle", "StreamElements Donations");
+        en.put("gui.trigger.tipeee_toggle", "Tipeeestream Donations");
+        en.put("gui.trigger.value_name", "&bValue/Event: &f{euro}€  |  {bits} Bits");
+        en.put("gui.trigger.value_lore", java.util.List.of(
+                "&7Universal currency: how much per event.",
+                "&7Default: &f5€ = 500 Bits = 1 Sub = 1 Event",
+                "&7Min. hardcoded: &f1€ / 100 Bits",
+                "&7Derived:",
+                "&7  Bits/Event  = &f{bits}",
+                "&7  Events/Sub  = &f{sub_events}",
+                "&7Left: &f-0.5€  &7Right: &f+0.5€",
+                "&7Shift + Click: &f±1.0€"));
+        en.put("gui.trigger.sub_info_name", "&71 Sub = &f{sub_events} Event(s)");
+        en.put("gui.trigger.sub_info_lore", java.util.List.of(
+                "&7Sub value: &f5€ (fixed by Twitch)",
+                "&7At current value ({euro}€/event):",
+                "&7ceil(5 / {euro}) = &f{sub_events} events"));
+        en.put("gui.trigger.bits_info_name", "&7100 Bits = 1€ → &f{bits} Bits/Event");
+        en.put("gui.trigger.bits_info_lore", java.util.List.of(
+                "&7Bits/Event = euro_per_event × 100",
+                "&7Currently: &f{euro}€ × 100 = {bits} Bits",
+                "&7Minimum: &f100 Bits (1€)"));
         en.put("gui.debug.test_toggle", "!test allowed");
         en.put("gui.debug.gift_toggle", "!gift simulation");
         en.put("gui.debug.giftbomb_toggle", "!giftbomb simulation");

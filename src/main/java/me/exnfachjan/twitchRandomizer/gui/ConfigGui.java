@@ -3,6 +3,7 @@ package me.exnfachjan.twitchRandomizer.gui;
 import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
 import me.exnfachjan.twitchRandomizer.command.RandomEventCommand;
 import me.exnfachjan.twitchRandomizer.i18n.Messages;
+import me.exnfachjan.twitchRandomizer.twitch.DonationsManager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -36,7 +37,6 @@ public class ConfigGui {
         this.keyExtra = new org.bukkit.NamespacedKey(plugin, "tr_extra");
     }
 
-    // Mapping of event keys to unique/fitting icons (avoid duplicates)
     private static final Map<String, Material> EVENT_ICON = Map.ofEntries(
             Map.entry("spawn_mobs", Material.SPAWNER),
             Map.entry("potion", Material.POTION),
@@ -67,7 +67,6 @@ public class ConfigGui {
         Inventory inv = Bukkit.createInventory(p, 27, i18n.tr(p, "gui.titles.main"));
         FileConfiguration cfg = plugin.getConfig();
 
-        // Multi-Channel Anzeige
         List<String> channels = cfg.getStringList("twitch.channels");
         if (channels == null || channels.isEmpty()) {
             String fallback = cfg.getString("twitch.channel", "");
@@ -82,7 +81,6 @@ public class ConfigGui {
         ph.put("channel", channelDisplay);
         ph.put("token_masked", token.isBlank() ? "(leer/empty)" : mask(token));
 
-        // Slot 0: Twitch-Info Buch
         inv.setItem(0, tag(MenuType.MAIN,
                 item(Material.BOOK,
                         i18n.tr(p, "gui.main.twitch_info_name"),
@@ -151,66 +149,90 @@ public class ConfigGui {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // TRIGGER
-    // Layout (27 Slots):
-    //  0  1  2  3  4  5  6  7  8
-    //  9 [subs] [bits] _ [donations] _ [bitsAmt] [donAmt] _
-    // 18 [save]        [interval]              _ _ _ [back]
+    // TRIGGER  (54 slots)
+    //
+    // Row 0 (0–8):   header / info
+    // Row 1 (9–17):  Subs toggle | Bits toggle | [gap] | SE toggle | Tipeee toggle
+    // Row 2 (18–26): [gap] | Value button | [gap] | sub info | bits info
+    // Row 3 (27–35): interval button
+    // Row 4 (36–44): [empty]
+    // Row 5 (45–53): save | [gap] | [gap] | [gap] | [gap] | [gap] | [gap] | [gap] | back
     // ─────────────────────────────────────────────────────────────────────────
     public void openTrigger(Player p) {
-        Inventory inv = Bukkit.createInventory(p, 27, i18n.tr(p, "gui.titles.trigger"));
+        Inventory inv = Bukkit.createInventory(p, 54, i18n.tr(p, "gui.titles.trigger"));
         FileConfiguration cfg = plugin.getConfig();
+        DonationsManager don = plugin.getDonations();
 
-        // Row 1: Toggles
-        inv.setItem(10, toggle(p, MenuType.TRIGGER, "twitch.triggers.subscriptions.enabled",
+        // ── Row 1: Toggles ──────────────────────────────────────────────────
+        inv.setItem(9, toggle(p, MenuType.TRIGGER, "twitch.triggers.subscriptions.enabled",
                 i18n.tr(p, "gui.trigger.subs_toggle")));
-        inv.setItem(11, toggle(p, MenuType.TRIGGER, "twitch.triggers.bits.enabled",
+
+        inv.setItem(10, toggle(p, MenuType.TRIGGER, "twitch.triggers.bits.enabled",
                 i18n.tr(p, "gui.trigger.bits_toggle")));
-        // SE-Toggle liest enabled direkt aus streamelements.yml
-        boolean seEnabled = plugin.getStreamElements() != null && plugin.getStreamElements().getEnabled();
+
+        // SE toggle (reads from donations.yml via DonationsManager)
         {
+            boolean seEnabled = don != null && don.getSeEnabled();
             Material mat = seEnabled ? Material.LIME_DYE : Material.GRAY_DYE;
-            Map<String, String> phSE = Map.of("label", i18n.tr(p, "gui.trigger.donations_toggle"));
+            Map<String, String> phSE = Map.of("label", i18n.tr(p, "gui.trigger.se_toggle"));
             String name = i18n.tr(p, seEnabled ? "toggles.on_prefix" : "toggles.off_prefix", phSE);
-            ItemStack seToggleItem = item(mat, name, List.of(ChatColor.GRAY + "Klick/Click to toggle"));
-            inv.setItem(13, tag(MenuType.TRIGGER, seToggleItem, "toggle", "streamelements.enabled", null));
+            ItemStack it = item(mat, name, List.of(ChatColor.GRAY + "Klick/Click to toggle"));
+            inv.setItem(12, tag(MenuType.TRIGGER, it, "toggle_se", null, null));
         }
 
-        // Row 1: Wert-Buttons
-        int bpt = Math.max(1, cfg.getInt("twitch.triggers.bits.bits_per_trigger", 500));
-        Map<String, String> phBits = Map.of("value", String.valueOf(bpt));
-        inv.setItem(15, tag(MenuType.TRIGGER,
-                item(Material.EMERALD,
-                        i18n.tr(p, "gui.trigger.bits_per_trigger_name", phBits),
-                        i18n.trList(p, "gui.trigger.bits_per_trigger_lore")),
-                "adjust_int_bits", "twitch.triggers.bits.bits_per_trigger", null));
+        // Tipeeestream toggle
+        {
+            boolean tipeeeEnabled = don != null && don.getTipeeeEnabled();
+            Material mat = tipeeeEnabled ? Material.LIME_DYE : Material.GRAY_DYE;
+            Map<String, String> phT = Map.of("label", i18n.tr(p, "gui.trigger.tipeee_toggle"));
+            String name = i18n.tr(p, tipeeeEnabled ? "toggles.on_prefix" : "toggles.off_prefix", phT);
+            ItemStack it = item(mat, name, List.of(ChatColor.GRAY + "Klick/Click to toggle"));
+            inv.setItem(13, tag(MenuType.TRIGGER, it, "toggle_tipeee", null, null));
+        }
 
-        double donAmt = plugin.getStreamElements() != null
-                ? plugin.getStreamElements().getAmountPerTrigger()
-                : cfg.getDouble("streamelements.triggers.tips.amount_per_trigger", 5.0);
-        Map<String, String> phDon = Map.of("value", String.format(Locale.US, "%.1f", donAmt));
-        inv.setItem(16, tag(MenuType.TRIGGER,
+        // ── Row 2: Value button + derived info ──────────────────────────────
+        double euroPerEvent = don != null ? don.getEuroPerEvent() : 5.0;
+        int bitsPerEvent = don != null ? don.getBitsPerEvent() : 500;
+        int eventsPerSub = don != null ? don.getEventsPerSub() : 1;
+
+        Map<String, String> phVal = new HashMap<>();
+        phVal.put("euro", String.format(Locale.US, "%.1f", euroPerEvent));
+        phVal.put("bits", String.valueOf(bitsPerEvent));
+        phVal.put("sub_events", String.valueOf(eventsPerSub));
+
+        inv.setItem(19, tag(MenuType.TRIGGER,
                 item(Material.SUNFLOWER,
-                        i18n.tr(p, "gui.trigger.donations_amount_name", phDon),
-                        i18n.trList(p, "gui.trigger.donations_amount_lore")),
-                "adjust_double_donations", "streamelements.triggers.tips.amount_per_trigger", null));
+                        i18n.tr(p, "gui.trigger.value_name", phVal),
+                        i18n.trList(p, "gui.trigger.value_lore", phVal)),
+                "adjust_euro_per_event", null, null));
 
-        // Row 2: Intervall + Save + Back
-        inv.setItem(18, tag(MenuType.TRIGGER,
-                item(Material.REPEATER,
-                        i18n.tr(p, "gui.common.save_reconnect_name"),
-                        i18n.trList(p, "gui.common.save_reconnect_lore")),
-                "save_reconnect", null, null));
+        // Info: sub value
+        inv.setItem(21, item(Material.PAPER,
+                i18n.tr(p, "gui.trigger.sub_info_name", phVal),
+                i18n.trList(p, "gui.trigger.sub_info_lore", phVal)));
 
+        // Info: bits value
+        inv.setItem(22, item(Material.EMERALD,
+                i18n.tr(p, "gui.trigger.bits_info_name", phVal),
+                i18n.trList(p, "gui.trigger.bits_info_lore", phVal)));
+
+        // ── Row 3: Interval ─────────────────────────────────────────────────
         double seconds = cfg.getDouble("twitch.trigger_interval_seconds", 1.0);
         Map<String, String> phInt = Map.of("seconds", String.format(Locale.US, "%.2f", seconds));
-        inv.setItem(22, tag(MenuType.TRIGGER,
+        inv.setItem(28, tag(MenuType.TRIGGER,
                 item(Material.CLOCK,
                         i18n.tr(p, "gui.trigger.interval_name", phInt),
                         i18n.trList(p, "gui.trigger.interval_lore")),
                 "adjust_double_interval", "twitch.trigger_interval_seconds", null));
 
-        inv.setItem(26, tag(MenuType.TRIGGER,
+        // ── Row 5: Save + Back ───────────────────────────────────────────────
+        inv.setItem(45, tag(MenuType.TRIGGER,
+                item(Material.REPEATER,
+                        i18n.tr(p, "gui.common.save_reconnect_name"),
+                        i18n.trList(p, "gui.common.save_reconnect_lore")),
+                "save_reconnect", null, null));
+
+        inv.setItem(53, tag(MenuType.TRIGGER,
                 item(Material.ARROW, i18n.tr(p, "gui.common.back"), null),
                 "back_main", null, null));
 
@@ -360,7 +382,7 @@ public class ConfigGui {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Hilfsmethoden
+    // Helpers
     // ─────────────────────────────────────────────────────────────────────────
 
     private void fillEmptyWithPane(Inventory inv) {

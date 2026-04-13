@@ -38,7 +38,6 @@ public class TwitchIntegrationManager {
     private boolean chatTriggerEnabled;
 
     private boolean bitsEnabled;
-    private int bitsPerTrigger;
 
     private static final String TEST_TRIGGER = "!test";
     private static final String CMD_GIFT = "!gift";
@@ -105,6 +104,34 @@ public class TwitchIntegrationManager {
         return false;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Currency helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Returns bitsPerEvent from DonationsManager (min 100). */
+    private int getBitsPerEvent() {
+        try {
+            if (plugin instanceof TwitchRandomizer t && t.getDonations() != null) {
+                return t.getDonations().getBitsPerEvent();
+            }
+        } catch (Throwable ignored) {}
+        return 500;
+    }
+
+    /** Returns eventsPerSub from DonationsManager (min 1). */
+    private int getEventsPerSub() {
+        try {
+            if (plugin instanceof TwitchRandomizer t && t.getDonations() != null) {
+                return t.getDonations().getEventsPerSub();
+            }
+        } catch (Throwable ignored) {}
+        return 1;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Start / Stop / Apply
+    // ─────────────────────────────────────────────────────────────────────────
+
     public void start(List<String> channels, String oauthToken, boolean legacyChatTriggerFlag) {
         String normToken = normalizeToken(oauthToken);
         if (channels == null || channels.isEmpty() || normToken.isBlank()) {
@@ -114,9 +141,7 @@ public class TwitchIntegrationManager {
 
         this.subsEnabled = plugin.getConfig().getBoolean("twitch.triggers.subscriptions.enabled", true);
         this.chatTriggerEnabled = plugin.getConfig().getBoolean("twitch.triggers.chat_test.enabled", legacyChatTriggerFlag);
-
         this.bitsEnabled = plugin.getConfig().getBoolean("twitch.triggers.bits.enabled", false);
-        this.bitsPerTrigger = Math.max(1, plugin.getConfig().getInt("twitch.triggers.bits.bits_per_trigger", 500));
 
         String raw = plugin.getConfig().getString("twitch.trigger_interval_seconds", "1.0");
         double seconds;
@@ -149,9 +174,7 @@ public class TwitchIntegrationManager {
         plugin.getLogger().info("Trigger-Intervall: " + seconds + "s (" + gapTicks + " Ticks)");
         plugin.getLogger().info("Triggers: subs=" + subsEnabled
                 + ", chat_test=" + chatTriggerEnabled
-                + ", bits=" + bitsEnabled + " (bits_per_trigger=" + bitsPerTrigger + ")");
-        plugin.getLogger().info("Sim-Trigger: gift=" + simGiftEnabled
-                + ", giftbomb=" + simGiftBombEnabled + " (default_count=" + simGiftBombDefaultCount + ")");
+                + ", bits=" + bitsEnabled);
 
         if (!queueLoaded) {
             loadQueue();
@@ -162,7 +185,9 @@ public class TwitchIntegrationManager {
             if (!subsEnabled) return;
             if (!isTimerRunningOrDeathscreen()) return;
             String user = resolveUserFromSubscription(event);
-            enqueue("randomevent " + user);
+            int eventsPerSub = getEventsPerSub();
+            enqueueMultiple(eventsPerSub, user);
+            if (debug) plugin.getLogger().info("[Twitch] Sub von " + user + " -> +" + eventsPerSub + " Events (eventsPerSub=" + eventsPerSub + ")");
         });
 
         twitchClient.getEventManager().onEvent(CheerEvent.class, event -> {
@@ -170,7 +195,8 @@ public class TwitchIntegrationManager {
             if (!isTimerRunningOrDeathscreen()) return;
 
             int bits = Math.max(0, event.getBits());
-            if (bits < bitsPerTrigger) return;
+            int bitsPerEvent = getBitsPerEvent();
+            if (bits < bitsPerEvent) return;
 
             String user = resolveAuthorFromCheer(event);
             if (isLikelyAnonymousCheer(event, user)) {
@@ -178,9 +204,9 @@ public class TwitchIntegrationManager {
                 return;
             }
 
-            int count = bits / bitsPerTrigger;
+            int count = bits / bitsPerEvent;
             enqueueMultiple(count, user);
-            if (debug) plugin.getLogger().info("[Twitch] Cheer: " + user + " -> " + bits + " bits -> +" + count + " Events (queue=" + commandQueue.size() + ")");
+            if (debug) plugin.getLogger().info("[Twitch] Cheer: " + user + " -> " + bits + " bits -> +" + count + " Events (bitsPerEvent=" + bitsPerEvent + ", queue=" + commandQueue.size() + ")");
         });
 
         twitchClient.getEventManager().onEvent(ChannelMessageEvent.class, event -> {
@@ -241,7 +267,6 @@ public class TwitchIntegrationManager {
         this.chatTriggerEnabled = plugin.getConfig().getBoolean("twitch.triggers.chat_test.enabled",
                 plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false));
         this.bitsEnabled = plugin.getConfig().getBoolean("twitch.triggers.bits.enabled", false);
-        this.bitsPerTrigger = Math.max(1, plugin.getConfig().getInt("twitch.triggers.bits.bits_per_trigger", 500));
         this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
 
         String raw = plugin.getConfig().getString("twitch.trigger_interval_seconds", "1.0");
@@ -298,10 +323,7 @@ public class TwitchIntegrationManager {
 
     private void startQueueWorker() {
         this.queueWorker = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (isAnyPlayerInDeathScreen()) {
-                return;
-            }
-
+            if (isAnyPlayerInDeathScreen()) return;
             if (!isTimerRunning()) return;
 
             try {
@@ -317,9 +339,7 @@ public class TwitchIntegrationManager {
                 }
                 int[] weights = randomEventExecutor != null ? randomEventExecutor.getWeights() : null;
 
-                if (weights == null || weights.length == 0) {
-                    return;
-                }
+                if (weights == null || weights.length == 0) return;
 
                 int[] weightsForPick = Arrays.copyOf(weights, weights.length);
 
@@ -340,9 +360,7 @@ public class TwitchIntegrationManager {
                 }
 
                 int pickable = Arrays.stream(weightsForPick).sum();
-                if (pickable <= 0) {
-                    return;
-                }
+                if (pickable <= 0) return;
             } catch (Throwable t) {
                 plugin.getLogger().warning("[Twitch] Fehler beim Queue-Event-Check: " + t.getMessage());
                 return;
