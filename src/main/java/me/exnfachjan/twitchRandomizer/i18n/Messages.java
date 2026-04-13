@@ -140,7 +140,7 @@ public class Messages {
         de.put("gui.trigger.value_lore", java.util.List.of(
                 "&7Universal-Währung: wie viel pro Event.",
                 "&7Standard: &f5€ = 500 Bits = 1 Sub = 1 Event",
-                "&7Min. hardcoded: &f1€ / 100 Bits",
+                "&7Minimum: &f1€ / 100 Bits",
                 "&7Abgeleitet:",
                 "&7  Bits/Event  = &f{bits}",
                 "&7  Events/Sub  = &f{sub_events}",
@@ -345,7 +345,7 @@ public class Messages {
         en.put("gui.trigger.value_lore", java.util.List.of(
                 "&7Universal currency: how much per event.",
                 "&7Default: &f5€ = 500 Bits = 1 Sub = 1 Event",
-                "&7Min. hardcoded: &f1€ / 100 Bits",
+                "&7Minimum: &f1€ / 100 Bits",
                 "&7Derived:",
                 "&7  Bits/Event  = &f{bits}",
                 "&7  Events/Sub  = &f{sub_events}",
