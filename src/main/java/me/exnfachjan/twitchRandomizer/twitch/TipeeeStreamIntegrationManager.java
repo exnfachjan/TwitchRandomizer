@@ -16,7 +16,9 @@ import java.util.concurrent.*;
  */
 public class TipeeeStreamIntegrationManager {
 
-    private static final String TIPEEE_WSS = "wss://sio.tipeeestream.com:443/socket.io/?EIO=3&transport=websocket";
+    // Official Tipeeestream socket URL — API key goes as query param per their docs:
+    // https://api.tipeeestream.com/api-doc/socketio
+    private static final String TIPEEE_WSS_BASE = "wss://sso-cf.tipeeestream.com:443/socket.io/?EIO=3&transport=websocket&access_token=";
 
     private final JavaPlugin plugin;
     private final OkHttpClient httpClient;
@@ -99,7 +101,7 @@ public class TipeeeStreamIntegrationManager {
 
     private void connect() {
         httpClient.newWebSocket(
-                new Request.Builder().url(TIPEEE_WSS).build(),
+                new Request.Builder().url(TIPEEE_WSS_BASE + apiKey).build(),
                 new TipeeeWebSocketListener());
     }
 
@@ -126,7 +128,7 @@ public class TipeeeStreamIntegrationManager {
         // Socket.io handshake
         if (raw.startsWith("0")) {
             // Send authentication
-            String auth = "42[\"join-room\",{\"room\":\"" + apiKey + "\",\"uuid\":\"twitchrandomizer\"}]";
+            String auth = "42[\"join-room\",{\"room\":\"" + apiKey + "\",\"username\":\"twitchrandomizer\"}]";
             ws.send(auth);
             if (debug) plugin.getLogger().info("[Tipeee] Auth gesendet.");
             cancelPing();
