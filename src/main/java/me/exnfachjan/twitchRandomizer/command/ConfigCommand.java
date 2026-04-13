@@ -67,11 +67,6 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
             }
             case "twitch" -> { return handleTwitch(sender, Arrays.copyOfRange(args, 1, args.length)); }
             case "donations", "don" -> { return handleDonations(sender, Arrays.copyOfRange(args, 1, args.length)); }
-            // Legacy alias kept for muscle memory
-            case "se" -> {
-                sender.sendMessage(ChatColor.YELLOW + "Hinweis: 'se' ist jetzt 'donations'. Weiterleitung...");
-                return handleDonations(sender, Arrays.copyOfRange(args, 1, args.length));
-            }
             case "weights" -> { return handleWeights(sender, Arrays.copyOfRange(args, 1, args.length)); }
             default -> sendUsage(sender);
         }
@@ -255,7 +250,7 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
                                                 @NotNull String[] args) {
         if (!sender.hasPermission(PERM)) return Collections.emptyList();
         if (args.length == 1) {
-            return prefixFilter(args[0], List.of("get", "set", "reload", "apply", "twitch", "donations", "se", "weights"));
+            return prefixFilter(args[0], List.of("get", "set", "reload", "apply", "twitch", "donations", "weights"));
         }
         if (args.length >= 2) {
             switch (args[0].toLowerCase(Locale.ROOT)) {
@@ -265,7 +260,7 @@ public class ConfigCommand implements CommandExecutor, TabCompleter {
                         return prefixFilter(args[2], List.of("channels", "token", "interval", "debug", "subs", "chat_test", "bits_enabled"));
                     }
                 }
-                case "donations", "don", "se" -> {
+                case "donations", "don" -> {
                     if (args.length == 2) return prefixFilter(args[1], List.of("reload", "status"));
                 }
                 case "weights" -> {
