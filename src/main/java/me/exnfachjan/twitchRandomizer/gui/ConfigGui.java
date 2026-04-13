@@ -153,8 +153,8 @@ public class ConfigGui {
     //
     // Row 0 (0–8):   [leer]
     // Row 1 (9–17):  _ 10=Subs 11=Bits _ _ 14=SE 15=Tipeee _ _
-    // Row 2 (18–26): _ _ _ 21=Uhr _ 23=Sunflower _ _ _
-    // Row 3 (27–35): [leer]
+    // Row 2 (18–26): [leer]
+    // Row 3 (27–35): _ _ _ 30=Uhr _ 32=Sunflower _ _ _
     // Row 4 (36–44): [leer]
     // Row 5 (45–53): 45=Repeater _ _ _ _ _ _ _ 53=Pfeil
     // ─────────────────────────────────────────────────────────────────────────
@@ -202,13 +202,13 @@ public class ConfigGui {
 
         double seconds = cfg.getDouble("twitch.trigger_interval_seconds", 1.0);
         Map<String, String> phInt = Map.of("seconds", String.format(Locale.US, "%.2f", seconds));
-        inv.setItem(21, tag(MenuType.TRIGGER,
+        inv.setItem(30, tag(MenuType.TRIGGER,
                 item(Material.CLOCK,
                         i18n.tr(p, "gui.trigger.interval_name", phInt),
                         i18n.trList(p, "gui.trigger.interval_lore")),
                 "adjust_double_interval", "twitch.trigger_interval_seconds", null));
 
-        inv.setItem(23, tag(MenuType.TRIGGER,
+        inv.setItem(32, tag(MenuType.TRIGGER,
                 item(Material.SUNFLOWER,
                         i18n.tr(p, "gui.trigger.value_name", phVal),
                         i18n.trList(p, "gui.trigger.value_lore", phVal)),
