@@ -5,7 +5,6 @@ import com.github.twitch4j.TwitchClientBuilder;
 import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
 import com.github.twitch4j.chat.events.channel.CheerEvent;
 import com.github.twitch4j.chat.events.channel.SubscriptionEvent;
-import com.netflix.hystrix.exception.HystrixRuntimeException;
 import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
 import me.exnfachjan.twitchRandomizer.timer.TimerManager;
 import me.exnfachjan.twitchRandomizer.command.RandomEventCommand;
@@ -100,10 +99,6 @@ public class TwitchIntegrationManager {
         return false;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Currency helpers
-    // ─────────────────────────────────────────────────────────────────────────
-
     private int getBitsPerEvent() {
         try { if (plugin instanceof TwitchRandomizer t && t.getDonations() != null) return t.getDonations().getBitsPerEvent(); }
         catch (Throwable ignored) {}
@@ -115,10 +110,6 @@ public class TwitchIntegrationManager {
         catch (Throwable ignored) {}
         return 1;
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Start / Stop / Apply
-    // ─────────────────────────────────────────────────────────────────────────
 
     public void start(List<String> channels, String oauthToken, boolean legacyChatTriggerFlag) {
         String normToken = normalizeToken(oauthToken);
@@ -135,7 +126,7 @@ public class TwitchIntegrationManager {
         String raw = plugin.getConfig().getString("twitch.trigger_interval_seconds", "1.0");
         double seconds;
         try { seconds = Double.parseDouble(raw.replace(",", ".")); }
-        catch (Exception e) { seconds = 1.0; plugin.getLogger().warning("Ungültiger Wert für twitch.trigger_interval_seconds: '" + raw + "'. Fallback 1.0s."); }
+        catch (Exception e) { seconds = 1.0; plugin.getLogger().warning("Ungültiger Wert: '" + raw + "'. Fallback 1.0s."); }
         if (seconds < 0.05) seconds = 0.05;
         this.gapTicks = Math.max(1, (int) Math.round(seconds * 20.0));
 
@@ -163,11 +154,9 @@ public class TwitchIntegrationManager {
 
         if (!queueLoaded) { loadQueue(); queueLoaded = true; }
 
-        // ── Subscriptions ──────────────────────────────────────────────────
         twitchClient.getEventManager().onEvent(SubscriptionEvent.class, event -> {
             if (!subsEnabled) return;
             if (!isTimerRunningOrDeathscreen()) return;
-            // Channel-Tag nur wenn mehr als ein Channel konfiguriert ist
             String channelTag = resolveChannelTag(event.getChannel() != null ? event.getChannel().getName() : null);
             String user = appendChannelTag(resolveUserFromSubscription(event), channelTag);
             int eventsPerSub = getEventsPerSub();
@@ -175,7 +164,6 @@ public class TwitchIntegrationManager {
             if (debug) plugin.getLogger().info("[Twitch] Sub von " + user + " -> +" + eventsPerSub + " Events");
         });
 
-        // ── Bits/Cheer ─────────────────────────────────────────────────────
         twitchClient.getEventManager().onEvent(CheerEvent.class, event -> {
             if (!bitsEnabled) return;
             if (!isTimerRunningOrDeathscreen()) return;
@@ -183,10 +171,7 @@ public class TwitchIntegrationManager {
             int bitsPerEvent = getBitsPerEvent();
             if (bits < bitsPerEvent) return;
             String user = resolveAuthorFromCheer(event);
-            if (isLikelyAnonymousCheer(event, user)) {
-                if (debug) plugin.getLogger().info("[Twitch] Cheer ignoriert (anonym) – bits=" + bits);
-                return;
-            }
+            if (isLikelyAnonymousCheer(event, user)) { if (debug) plugin.getLogger().info("[Twitch] Cheer ignoriert (anonym)"); return; }
             String channelTag = resolveChannelTag(event.getChannel() != null ? event.getChannel().getName() : null);
             user = appendChannelTag(user, channelTag);
             int count = bits / bitsPerEvent;
@@ -194,13 +179,11 @@ public class TwitchIntegrationManager {
             if (debug) plugin.getLogger().info("[Twitch] Cheer: " + user + " -> " + bits + " bits -> +" + count + " Events");
         });
 
-        // ── Chat messages (!test, !gift, !giftbomb) ────────────────────────
         twitchClient.getEventManager().onEvent(ChannelMessageEvent.class, event -> {
             if (!isTimerRunningOrDeathscreen()) return;
             String msg = event.getMessage();
             if (msg == null) return;
             String author = resolveAuthorFromChat(event);
-            // Channel-Tag für Chat-Events
             String channelTag = resolveChannelTag(event.getChannel() != null ? event.getChannel().getName() : null);
             author = appendChannelTag(author, channelTag);
             String trimmed = msg.trim();
@@ -244,8 +227,7 @@ public class TwitchIntegrationManager {
 
         String raw = plugin.getConfig().getString("twitch.trigger_interval_seconds", "1.0");
         double seconds;
-        try { seconds = Double.parseDouble(raw.replace(",", ".")); }
-        catch (Exception e) { seconds = 1.0; }
+        try { seconds = Double.parseDouble(raw.replace(",", ".")); } catch (Exception e) { seconds = 1.0; }
         if (seconds < 0.05) seconds = 0.05;
         this.gapTicks = Math.max(1, (int) Math.round(seconds * 20.0));
 
@@ -274,10 +256,6 @@ public class TwitchIntegrationManager {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Queue Worker
-    // ─────────────────────────────────────────────────────────────────────────
-
     private void startQueueWorker() {
         this.queueWorker = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (isAnyPlayerInDeathScreen()) return;
@@ -304,9 +282,7 @@ public class TwitchIntegrationManager {
                 }
                 if (anyGroundActive) { weightsForPick[11] = 0; weightsForPick[13] = 0; }
                 if (noCraftingActive) weightsForPick[9] = 0;
-
-                int pickable = Arrays.stream(weightsForPick).sum();
-                if (pickable <= 0) return;
+                if (Arrays.stream(weightsForPick).sum() <= 0) return;
             } catch (Throwable t) {
                 plugin.getLogger().warning("[Twitch] Fehler beim Queue-Event-Check: " + t.getMessage()); return;
             }
@@ -326,50 +302,25 @@ public class TwitchIntegrationManager {
         }, 1L, 2L);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Channel-Tag Helpers (NEU)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Gibt den Channel-Tag zurück der hinter dem Username angehängt werden soll.
-     * Nur wenn mehr als 1 Channel konfiguriert ist und channelName nicht null/leer.
-     */
     private String resolveChannelTag(String channelName) {
         if (channelName == null || channelName.isBlank()) return null;
-        if (currentChannels.size() <= 1) return null; // Nur bei Multi-Channel anzeigen
+        if (currentChannels.size() <= 1) return null;
         return channelName;
     }
 
-    /**
-     * Hängt "(ChannelName)" hinter den user-String wenn tag != null.
-     * Das Format "role:XYZ:Username" wird dabei korrekt behandelt.
-     */
     private String appendChannelTag(String user, String channelTag) {
         if (channelTag == null) return user;
         if (user == null) return "(" + channelTag + ")";
-        // Wenn es ein role-präfixierter String ist, Tag am Ende des Namens anhängen
-        if (user.startsWith("role:")) {
-            // Format: role:ROLE:NAME  →  role:ROLE:NAME (Channel)
-            return user + " \u00a77(" + channelTag + ")\u00a7r";
-        }
         return user + " \u00a77(" + channelTag + ")\u00a7r";
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // User-Resolution Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private String resolveAuthorFromChat(ChannelMessageEvent event) {
         String name = "unknown", role = "";
         try {
             String display = (event.getMessageEvent() != null) ? event.getMessageEvent().getTagValue("display-name").orElse(null) : null;
             if (display != null && !display.isBlank()) name = display;
-            else if (event.getMessageEvent() != null) {
-                String loginFromIrc = event.getMessageEvent().getUserName();
-                if (loginFromIrc != null && !loginFromIrc.isBlank()) name = loginFromIrc;
-            } else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
-                name = event.getUser().getName();
-            }
+            else if (event.getMessageEvent() != null) { String l = event.getMessageEvent().getUserName(); if (l != null && !l.isBlank()) name = l; }
+            else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) name = event.getUser().getName();
             role = resolveTwitchRoleFromIRC(event.getMessageEvent());
         } catch (Throwable ignored) {}
         return colorizeByRole(name, role);
@@ -380,9 +331,7 @@ public class TwitchIntegrationManager {
         try {
             String display = (event.getMessageEvent() != null) ? event.getMessageEvent().getTagValue("display-name").orElse(null) : null;
             if (display != null && !display.isBlank()) name = display;
-            else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
-                name = event.getUser().getName();
-            }
+            else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) name = event.getUser().getName();
             role = resolveTwitchRoleFromIRC(event.getMessageEvent());
         } catch (Throwable ignored) {}
         return colorizeByRole(name, role);
@@ -393,9 +342,7 @@ public class TwitchIntegrationManager {
         try {
             String display = (event.getMessageEvent() != null) ? event.getMessageEvent().getTagValue("display-name").orElse(null) : null;
             if (display != null && !display.isBlank()) name = display;
-            else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
-                name = event.getUser().getName();
-            }
+            else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) name = event.getUser().getName();
             role = resolveTwitchRoleFromIRC(event.getMessageEvent());
         } catch (Throwable ignored) {}
         return colorizeByRole(name, role);
@@ -425,18 +372,13 @@ public class TwitchIntegrationManager {
     private boolean isLikelyAnonymousCheer(CheerEvent event, String user) {
         if (event.getUser() == null) return true;
         String low = user == null ? "" : user.toLowerCase(Locale.ROOT);
-        if (low.isBlank()) return true;
-        if (low.contains("anonymous")) return true;
+        if (low.isBlank() || low.contains("anonymous")) return true;
         try {
             String display = (event.getMessageEvent() != null) ? event.getMessageEvent().getTagValue("display-name").orElse(null) : null;
             if (display != null && display.toLowerCase(Locale.ROOT).contains("anonymous")) return true;
         } catch (Throwable ignored) {}
         return false;
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Queue I/O
-    // ─────────────────────────────────────────────────────────────────────────
 
     public void enqueue(String cmd) {
         commandQueue.offer(cmd);
@@ -446,9 +388,7 @@ public class TwitchIntegrationManager {
 
     public void enqueueMultiple(int count, String byUserNullable) {
         if (count <= 0) return;
-        String base = (byUserNullable != null && !byUserNullable.isBlank())
-                ? "randomevent " + byUserNullable.trim()
-                : "randomevent";
+        String base = (byUserNullable != null && !byUserNullable.isBlank()) ? "randomevent " + byUserNullable.trim() : "randomevent";
         for (int i = 0; i < count; i++) commandQueue.offer(base);
         if (debug) plugin.getLogger().info("[Twitch] EnqueueMultiple: +" + count + " as '" + base + "' (queue=" + commandQueue.size() + ")");
         saveQueueAsync();
@@ -465,17 +405,10 @@ public class TwitchIntegrationManager {
             int loaded = 0;
             try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(queueFile), StandardCharsets.UTF_8))) {
                 String line;
-                while ((line = br.readLine()) != null) {
-                    line = line.trim();
-                    if (line.isEmpty()) continue;
-                    commandQueue.offer(line);
-                    loaded++;
-                }
+                while ((line = br.readLine()) != null) { line = line.trim(); if (!line.isEmpty()) { commandQueue.offer(line); loaded++; } }
             }
             plugin.getLogger().info("Queue geladen: " + loaded + " Einträge.");
-        } catch (Exception e) {
-            plugin.getLogger().warning("Fehler beim Laden der Queue: " + e.getMessage());
-        }
+        } catch (Exception e) { plugin.getLogger().warning("Fehler beim Laden der Queue: " + e.getMessage()); }
     }
 
     private void saveQueueAsync() {
@@ -487,9 +420,7 @@ public class TwitchIntegrationManager {
                     try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(queueFile), StandardCharsets.UTF_8))) {
                         for (String line : snapshot) pw.println(line);
                     }
-                } catch (Exception e) {
-                    plugin.getLogger().warning("Fehler beim Speichern der Queue: " + e.getMessage());
-                }
+                } catch (Exception e) { plugin.getLogger().warning("Fehler beim Speichern der Queue: " + e.getMessage()); }
             });
         } catch (Throwable ignored) {}
     }

@@ -1,6 +1,6 @@
 name: TwitchRandomizer
 main: me.exnfachjan.twitchRandomizer.TwitchRandomizer
-version: 1.4.1
+version: 1.5.0
 api-version: "1.21"
 
 commands:

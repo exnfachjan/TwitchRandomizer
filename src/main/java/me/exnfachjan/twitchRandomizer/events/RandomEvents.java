@@ -86,9 +86,7 @@ public class RandomEvents implements Listener {
                 e.setCancelled(true);
                 return;
             }
-            if (e.isShiftClick()) {
-                e.setCancelled(true);
-            }
+            if (e.isShiftClick()) e.setCancelled(true);
         }
     }
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
@@ -118,12 +116,9 @@ public class RandomEvents implements Listener {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // SYNC-WRAPPER: Alle trigger-Methoden haben eine synced-Variante die einen
-    // vorberechneten long-Seed entgegennimmt. RandomEventCommand ruft immer
-    // die synced-Variante auf, damit alle Spieler dieselben Zufallswerte bekommen.
+    // Sync-Seed Helper
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Erzeugt einen frischen Random aus dem Sync-Seed */
     private Random seededRng(long seed) { return new Random(seed); }
 
     // ─── SpawnMobs ────────────────────────────────────────────────────────────
@@ -169,8 +164,7 @@ public class RandomEvents implements Listener {
         ph.put("amount", String.valueOf(amount));
         ph.put("entity", pretty(selectedType.name()));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.spawn.by" : "events.spawn.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.spawn.by" : "events.spawn.solo", ph));
     }
 
     private boolean isHostileMob(EntityType type) {
@@ -201,8 +195,7 @@ public class RandomEvents implements Listener {
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         ph.put("effect", pretty(effectType.getName()));
         ph.put("seconds", String.valueOf(durationSec));
-        String key = (byUser != null && !byUser.isBlank()) ? "events.potion.applied.by" : "events.potion.applied.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.potion.applied.by" : "events.potion.applied.solo", ph));
     }
 
     // ─── GiveItem ─────────────────────────────────────────────────────────────
@@ -218,8 +211,7 @@ public class RandomEvents implements Listener {
         ph.put("item", pretty(mat.name()));
         ph.put("amount", String.valueOf(amount));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.give.item.by" : "events.give.item.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.give.item.by" : "events.give.item.solo", ph));
     }
 
     // ─── ClearInventory ───────────────────────────────────────────────────────
@@ -236,8 +228,7 @@ public class RandomEvents implements Listener {
         Map<String, String> ph = new HashMap<>();
         ph.put("count", String.valueOf(slotsToClear));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.inventory.cleared.by" : "events.inventory.cleared.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.inventory.cleared.by" : "events.inventory.cleared.solo", ph));
     }
 
     // ─── Teleport ─────────────────────────────────────────────────────────────
@@ -531,10 +522,7 @@ public class RandomEvents implements Listener {
         }, 0L, ticksPerRun);
         groundTasks.put(p.getUniqueId(), task);
     }
-
-    @EventHandler public void onIce(org.bukkit.event.player.PlayerMoveEvent e) {
-        if (!isSlipperyActive(e.getPlayer())) return;
-    }
+    // FIX: leerer @EventHandler onIce() entfernt — der Handler hatte keinen Body und tat nichts.
 
     // ─── HellIsCalling ────────────────────────────────────────────────────────
     public void triggerHellIsCalling(Player p, String byUser) { triggerHellIsCalling(p, byUser, rng.nextLong()); }
@@ -615,16 +603,9 @@ public class RandomEvents implements Listener {
     }
 
     // ─── Skyblock ─────────────────────────────────────────────────────────────
-    // triggerSkyblock ohne meetingPoint: nur für Einzelspieler-Aufruf (Legacy-Fallback)
     public void triggerSkyblock(Player p, String byUser) { triggerSkyblock(p, byUser, p.getLocation()); }
     public void triggerSkyblock(Player p, String byUser, long seed) { triggerSkyblock(p, byUser, p.getLocation()); }
 
-    /**
-     * Hauptmethode: Teleportiert Spieler zum meetingPoint und cleared umliegende Chunks.
-     * meetingPoint wird von RandomEventCommand einmalig für alle Spieler bestimmt –
-     * dadurch landen alle am selben Punkt und es wird nur einmal gecleard.
-     * Nur der erste Aufruf (erkennbar an skyblockLocked leer) führt den Chunk-Clear durch.
-     */
     public void triggerSkyblock(Player p, String byUser, Location meetingPoint) {
         if (skyblockLocked.contains(p.getUniqueId())) return;
         skyblockLocked.add(p.getUniqueId());
@@ -633,26 +614,18 @@ public class RandomEvents implements Listener {
         int radius = plugin.getConfig().getInt("events.settings.skyblock.radius", 2);
         Chunk centerChunk = meetingPoint.getChunk();
 
-        // Spieler auf Sammelpunkt teleportieren (1 Tick verzögert damit Chunks geladen sind)
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (p.isOnline() && !p.isDead()) {
-                p.teleport(meetingPoint);
-            }
+            if (p.isOnline() && !p.isDead()) p.teleport(meetingPoint);
         }, 1L);
 
-        // Chunk-Clear nur vom "ersten" Aufruf ausführen – erkennbar daran dass der Chunk
-        // noch nicht in skyblockChunksCleared registriert ist.
-        // Wir verwenden den Chunk-Key als Marker damit es nur einmal passiert.
         String chunkKey = world.getName() + ":" + centerChunk.getX() + ":" + centerChunk.getZ();
         if (skyblockChunksCleaned.contains(chunkKey)) {
-            // Chunk-Clear wurde bereits von einem anderen Spieler dieses Events ausgelöst
             sendSkyblockMessage(p, byUser);
             Bukkit.getScheduler().runTaskLater(plugin, () -> skyblockLocked.remove(p.getUniqueId()), 200L);
             return;
         }
         skyblockChunksCleaned.add(chunkKey);
 
-        // Umliegende Chunks sammeln (Center-Chunk wird NICHT gelöscht – da stehen die Spieler)
         List<int[]> chunksToDelete = new ArrayList<>();
         for (int cx = centerChunk.getX() - radius; cx <= centerChunk.getX() + radius; cx++) {
             for (int cz = centerChunk.getZ() - radius; cz <= centerChunk.getZ() + radius; cz++) {
@@ -661,32 +634,24 @@ public class RandomEvents implements Listener {
             }
         }
 
-        // Verzögert clearen damit Teleport zuerst abgeschlossen ist
         new BukkitRunnable() {
             int index = 0;
-            @Override
-            public void run() {
+            @Override public void run() {
                 int processed = 0;
                 while (index < chunksToDelete.size() && processed < 2) {
                     int[] coords = chunksToDelete.get(index++);
                     Chunk targetChunk = world.getChunkAt(coords[0], coords[1]);
                     if (!targetChunk.isLoaded()) world.loadChunk(targetChunk);
                     int minY = world.getMinHeight(), maxY = world.getMaxHeight();
-                    for (int x = 0; x < 16; x++) {
-                        for (int z2 = 0; z2 < 16; z2++) {
-                            for (int y = minY; y < maxY; y++) {
+                    for (int x = 0; x < 16; x++)
+                        for (int z2 = 0; z2 < 16; z2++)
+                            for (int y = minY; y < maxY; y++)
                                 targetChunk.getBlock(x, y, z2).setType(Material.AIR, false);
-                            }
-                        }
-                    }
                     processed++;
                 }
-                if (index >= chunksToDelete.size()) {
-                    skyblockChunksCleaned.remove(chunkKey);
-                    cancel();
-                }
+                if (index >= chunksToDelete.size()) { skyblockChunksCleaned.remove(chunkKey); cancel(); }
             }
-        }.runTaskTimer(plugin, 5L, 1L); // 5 Ticks warten damit TP fertig ist
+        }.runTaskTimer(plugin, 5L, 1L);
 
         sendSkyblockMessage(p, byUser);
         Bukkit.getScheduler().runTaskLater(plugin, () -> skyblockLocked.remove(p.getUniqueId()), 200L);
@@ -704,8 +669,7 @@ public class RandomEvents implements Listener {
         ItemMeta meta = totem.getItemMeta();
         NamespacedKey key = new NamespacedKey(plugin, "fake_totem");
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
-        String displayName = i18n.tr(p, "item.minecraft.totem_of_undying");
-        meta.setDisplayName(displayName);
+        meta.setDisplayName(i18n.tr(p, "item.minecraft.totem_of_undying"));
         totem.setItemMeta(meta);
         p.getInventory().addItem(totem);
         Map<String, String> ph = new HashMap<>();
@@ -744,8 +708,7 @@ public class RandomEvents implements Listener {
         for (int i = 0; i < contents.length; i++) {
             ItemStack item = contents[i];
             if (item == null || item.getType() == Material.AIR) continue;
-            Material[][] tiers = TOOL_TIERS;
-            for (Material[] tier : tiers) {
+            for (Material[] tier : TOOL_TIERS) {
                 for (int j = 0; j < tier.length; j++) {
                     if (tier[j] == item.getType()) {
                         int delta = r.nextBoolean() ? 1 : -1;
@@ -800,7 +763,6 @@ public class RandomEvents implements Listener {
         else if ("ice".equals(type)) slipperyActive.remove(p.getUniqueId());
         cancelEventBossbar(p);
     }
-
     private void showNoCraftBossbar(Player p, int totalSec) {
         hideNoCraftBossbar(p);
         BossBar bar = Bukkit.createBossBar(i18n.tr(p, "bossbar.no_crafting") + " – " + totalSec + "s", BarColor.YELLOW, BarStyle.SEGMENTED_10);

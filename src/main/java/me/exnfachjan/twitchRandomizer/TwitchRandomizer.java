@@ -23,7 +23,8 @@ public class TwitchRandomizer extends JavaPlugin {
 
     private TimerManager timerManager;
     private TwitchIntegrationManager twitch;
-    private StreamElementsIntegrationManager streamElements;
+    // FIX: streamElements-Feld und @Deprecated getStreamElements() entfernt.
+    // StreamElementsIntegrationManager wird intern über DonationsManager verwaltet.
     private TipeeeStreamIntegrationManager tipeeeStream;
     private DonationsManager donations;
 
@@ -94,8 +95,6 @@ public class TwitchRandomizer extends JavaPlugin {
 
         this.deathCounter = new DeathCounterManager(this);
         this.deathCounter.load();
-        // GEÄNDERT: plugin-Referenz (this) als zweiten Parameter übergeben,
-        // damit DeathCounterListener den Modus (spectator vs. deaths) kennt.
         getServer().getPluginManager().registerEvents(new DeathCounterListener(this.deathCounter, this), this);
 
         ConfigGui configGui = new ConfigGui(this);
@@ -116,9 +115,7 @@ public class TwitchRandomizer extends JavaPlugin {
         List<String> channels = getConfig().getStringList("twitch.channels");
         if (channels == null || channels.isEmpty()) {
             String single = getConfig().getString("twitch.channel", "");
-            if (single != null && !single.isBlank()) {
-                channels = List.of(single);
-            }
+            if (single != null && !single.isBlank()) channels = List.of(single);
         }
         String token = getConfig().getString("twitch.oauth_token", "");
         boolean enableChatTrigger = getConfig().getBoolean("twitch.chat_trigger.enabled", false);
@@ -127,7 +124,7 @@ public class TwitchRandomizer extends JavaPlugin {
         twitch.start(channels, token, enableChatTrigger);
 
         // Donations (SE + Tipeeestream) via unified DonationsManager
-        this.streamElements = new StreamElementsIntegrationManager(this);
+        StreamElementsIntegrationManager streamElements = new StreamElementsIntegrationManager(this);
         this.tipeeeStream = new TipeeeStreamIntegrationManager(this);
         this.donations = new DonationsManager(this, streamElements, tipeeeStream);
         donations.start();
@@ -153,6 +150,10 @@ public class TwitchRandomizer extends JavaPlugin {
 
         PluginCommand guiCmd = getCommand("gui");
         if (guiCmd != null) guiCmd.setExecutor(new TrGuiCommand(this, configGui));
+
+        // FIX: ZmdCommand war in plugin.yml registriert aber der Executor wurde nie gesetzt.
+        PluginCommand zmdCmd = getCommand("zmd");
+        if (zmdCmd != null) zmdCmd.setExecutor(new ZmdCommand(this));
     }
 
     @Override
@@ -171,9 +172,6 @@ public class TwitchRandomizer extends JavaPlugin {
     public Messages getMessages() { return messages; }
     public TimerManager getTimerManager() { return timerManager; }
     public TwitchIntegrationManager getTwitch() { return twitch; }
-    /** @deprecated Use getDonations() instead */
-    @Deprecated
-    public StreamElementsIntegrationManager getStreamElements() { return streamElements; }
     public TipeeeStreamIntegrationManager getTipeeeStream() { return tipeeeStream; }
     public DonationsManager getDonations() { return donations; }
     public RandomEventCommand getRandomEventExecutor() { return randomEventExecutor; }
@@ -192,21 +190,10 @@ public class TwitchRandomizer extends JavaPlugin {
         org.bukkit.Bukkit.getScheduler().runTaskLaterAsynchronously(this, () -> {
             applyPending = false;
             org.bukkit.Bukkit.getScheduler().runTask(this, () -> {
-                try {
-                    if (twitch != null) twitch.applyConfig();
-                } catch (Throwable ignored) {}
-
-                try {
-                    if (randomEventExecutor != null) randomEventExecutor.reloadWeights();
-                } catch (Throwable ignored) {}
-
-                try {
-                    if (donations != null) donations.applyConfig();
-                } catch (Throwable ignored) {}
-
-                try {
-                    if (messages != null) messages.load();
-                } catch (Throwable e) {
+                try { if (twitch != null) twitch.applyConfig(); } catch (Throwable ignored) {}
+                try { if (randomEventExecutor != null) randomEventExecutor.reloadWeights(); } catch (Throwable ignored) {}
+                try { if (donations != null) donations.applyConfig(); } catch (Throwable ignored) {}
+                try { if (messages != null) messages.load(); } catch (Throwable e) {
                     getLogger().warning("i18n reload failed: " + e.getMessage());
                 }
             });
@@ -229,9 +216,7 @@ public class TwitchRandomizer extends JavaPlugin {
         return (int) Math.ceil(left / 1000.0);
     }
 
-    public synchronized String getResetConfirmRequester() {
-        return resetConfirmRequester;
-    }
+    public synchronized String getResetConfirmRequester() { return resetConfirmRequester; }
 
     public synchronized void clearResetConfirmation() {
         this.resetConfirmUntilMs = 0L;
@@ -240,6 +225,5 @@ public class TwitchRandomizer extends JavaPlugin {
 
     public GamePauseService getPauseService() { return pauseService; }
 
-    public void onGlobalPauseStateChanged(boolean paused) {
-    }
+    public void onGlobalPauseStateChanged(boolean paused) {}
 }

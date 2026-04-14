@@ -68,7 +68,10 @@ public class TimerManager implements Listener {
     }
 
     public void stop() {
-        if (running && shouldTimerRun()) {
+        // FIX: Bedingung war "if (running && shouldTimerRun())" — shouldTimerRun() gibt false
+        // zurück wenn alle Spieler im Spectator sind, wodurch stop() via GUI still fehlschlug.
+        // Korrekte Bedingung: nur prüfen ob der Timer überhaupt läuft.
+        if (running) {
             running = false;
             showOnce();
             onTimerStopped();
@@ -278,8 +281,8 @@ public class TimerManager implements Listener {
         if (running) return;
         e.setCancelled(true);
         Player p = e.getPlayer();
-        p.sendActionBar(net.kyori.adventure.text.Component.text(
-            messages.tr(p, "timer.paused_action_blocked"), net.kyori.adventure.text.format.NamedTextColor.RED));
+        p.sendActionBar(Component.text(
+            messages.tr(p, "timer.paused_action_blocked"), NamedTextColor.RED));
     }
 
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGH, ignoreCancelled = true)
@@ -287,8 +290,8 @@ public class TimerManager implements Listener {
         if (running) return;
         e.setCancelled(true);
         Player p = e.getPlayer();
-        p.sendActionBar(net.kyori.adventure.text.Component.text(
-            messages.tr(p, "timer.paused_action_blocked"), net.kyori.adventure.text.format.NamedTextColor.RED));
+        p.sendActionBar(Component.text(
+            messages.tr(p, "timer.paused_action_blocked"), NamedTextColor.RED));
     }
 
     @EventHandler
@@ -296,12 +299,8 @@ public class TimerManager implements Listener {
         Bukkit.getScheduler().runTask(plugin, () -> {
             e.getPlayer().sendActionBar(buildActionbar(e.getPlayer()));
             if (!running) {
-                if (particleTask == null) {
-                    startParticleEffect();
-                }
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    if (!running) freezeTime();
-                }, 5L);
+                if (particleTask == null) startParticleEffect();
+                Bukkit.getScheduler().runTaskLater(plugin, () -> { if (!running) freezeTime(); }, 5L);
             }
         });
     }
@@ -325,17 +324,11 @@ public class TimerManager implements Listener {
 
     private boolean shouldTimerRun() {
         try {
-            if (plugin.getPauseService() != null && plugin.getPauseService().isPaused()) {
-                return false;
-            }
+            if (plugin.getPauseService() != null && plugin.getPauseService().isPaused()) return false;
         } catch (Throwable ignored) {}
-        if (Bukkit.getOnlinePlayers().isEmpty()) {
-            return false;
-        }
+        if (Bukkit.getOnlinePlayers().isEmpty()) return false;
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.getGameMode() != GameMode.SPECTATOR && !player.isDead()) {
-                return true;
-            }
+            if (player.getGameMode() != GameMode.SPECTATOR && !player.isDead()) return true;
         }
         return false;
     }
@@ -368,7 +361,6 @@ public class TimerManager implements Listener {
 
         int deaths = Math.max(0, plugin.getConfig().getInt("stats.deaths", 0));
 
-        // Label dynamisch: "Tries/Versuche" wenn spectator-Modus, sonst "Deaths/Tode"
         boolean spectatorMode = plugin.getConfig().getBoolean("challenge.auto_spectator_on_death", false);
         String deathLabelKey = spectatorMode ? "actionbar.tries_label" : "actionbar.deaths_label";
 
@@ -389,9 +381,7 @@ public class TimerManager implements Listener {
         }
     }
 
-    private void showOnce() {
-        broadcastActionBar();
-    }
+    private void showOnce() { broadcastActionBar(); }
 
     private void loadState() {
         if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();

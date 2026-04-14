@@ -3,7 +3,7 @@
 [![Modrinth](https://img.shields.io/badge/Modrinth-exnfachjanTTV-1bd96a?logo=modrinth&logoColor=white)](https://modrinth.com/user/exnfachjanTTV)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings interactive, randomized challenges to your server... all controlled by your Twitch viewers! It seamlessly integrates your Minecraft gameplay with Twitch chat, letting your audience influence and trigger in-game events in real time.
+TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings interactive, randomized challenges to your server — all controlled by your Twitch viewers! It seamlessly integrates your Minecraft gameplay with Twitch chat, letting your audience influence and trigger in-game events in real time.
 
 ---
 
@@ -13,17 +13,28 @@ TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings intera
   Twitch viewers can trigger random events by subscribing or donating bits to your channel!
 
 - **Play this Challenge with your Twitch Friends:**  
-  The plugin can read subscriptions and bits from multiple Twitch accounts — including StreamElements donations. So you can play this challenge with your Twitch friends!  
-  **_Shared Chat may work, but seamless functionality is not guaranteed._**
+  The plugin can read subscriptions and bits from multiple Twitch accounts — including StreamElements and Tipeeestream donations. So you can play this challenge with your Twitch friends!
 
-- **StreamElements Donation Integration:**  
-  Donations via StreamElements trigger in-game events. Supports multiple streamer accounts simultaneously. Configuration is done exclusively via `streamelements.yml` in the plugin folder — reload in-game with `/trconfig se reload`.
+- **StreamElements & Tipeeestream Donation Integration:**  
+  Donations via StreamElements or Tipeeestream trigger in-game events. Both support **multiple streamer accounts simultaneously**. Configuration is done exclusively via `donations.yml` in the plugin folder.
+
+- **Channel Name Display:**  
+  When playing with multiple Twitch channels, the source channel is shown in brackets after every trigger — e.g. `exnfachjan (fuxelbau) deals 4 hearts`.
 
 - **Twitch Role Colors:**  
-  Viewer names appear color-coded in Minecraft chat — Broadcaster (red), Moderator (green), VIP (pink), and regular viewers (white).
+  Viewer names appear color-coded in Minecraft chat — Broadcaster (red), Moderator (green), VIP (pink), Donation (aqua), and regular viewers (white).
 
 - **Event Weighting and Customization:**  
   Adjust the likelihood of each event — make some more common, some rare, or disable them entirely. Easily reload or adjust settings on the fly. Reset all weights to defaults with one click.
+
+- **Recent Event Cooldown:**  
+  A built-in cooldown system reduces the chance of the same event appearing multiple times in a row, automatically — no configuration needed.
+
+- **Synced Multi-Player Events:**  
+  When playing with multiple players, all random values within an event (duration, item, mob type, etc.) are identical for every player. No more player 1 getting 10 seconds of Floor is Lava while player 2 gets 69.
+
+- **Spectator After Death:**  
+  When a player dies, all players are moved to Spectator mode simultaneously. The timer and queue pause until a new run begins. Configurable per-run as "Tries" (team lives) or classic "Deaths" counter.
 
 - **Death Counter and Statistics:**  
   Built-in death tracking and player statistics, perfect for challenge runs and community competitions.
@@ -64,28 +75,28 @@ Optional commands (not necessary, because you can manage everything seamlessly f
 
 ## 🎉 Events
 
-| Event                 | Description                                                                       |
-| --------------------- | --------------------------------------------------------------------------------- |
-| **spawn_mobs**        | Spawn random mobs near the player (hostile mobs chase you!)                       |
-| **potion**            | Apply a random potion effect                                                      |
-| **give_item**         | Give a random item                                                                |
-| **clear_inventory**   | Clear random slots from the player's inventory                                    |
-| **teleport**          | Teleport to a random location (safe Y-level)                                      |
-| **damage_half_heart** | Take heart damage                                                                 |
-| **fire**              | Set the player on fire                                                            |
-| **inv_shuffle**       | Shuffle the entire inventory                                                      |
-| **hot_potato**        | A fast zombie chases you — if it catches you, it explodes!                        |
-| **no_crafting**       | Block crafting for a random duration (with boss bar countdown)                    |
-| **safe_creepers**     | 6 Creepers surround you clock-style and explode (no damage, no block destruction) |
-| **floor_is_lava**     | The floor beneath you turns to magma blocks (with block restore)                  |
-| **nasa_call**         | Launch the player sky-high                                                        |
-| **slippery_ground**   | The ground turns to packed ice (with block restore)                               |
-| **hell_is_calling**   | Homing fireballs rain down on you                                                 |
-| **tnt_rain**          | TNT Minecarts rain from the sky                                                   |
-| **anvil_rain**        | Anvils fall from the sky                                                          |
-| **skyblock**          | All surrounding chunks get deleted — instant Skyblock!                            |
-| **fake_totem**        | Receive a Totem of Undying that doesn't actually work                             |
-| **equipment_shuffle** | All tiered tools and armor in your inventory are randomly upgraded or downgraded  |
+| Event                 | Description                                                                      |
+| --------------------- | -------------------------------------------------------------------------------- |
+| **spawn_mobs**        | Spawn random mobs near the player (hostile mobs chase you!)                      |
+| **potion**            | Apply a random potion effect                                                     |
+| **give_item**         | Give a random item                                                               |
+| **clear_inventory**   | Clear random slots from the player's inventory                                   |
+| **teleport**          | Teleport to a random location (safe Y-level)                                     |
+| **damage_half_heart** | Take heart damage                                                                |
+| **fire**              | Set the player on fire                                                           |
+| **inv_shuffle**       | Shuffle the entire inventory                                                     |
+| **hot_potato**        | A fast zombie chases you — if it catches you, it explodes!                       |
+| **no_crafting**       | Block crafting for a random duration (with boss bar countdown)                   |
+| **safe_creepers**     | Creepers surround you clock-style and explode (no damage, no block destruction)  |
+| **floor_is_lava**     | The floor beneath you turns to magma blocks (with block restore)                 |
+| **nasa_call**         | Launch the player sky-high                                                       |
+| **slippery_ground**   | The ground turns to packed ice (with block restore)                              |
+| **hell_is_calling**   | Homing fireballs rain down on you                                                |
+| **tnt_rain**          | TNT Minecarts rain from the sky                                                  |
+| **anvil_rain**        | Anvils fall from the sky                                                         |
+| **skyblock**          | All players are teleported together — surrounding chunks get deleted!            |
+| **fake_totem**        | Receive a Totem of Undying that doesn't actually work                            |
+| **equipment_shuffle** | All tiered tools and armor in your inventory are randomly upgraded or downgraded |
 
 ---
 
@@ -105,28 +116,38 @@ You can configure the plugin through the config.yml or without OP permissions di
      Make sure the following scopes are active: `bits.read`, `chat:read`, `channel:read:subscriptions` and `user:read:subscriptions`.
 
 3. **Configure StreamElements (optional):**  
-   Edit `plugins/TwitchRandomizer/streamelements.yml` — this file is created automatically on first start and is **never overwritten** by the plugin.
+   Edit `plugins/TwitchRandomizer/donations.yml` — this file is created automatically on first start and is **never overwritten** by the plugin.
 
    ```yaml
-   enabled: true
-   accounts: "YOUR_CHANNEL:YOUR_JWT_TOKEN"
-   amount_per_trigger: 5.0
-   tips_enabled: true
+   se_enabled: true
+   se_accounts: "YOUR_CHANNEL:YOUR_JWT_TOKEN"
    ```
 
    For multiple streamers, separate entries with a semicolon:
 
    ```yaml
-   accounts: "Channel1:JWT1;Channel2:JWT2"
+   se_accounts: "Channel1:JWT1;Channel2:JWT2"
    ```
 
-   Get your JWT token from: https://streamelements.com/dashboard/account/channels  
-   After editing the file, apply it in-game with `/trconfig se reload` — no server restart required.
+   Get your JWT token from: https://streamelements.com/dashboard/account/channels
 
-4. **Reload/Restart:**  
+4. **Configure Tipeeestream (optional):**  
+   In the same `donations.yml`:
+
+   ```yaml
+   tipeee_enabled: true
+   tipeee_accounts: "YOUR_CHANNEL:YOUR_APIKEY"
+   ```
+
+   Multiple accounts work the same way: `"Ch1:KEY1;Ch2:KEY2"`  
+   Get your API key from: https://tipeeestream.com/dashboard/stream
+
+   After editing `donations.yml`, apply it in-game with `/trconfig donations reload` — no server restart required.
+
+5. **Reload/Restart:**  
    If you use the GUI, you don't need to restart the server.
 
-5. **Set up your trigger**  
+6. **Set up your trigger**  
    You can test your connection. With the test triggers enabled (find them in the `Debug Menu`), you can simulate events like a sub (`!test`), a gift sub (`!gift`), or a sub gift bomb (`!giftbomb [N]`).
 
    **MAKE SURE YOUR TIMER IS RUNNING! OTHERWISE, YOU CAN'T ADD EVENTS TO THE QUEUE THROUGH TWITCH!**
@@ -162,12 +183,24 @@ The GUI uses sensible permission checks for each action.
 
 ## 📋 Changelog
 
+### v1.5.0
+
+- **Tipeeestream multi-account support** — `donations.yml` now uses `tipeee_accounts` with the same `"Channel:APIKEY;Channel2:APIKEY2"` format as StreamElements.
+- **Channel tag display** — When playing with multiple Twitch channels, the source channel name is shown in brackets after every event trigger.
+- **Synced multi-player events** — All random values (duration, item, mob type, potion effect, etc.) are now identical for every player in the same event dispatch.
+- **Skyblock team fix** — All players are now teleported to a single meeting point before chunks are cleared. Prevents players from voiding each other.
+- **Spectator-after-death team fix** — When a player dies, all online players are now moved to Spectator simultaneously. Timer and queue pause correctly.
+- **Tries vs Deaths counter** — When Spectator-after-death is enabled, the counter is labeled "Tries/Versuche" and only counts once per team-death. When disabled, it counts individual deaths as before.
+- **Euro/Event maximum** — The donation value per event is now capped at 5.0€ (the standard price). You can only go lower, not higher.
+- **Recent event cooldown** — A new anti-repeat algorithm reduces the weight of recently triggered events for the next 2–3 picks, making the event pool feel more varied.
+- **Queue pause on all-spectator** — Timer and queue now correctly pause as soon as all players are in Spectator mode.
+
 ### v1.4.0
 
 - **New event: `equipment_shuffle`** — All tiered tools and armor in the inventory are randomly upgraded or downgraded by one tier. Enchantments, display names, and lore are preserved.
-- **StreamElements donation integration** — Donations via StreamElements now trigger in-game events. Configured exclusively through `streamelements.yml` (never touched by the plugin's auto-save). Supports multiple streamer accounts simultaneously. Reload in-game with `/trconfig se reload` — no restart required.
-- **Pause aura** — A spiral flame particle effect is displayed around all online players while the timer is paused, making the paused state clearly visible at a glance.
-- **Weights:** small default value change
+- **StreamElements donation integration** — Donations via StreamElements now trigger in-game events. Supports multiple streamer accounts simultaneously.
+- **Pause aura** — A spiral flame particle effect is displayed around all online players while the timer is paused.
+- **Weights:** small default value changes.
 
 ### v1.3.1
 
