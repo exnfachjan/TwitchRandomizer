@@ -455,6 +455,7 @@ public class TwitchIntegrationManager {
     }
 
     public int getQueueSize() { return commandQueue.size(); }
+    public int getChannelCount() { return currentChannels.size(); }
     public int getTicksUntilNextDispatch() { return Math.max(0, gapTicks - ticksSinceLastDispatch); }
 
     private void loadQueue() {

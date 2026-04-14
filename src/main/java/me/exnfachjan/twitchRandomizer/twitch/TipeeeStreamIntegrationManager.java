@@ -138,6 +138,16 @@ public class TipeeeStreamIntegrationManager {
         return null;
     }
 
+    /** True wenn mehr als ein Twitch-Channel konfiguriert ist – dann Channel-Tag anzeigen */
+    private boolean isMultiChannel() {
+        try {
+            if (plugin instanceof TwitchRandomizer t && t.getTwitch() != null) {
+                return t.getTwitch().getChannelCount() > 1;
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
     private String extractJsonString(String json, String key) {
         String search = "\"" + key + "\":\"";
         int idx = json.indexOf(search);
@@ -249,9 +259,9 @@ public class TipeeeStreamIntegrationManager {
             String username = extractJsonString(content, "username");
             if (username == null || username.isBlank()) username = "TipeeeStreamTip";
 
-            // Channel-Tag nur bei mehreren Connections
+            // Channel-Tag anzeigen wenn mehr als ein Twitch-Channel konfiguriert ist
             String taggedUsername;
-            if (connections.size() > 1) {
+            if (isMultiChannel()) {
                 taggedUsername = "role:donation:" + username + " \u00a77(" + channelName + ")\u00a7r";
             } else {
                 taggedUsername = "role:donation:" + username;
