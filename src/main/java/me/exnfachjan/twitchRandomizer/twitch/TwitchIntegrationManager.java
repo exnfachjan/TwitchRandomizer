@@ -2,14 +2,9 @@ package me.exnfachjan.twitchRandomizer.twitch;
 
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.TwitchClientBuilder;
-import com.github.twitch4j.auth.providers.TwitchIdentityProvider;
 import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
-import com.github.twitch4j.common.events.domain.EventUser;
-import com.github.twitch4j.events.ChannelGoLiveEvent;
-import com.github.twitch4j.helix.domain.Subscription;
-import com.github.twitch4j.pubsub.events.ChannelBitsEvent;
-import com.github.twitch4j.pubsub.events.CheerEvent;
-import com.github.twitch4j.pubsub.events.SubscriptionEvent;
+import com.github.twitch4j.chat.events.channel.CheerEvent;
+import com.github.twitch4j.chat.events.channel.SubscriptionEvent;
 import com.netflix.hystrix.exception.HystrixRuntimeException;
 import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
 import me.exnfachjan.twitchRandomizer.timer.TimerManager;

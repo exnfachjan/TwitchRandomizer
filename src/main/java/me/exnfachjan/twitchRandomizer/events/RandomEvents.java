@@ -145,7 +145,7 @@ public class RandomEvents implements Listener {
         for (int i = 0; i < amount; i++) {
             Location spawnLoc = p.getLocation().clone().add(r.nextInt(5) - 2, 0, r.nextInt(5) - 2);
             Entity entity = p.getWorld().spawnEntity(spawnLoc, selectedType);
-            if (entity instanceof LivingEntity mob) {
+            if (entity instanceof org.bukkit.entity.Mob mob) {
                 mob.setTarget(p);
                 if (isHostileMob(selectedType)) {
                     mob.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20 * 60 * 60, 1, true, false, true));
@@ -400,8 +400,8 @@ public class RandomEvents implements Listener {
                 c.setMaxFuseTicks(0); c.setFuseTicks(0);
                 c.getPersistentDataContainer().set(safeKey, PersistentDataType.BYTE, (byte) 1);
             });
-            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, lifetimeSec * 20 + 40, 4, 128, false, false));
-            p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, lifetimeSec * 20 + 40, -4, 128, false, false));
+            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, lifetimeSec * 20 + 40, 4, false, false, false));
+            p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, lifetimeSec * 20 + 40, -4, false, false, false));
             spawnedCreepers.add(creeper);
         }
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
