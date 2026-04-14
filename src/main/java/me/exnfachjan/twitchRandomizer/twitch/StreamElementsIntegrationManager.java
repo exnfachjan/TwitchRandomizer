@@ -77,7 +77,6 @@ public class StreamElementsIntegrationManager {
         boolean accountsChanged = !Objects.equals(this.lastAccounts, acc);
         boolean amountChanged = this.amountPerTrigger != amountPerTrigger;
 
-        // Amount only change: just update value, no reconnect needed
         if (!enabledChanged && !accountsChanged) {
             this.amountPerTrigger = amountPerTrigger;
             if (debug && amountChanged) plugin.getLogger().info("[SE] amountPerTrigger aktualisiert: " + amountPerTrigger);
@@ -242,7 +241,15 @@ public class StreamElementsIntegrationManager {
 
             String username = extractJsonString(content, "username");
             if (username == null || username.isBlank()) username = "StreamElementsTip";
-            String taggedUsername = "role:donation:" + username;
+
+            // Channel-Tag nur anhängen wenn mehr als eine SE-Verbindung aktiv ist
+            String taggedUsername;
+            if (connections.size() > 1) {
+                taggedUsername = "role:donation:" + username + " \u00a77(" + channelName + ")\u00a7r";
+            } else {
+                taggedUsername = "role:donation:" + username;
+            }
+
             double amount = extractJsonDouble(content, "amount");
 
             if (debug) plugin.getLogger().info("[SE:" + channelName + "] Tip von " + username + ": " + amount + " (min=" + amountPerTrigger + ")");
