@@ -109,7 +109,7 @@ public class TimerManager implements Listener {
         playTimerSound(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 0.8f);
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings({"deprecation", "removal"})
     private void freezeTime() {
         try {
             for (org.bukkit.World world : Bukkit.getWorlds()) {
@@ -131,7 +131,7 @@ public class TimerManager implements Listener {
         } catch (Throwable ignored) {}
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings({"deprecation", "removal"})
     private void unfreezeTime() {
         try {
             for (org.bukkit.World world : Bukkit.getWorlds()) {

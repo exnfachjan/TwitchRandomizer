@@ -25,7 +25,7 @@ import java.util.*;
 public class DonationsManager {
 
     public static final double MIN_EURO_PER_EVENT = 1.0;
-    public static final double MAX_EURO_PER_EVENT = SUB_VALUE_EURO; // Maximum = Standard-Preis (5€)
+    public static final double MAX_EURO_PER_EVENT = 5.0;  // Maximum = Standard-Preis (= SUB_VALUE_EURO)
     public static final int    MIN_BITS_PER_EVENT  = 100;
     public static final double SUB_VALUE_EURO      = 5.0;
 
