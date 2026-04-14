@@ -13,8 +13,9 @@ import org.bukkit.event.player.PlayerRespawnEvent;
  * Setzt Spieler nach dem Tod automatisch in den Spectator-Modus,
  * wenn challenge.auto_spectator_on_death = true.
  *
- * Hinweis: Direkte Referenzen auf TwitchIntegrationManager wurden entfernt,
- * damit die Klasse nicht am Paket-Refactor scheitert.
+ * ÄNDERUNG: Wenn ein Spieler stirbt, werden ALLE online Spieler in Spectator
+ * gesetzt – nicht nur der Tote. Dadurch pausiert die Queue sobald alle im
+ * Spectator sind (GamePauseService → pause_if_all_spectator).
  */
 public class DeathRuleListener implements Listener {
 
@@ -28,12 +29,22 @@ public class DeathRuleListener implements Listener {
     public void onPlayerDeath(PlayerDeathEvent event) {
         if (!plugin.getConfig().getBoolean("challenge.auto_spectator_on_death", false)) return;
 
-        Player player = event.getEntity();
         // Nach 1 Tick ausführen, damit Bukkit den Death-Cycle abschließen kann
         Bukkit.getScheduler().runTask(plugin, () -> {
-            if (player.isOnline()) {
-                player.setGameMode(GameMode.SPECTATOR);
+            // Den gestorbenen Spieler in Spectator setzen
+            Player deadPlayer = event.getEntity();
+            if (deadPlayer.isOnline()) {
+                deadPlayer.setGameMode(GameMode.SPECTATOR);
             }
+
+            // ALLE anderen online Spieler ebenfalls in Spectator setzen
+            for (Player other : Bukkit.getOnlinePlayers()) {
+                if (!other.getUniqueId().equals(deadPlayer.getUniqueId())) {
+                    other.setGameMode(GameMode.SPECTATOR);
+                }
+            }
+            // Sobald alle im Spectator sind, greift GamePauseService.pause_if_all_spectator
+            // und pausiert Timer + Queue automatisch.
         });
     }
 
@@ -42,7 +53,7 @@ public class DeathRuleListener implements Listener {
         if (!plugin.getConfig().getBoolean("challenge.auto_spectator_on_death", false)) return;
 
         Player player = event.getPlayer();
-        // Sicherstellen, dass er auch nach dem Respawn Spectator ist
+        // Sicherstellen, dass er auch nach dem Respawn Spectator bleibt
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (player.isOnline()) {
                 player.setGameMode(GameMode.SPECTATOR);

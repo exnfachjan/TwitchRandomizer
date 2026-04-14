@@ -43,9 +43,13 @@ public class DeathCounterManager {
     }
 
     public void sendActionbar(Player p) {
+        // Label dynamisch wählen: Tries/Versuche wenn spectator-Modus, Deaths/Tode sonst
+        boolean spectatorMode = plugin.getConfig().getBoolean("challenge.auto_spectator_on_death", false);
+        String labelKey = spectatorMode ? "actionbar.tries_label" : "actionbar.deaths_label";
+
         String label = plugin.getMessages() != null
-                ? plugin.getMessages().tr(p, "actionbar.deaths_label")
-                : "Deaths";
+                ? plugin.getMessages().tr(p, labelKey)
+                : (spectatorMode ? "Tries" : "Deaths");
         String msg = ChatColor.WHITE + "💀 " + label + ": " + ChatColor.WHITE + get();
         sendActionbarLegacy(p, msg);
     }

@@ -94,7 +94,9 @@ public class TwitchRandomizer extends JavaPlugin {
 
         this.deathCounter = new DeathCounterManager(this);
         this.deathCounter.load();
-        getServer().getPluginManager().registerEvents(new DeathCounterListener(this.deathCounter), this);
+        // GEÄNDERT: plugin-Referenz (this) als zweiten Parameter übergeben,
+        // damit DeathCounterListener den Modus (spectator vs. deaths) kennt.
+        getServer().getPluginManager().registerEvents(new DeathCounterListener(this.deathCounter, this), this);
 
         ConfigGui configGui = new ConfigGui(this);
         getServer().getPluginManager().registerEvents(new GuiListener(this, configGui), this);

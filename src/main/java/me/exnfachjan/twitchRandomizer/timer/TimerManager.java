@@ -368,12 +368,16 @@ public class TimerManager implements Listener {
 
         int deaths = Math.max(0, plugin.getConfig().getInt("stats.deaths", 0));
 
+        // Label dynamisch: "Tries/Versuche" wenn spectator-Modus, sonst "Deaths/Tode"
+        boolean spectatorMode = plugin.getConfig().getBoolean("challenge.auto_spectator_on_death", false);
+        String deathLabelKey = spectatorMode ? "actionbar.tries_label" : "actionbar.deaths_label";
+
         Component sep = Component.text("  |  ", NamedTextColor.DARK_GRAY);
         Component queueC = Component.text(messages.tr(p, "actionbar.queue_label") + ": ", NamedTextColor.YELLOW)
                 .append(Component.text(String.valueOf(queue), NamedTextColor.WHITE));
         Component next = Component.text(messages.tr(p, "actionbar.next_label") + ": ", NamedTextColor.AQUA)
                 .append(Component.text(nextStr, NamedTextColor.WHITE));
-        Component deathsC = Component.text("💀 " + messages.tr(p, "actionbar.deaths_label") + ": ", NamedTextColor.WHITE)
+        Component deathsC = Component.text("💀 " + messages.tr(p, deathLabelKey) + ": ", NamedTextColor.WHITE)
                 .append(Component.text(String.valueOf(deaths), NamedTextColor.WHITE));
 
         return left.append(sep).append(queueC).append(sep).append(next).append(sep).append(deathsC);
