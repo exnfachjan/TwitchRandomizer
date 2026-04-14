@@ -2,50 +2,26 @@ package me.exnfachjan.twitchRandomizer.events;
 
 import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
 import me.exnfachjan.twitchRandomizer.i18n.Messages;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Zombie;
-import org.bukkit.entity.Creeper;
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.CraftItemEvent;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.inventory.InventoryOpenEvent;
-import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.event.inventory.PrepareItemCraftEvent;
+import org.bukkit.event.entity.*;
+import org.bukkit.event.inventory.*;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.entity.Mob;
-import org.bukkit.entity.Wolf;
-import org.bukkit.entity.Bee;
-import org.bukkit.entity.Panda;
-import org.bukkit.entity.IronGolem;
-import org.bukkit.entity.Llama;
-import org.bukkit.Chunk;
-import org.bukkit.NamespacedKey;
-import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.event.entity.EntityResurrectEvent;
-import org.bukkit.event.entity.EntityExplodeEvent;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.ExplosionPrimeEvent;
-import org.bukkit.GameMode;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -73,19 +49,17 @@ public class RandomEvents implements Listener {
         this.i18n = plugin.getMessages();
     }
 
-    public boolean isLavaActive(Player p) {
-        return lavaActive.contains(p.getUniqueId());
-    }
-    public boolean isSlipperyActive(Player p) {
-        return slipperyActive.contains(p.getUniqueId());
-    }
-    public boolean isAnyGroundEventActive(Player p) {
-        return isLavaActive(p) || isSlipperyActive(p);
-    }
+    public boolean isLavaActive(Player p) { return lavaActive.contains(p.getUniqueId()); }
+    public boolean isSlipperyActive(Player p) { return slipperyActive.contains(p.getUniqueId()); }
+    public boolean isAnyGroundEventActive(Player p) { return isLavaActive(p) || isSlipperyActive(p); }
     public boolean isNoCraftingActive(Player p) {
         Long until = noCraftUntil.get(p.getUniqueId());
         return until != null && System.currentTimeMillis() <= until;
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // NoCrafting inventory event handlers
+    // ─────────────────────────────────────────────────────────────────────────
 
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPrepare(PrepareItemCraftEvent e) {
@@ -125,8 +99,7 @@ public class RandomEvents implements Listener {
         for (int rawSlot : e.getRawSlots()) {
             org.bukkit.inventory.InventoryView view = e.getView();
             InventoryType.SlotType slotType = view.getSlotType(rawSlot);
-            if (slotType == InventoryType.SlotType.RESULT ||
-                    slotType == InventoryType.SlotType.CRAFTING) {
+            if (slotType == InventoryType.SlotType.RESULT || slotType == InventoryType.SlotType.CRAFTING) {
                 e.setCancelled(true);
                 break;
             }
@@ -143,106 +116,19 @@ public class RandomEvents implements Listener {
         }
     }
 
-    public void triggerNoCrafting(Player p, String byUser) {
-        int seconds = 30 + rng.nextInt(91);
-        noCraftUntil.put(p.getUniqueId(), System.currentTimeMillis() + (seconds * 1000));
+    // ─────────────────────────────────────────────────────────────────────────
+    // SYNC-WRAPPER: Alle trigger-Methoden haben eine synced-Variante die einen
+    // vorberechneten long-Seed entgegennimmt. RandomEventCommand ruft immer
+    // die synced-Variante auf, damit alle Spieler dieselben Zufallswerte bekommen.
+    // ─────────────────────────────────────────────────────────────────────────
 
-        showNoCraftBossbar(p, seconds);
+    /** Erzeugt einen frischen Random aus dem Sync-Seed */
+    private Random seededRng(long seed) { return new Random(seed); }
 
-        BukkitTask oldTask = noCraftTasks.remove(p.getUniqueId());
-        if (oldTask != null) oldTask.cancel();
-
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            int remaining = seconds;
-            @Override
-            public void run() {
-                if (!isNoCraftingActive(p) || remaining <= 0) {
-                    hideNoCraftBossbar(p);
-                    BukkitTask t = noCraftTasks.remove(p.getUniqueId());
-                    if (t != null) t.cancel();
-                    return;
-                }
-                updateNoCraftBossbar(p, remaining, seconds);
-                remaining--;
-            }
-        }, 0L, 20L);
-        noCraftTasks.put(p.getUniqueId(), task);
-
-        Map<String, String> ph = new HashMap<>();
-        ph.put("seconds", String.valueOf(seconds));
-        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.no_crafting.start_by" : "events.no_crafting.start";
-        p.sendMessage(i18n.tr(p, key, ph));
-    }
-
-    private void showNoCraftBossbar(Player p, int totalSeconds) {
-        hideNoCraftBossbar(p);
-        String title = i18n.tr(p, "bossbar.no_crafting") + " \u2013 " + totalSeconds + "s";
-        BossBar bar = Bukkit.createBossBar(title, BarColor.YELLOW, BarStyle.SEGMENTED_10);
-        bar.setProgress(1.0);
-        bar.addPlayer(p);
-        noCraftBossbars.put(p.getUniqueId(), bar);
-    }
-
-    private void updateNoCraftBossbar(Player p, int secondsLeft, int total) {
-        BossBar bar = noCraftBossbars.get(p.getUniqueId());
-        if (bar != null) {
-            String title = i18n.tr(p, "bossbar.no_crafting") + " \u2013 " + secondsLeft + "s";
-            bar.setTitle(title);
-            bar.setProgress(Math.max(0.0, Math.min(1.0, (double) secondsLeft / (double) total)));
-        }
-    }
-
-    private void hideNoCraftBossbar(Player p) {
-        BossBar bar = noCraftBossbars.remove(p.getUniqueId());
-        if (bar != null) {
-            bar.removeAll();
-        }
-    }
-
-    public void triggerFakeTotem(Player p, String byUser) {
-        ItemStack fakeTotem = new ItemStack(Material.TOTEM_OF_UNDYING);
-        ItemMeta meta = fakeTotem.getItemMeta();
-        meta.setDisplayName(i18n.tr(p, "item.minecraft.totem_of_undying"));
-        NamespacedKey key = new NamespacedKey(plugin, "fake_totem");
-        meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
-        fakeTotem.setItemMeta(meta);
-        p.getInventory().addItem(fakeTotem);
-
-        Map<String, String> ph = new HashMap<>();
-        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String keyMsg = (byUser != null && !byUser.isBlank()) ? "event.fake_totem.given_by" : "event.fake_totem.given";
-        p.sendMessage(i18n.tr(p, keyMsg, ph));
-    }
-
-    @EventHandler
-    public void onEntityResurrect(EntityResurrectEvent event) {
-        if (!(event.getEntity() instanceof Player p)) return;
-        NamespacedKey key = new NamespacedKey(plugin, "fake_totem");
-
-        ItemStack offhand = p.getInventory().getItemInOffHand();
-        if (offhand != null && offhand.getType() == Material.TOTEM_OF_UNDYING) {
-            ItemMeta meta = offhand.getItemMeta();
-            if (meta != null && meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
-                event.setCancelled(true);
-                p.getInventory().setItemInOffHand(null);
-                p.sendMessage(i18n.tr(p, "event.fake_totem.fail"));
-                return;
-            }
-        }
-
-        ItemStack mainhand = p.getInventory().getItemInMainHand();
-        if (mainhand != null && mainhand.getType() == Material.TOTEM_OF_UNDYING) {
-            ItemMeta meta = mainhand.getItemMeta();
-            if (meta != null && meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
-                event.setCancelled(true);
-                p.getInventory().setItemInMainHand(null);
-                p.sendMessage(i18n.tr(p, "event.fake_totem.fail"));
-            }
-        }
-    }
-
-    public void triggerSpawnMobs(Player p, String byUser) {
+    // ─── SpawnMobs ────────────────────────────────────────────────────────────
+    public void triggerSpawnMobs(Player p, String byUser) { triggerSpawnMobs(p, byUser, rng.nextLong()); }
+    public void triggerSpawnMobs(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
         List<EntityType> allMobTypes = Arrays.asList(
                 EntityType.ZOMBIE, EntityType.SKELETON, EntityType.CREEPER, EntityType.SPIDER,
                 EntityType.CAVE_SPIDER, EntityType.ENDERMAN, EntityType.WITCH, EntityType.SLIME,
@@ -250,71 +136,33 @@ public class RandomEvents implements Listener {
                 EntityType.ZOMBIFIED_PIGLIN, EntityType.ENDERMITE, EntityType.GUARDIAN, EntityType.ELDER_GUARDIAN,
                 EntityType.SHULKER, EntityType.VEX, EntityType.VINDICATOR, EntityType.EVOKER,
                 EntityType.RAVAGER, EntityType.PILLAGER, EntityType.PHANTOM,
-                EntityType.DROWNED, EntityType.HUSK, EntityType.STRAY, EntityType.PIGLIN, EntityType.PIGLIN_BRUTE,
-                EntityType.HOGLIN, EntityType.ZOGLIN,
-                EntityType.COW, EntityType.PIG, EntityType.SHEEP, EntityType.CHICKEN, EntityType.HORSE,
-                EntityType.DONKEY, EntityType.MULE, EntityType.LLAMA, EntityType.TRADER_LLAMA,
-                EntityType.WOLF, EntityType.CAT, EntityType.OCELOT, EntityType.RABBIT, EntityType.VILLAGER,
-                EntityType.IRON_GOLEM, EntityType.SNOW_GOLEM, EntityType.SQUID, EntityType.GLOW_SQUID,
-                EntityType.BAT, EntityType.MOOSHROOM, EntityType.POLAR_BEAR, EntityType.PARROT,
-                EntityType.DOLPHIN, EntityType.TURTLE, EntityType.COD, EntityType.SALMON,
-                EntityType.PUFFERFISH, EntityType.TROPICAL_FISH, EntityType.PANDA, EntityType.FOX,
-                EntityType.BEE, EntityType.STRIDER, EntityType.AXOLOTL, EntityType.GOAT,
-                EntityType.ALLAY, EntityType.FROG, EntityType.WITHER, EntityType.WARDEN
+                EntityType.DROWNED, EntityType.HUSK, EntityType.STRAY, EntityType.PIGLIN,
+                EntityType.HOGLIN, EntityType.ZOGLIN, EntityType.BEE, EntityType.PANDA,
+                EntityType.WOLF, EntityType.IRON_GOLEM, EntityType.LLAMA
         );
-
-        List<EntityType> availableMobs = allMobTypes.stream()
-                .filter(type -> type != null && type.isSpawnable())
-                .collect(Collectors.toList());
-        if (availableMobs.isEmpty()) {
-            availableMobs = Arrays.asList(EntityType.ZOMBIE, EntityType.SKELETON, EntityType.CREEPER, EntityType.COW, EntityType.PIG);
-        }
-        EntityType selectedType = availableMobs.get(rng.nextInt(availableMobs.size()));
-        int amount = 1 + rng.nextInt(5);
+        EntityType selectedType = allMobTypes.get(r.nextInt(allMobTypes.size()));
+        int amount = 1 + r.nextInt(5);
         for (int i = 0; i < amount; i++) {
-            double offsetX = rng.nextDouble() * 4 - 2;
-            double offsetZ = rng.nextDouble() * 4 - 2;
-            Entity entity = p.getWorld().spawnEntity(p.getLocation().add(offsetX, 0, offsetZ), selectedType);
-
-            if (entity instanceof Mob mob) {
+            Location spawnLoc = p.getLocation().clone().add(r.nextInt(5) - 2, 0, r.nextInt(5) - 2);
+            Entity entity = p.getWorld().spawnEntity(spawnLoc, selectedType);
+            if (entity instanceof LivingEntity mob) {
                 mob.setTarget(p);
-
                 if (isHostileMob(selectedType)) {
                     mob.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 20 * 60 * 60, 1, true, false, true));
                     mob.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * 60 * 60, 1, true, false, true));
-
                     new BukkitRunnable() {
-                        @Override
-                        public void run() {
-                            if (mob.isDead() || !p.isOnline() || p.isDead()) {
-                                this.cancel();
-                                return;
-                            }
-                            if (mob.getTarget() == null || !mob.getTarget().equals(p)) {
-                                mob.setTarget(p);
-                            }
+                        @Override public void run() {
+                            if (mob.isDead() || !p.isOnline() || p.isDead()) { this.cancel(); return; }
+                            if (mob.getTarget() == null || !mob.getTarget().equals(p)) mob.setTarget(p);
                         }
                     }.runTaskTimer(plugin, 20L, 20L);
                 }
             }
-            if (entity instanceof Wolf wolf) {
-                wolf.setAngry(true);
-                wolf.setTarget(p);
-            }
-            if (entity instanceof Bee bee) {
-                bee.setAnger(999999);
-                bee.setTarget(p);
-            }
-            if (entity instanceof Panda panda) {
-                panda.setAggressive(true);
-            }
-            if (entity instanceof IronGolem golem) {
-                golem.setPlayerCreated(false);
-                golem.setTarget(p);
-            }
-            if (entity instanceof Llama llama) {
-                llama.setTarget(p);
-            }
+            if (entity instanceof Wolf wolf) { wolf.setAngry(true); wolf.setTarget(p); }
+            if (entity instanceof Bee bee) { bee.setAnger(999999); bee.setTarget(p); }
+            if (entity instanceof Panda panda) { panda.setAggressive(true); }
+            if (entity instanceof IronGolem golem) { golem.setPlayerCreated(false); golem.setTarget(p); }
+            if (entity instanceof Llama llama) { llama.setTarget(p); }
         }
         Map<String, String> ph = new HashMap<>();
         ph.put("amount", String.valueOf(amount));
@@ -334,85 +182,37 @@ public class RandomEvents implements Listener {
         };
     }
 
-    public void triggerTntRain(Player p, String byUser) {
-        int duration = plugin.getConfig().getInt("events.settings.tnt_rain.duration_seconds", 30);
-        int radius = plugin.getConfig().getInt("events.settings.tnt_rain.radius", 25);
-        int intervalTicks = plugin.getConfig().getInt("events.settings.tnt_rain.interval_ticks", 6);
-
-        World world = p.getWorld();
-        int totalTicks = duration * 20;
-        new BukkitRunnable() {
-            int ticksRun = 0;
-            final Random rng = new Random();
-            @Override
-            public void run() {
-                if (!p.isOnline() || p.isDead()) { cancel(); return; }
-                int tntCount = 8 + rng.nextInt(5);
-                Location playerLoc = p.getLocation();
-                for (int i = 0; i < tntCount; i++) {
-                    double dx = rng.nextDouble() * radius * 2 - radius;
-                    double dz = rng.nextDouble() * radius * 2 - radius;
-                    int yOffset = 3 + rng.nextInt(5);
-                    int ySpawn = Math.min(playerLoc.getWorld().getMaxHeight() - 2, playerLoc.getBlockY() + yOffset);
-                    Location spawnLoc = playerLoc.clone().add(dx, ySpawn - playerLoc.getY(), dz);
-                    world.spawnEntity(spawnLoc, EntityType.TNT_MINECART);
-                }
-                ticksRun += intervalTicks;
-                if (ticksRun >= totalTicks) cancel();
-            }
-        }.runTaskTimer(plugin, 0L, intervalTicks);
-
+    // ─── Potion ───────────────────────────────────────────────────────────────
+    public void triggerPotion(Player p, String byUser) { triggerPotion(p, byUser, rng.nextLong()); }
+    public void triggerPotion(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
+        PotionEffectType[] effects = {
+                PotionEffectType.REGENERATION, PotionEffectType.SATURATION, PotionEffectType.WITHER,
+                PotionEffectType.DARKNESS, PotionEffectType.SPEED, PotionEffectType.SLOWNESS,
+                PotionEffectType.POISON, PotionEffectType.BLINDNESS, PotionEffectType.RAID_OMEN,
+                PotionEffectType.HERO_OF_THE_VILLAGE, PotionEffectType.ABSORPTION, PotionEffectType.JUMP_BOOST
+        };
+        PotionEffectType effectType = effects[r.nextInt(effects.length)];
+        int durationSec = 10 + r.nextInt(111);
+        int amplifier = r.nextInt(2);
+        p.addPotionEffect(new PotionEffect(effectType, durationSec * 20, amplifier));
         Map<String, String> ph = new HashMap<>();
-        ph.put("seconds", String.valueOf(duration));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.tnt_rain.by" : "events.tnt_rain.solo";
+        ph.put("effect", pretty(effectType.getName()));
+        ph.put("seconds", String.valueOf(durationSec));
+        String key = (byUser != null && !byUser.isBlank()) ? "events.potion.applied.by" : "events.potion.applied.solo";
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    public void triggerAnvilRain(Player p, String byUser) {
-        int duration = plugin.getConfig().getInt("events.settings.anvil_rain.duration_seconds", 30);
-        int radius = plugin.getConfig().getInt("events.settings.anvil_rain.radius", 25);
-        int intervalTicks = plugin.getConfig().getInt("events.settings.anvil_rain.interval_ticks", 6);
-
-        World world = p.getWorld();
-        int totalTicks = duration * 20;
-        new BukkitRunnable() {
-            int ticksRun = 0;
-            final Random rng = new Random();
-            @Override
-            public void run() {
-                if (!p.isOnline() || p.isDead()) { cancel(); return; }
-                int anvilCount = 8 + rng.nextInt(5);
-                Location base = p.getLocation();
-                for (int i = 0; i < anvilCount; i++) {
-                    double dx = rng.nextDouble() * radius * 2 - radius;
-                    double dz = rng.nextDouble() * radius * 2 - radius;
-                    int ySpawn = Math.min(world.getMaxHeight() - 2, base.getBlockY() + 30 + rng.nextInt(10));
-                    Location spawnLoc = base.clone().add(dx, ySpawn - base.getY(), dz);
-                    world.spawnFallingBlock(spawnLoc, Material.ANVIL.createBlockData());
-                }
-                ticksRun += intervalTicks;
-                if (ticksRun >= totalTicks) cancel();
-            }
-        }.runTaskTimer(plugin, 0L, intervalTicks);
-
-        Map<String, String> ph = new HashMap<>();
-        ph.put("seconds", String.valueOf(duration));
-        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.anvil_rain.by" : "events.anvil_rain.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
-    }
-
-    public void triggerGiveItem(Player p, String byUser) {
+    // ─── GiveItem ─────────────────────────────────────────────────────────────
+    public void triggerGiveItem(Player p, String byUser) { triggerGiveItem(p, byUser, rng.nextLong()); }
+    public void triggerGiveItem(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
         List<Material> mats = Arrays.stream(Material.values())
-                .filter(Material::isItem)
-                .filter(mat -> mat != Material.AIR)
-                .collect(Collectors.toList());
-
-        Material mat = mats.get(rng.nextInt(mats.size()));
-        int amount = 1 + rng.nextInt(5);
+                .filter(Material::isItem).filter(mat -> mat != Material.AIR).collect(Collectors.toList());
+        Material mat = mats.get(r.nextInt(mats.size()));
+        int amount = 1 + r.nextInt(5);
         p.getInventory().addItem(new ItemStack(mat, amount));
-
         Map<String, String> ph = new HashMap<>();
         ph.put("item", pretty(mat.name()));
         ph.put("amount", String.valueOf(amount));
@@ -421,81 +221,17 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    public void triggerSkyblock(Player p, String byUser) {
-        int chunkRadius = plugin.getConfig().getInt("events.settings.skyblock.radius", 2);
-        World world = p.getWorld();
-        Chunk playerChunk = p.getLocation().getChunk();
-
-        Set<UUID> toLock = new HashSet<>();
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            if (!online.getWorld().equals(world)) continue;
-            if (online.getGameMode() == GameMode.SPECTATOR || online.isDead()) continue;
-            toLock.add(online.getUniqueId());
-        }
-        skyblockLocked.addAll(toLock);
-
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            if (!online.getWorld().equals(world)) continue;
-            if (online.getGameMode() == GameMode.SPECTATOR || online.isDead()) continue;
-            online.teleport(p.getLocation());
-        }
-
-        List<int[]> chunksToDelete = new ArrayList<>();
-        for (int cx = -chunkRadius; cx <= chunkRadius; cx++) {
-            for (int cz = -chunkRadius; cz <= chunkRadius; cz++) {
-                if (cx == 0 && cz == 0) continue;
-                chunksToDelete.add(new int[]{playerChunk.getX() + cx, playerChunk.getZ() + cz});
-            }
-        }
-
-        new BukkitRunnable() {
-            int index = 0;
-            @Override
-            public void run() {
-                int processed = 0;
-                while (index < chunksToDelete.size() && processed < 2) {
-                    int[] coords = chunksToDelete.get(index++);
-                    Chunk targetChunk = world.getChunkAt(coords[0], coords[1]);
-                    if (!targetChunk.isLoaded()) world.loadChunk(targetChunk);
-
-                    int minY = world.getMinHeight();
-                    int maxY = world.getMaxHeight();
-                    for (int x = 0; x < 16; x++) {
-                        for (int z = 0; z < 16; z++) {
-                            for (int y = minY; y < maxY; y++) {
-                                targetChunk.getBlock(x, y, z).setType(Material.AIR, false);
-                            }
-                        }
-                    }
-                    processed++;
-                }
-
-                if (index >= chunksToDelete.size()) {
-                    skyblockLocked.removeAll(toLock);
-                    cancel();
-                }
-            }
-        }.runTaskTimer(plugin, 0L, 1L);
-
-        Map<String, String> ph = new HashMap<>();
-        ph.put("radius", String.valueOf(chunkRadius));
-        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.skyblock.by" : "events.skyblock.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
-    }
-
-    public void triggerClearInventory(Player p, String byUser) {
+    // ─── ClearInventory ───────────────────────────────────────────────────────
+    public void triggerClearInventory(Player p, String byUser) { triggerClearInventory(p, byUser, rng.nextLong()); }
+    public void triggerClearInventory(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
         PlayerInventory inv = p.getInventory();
         List<Integer> allSlots = new ArrayList<>();
         for (int i = 0; i <= 40; i++) allSlots.add(i);
-        Collections.shuffle(allSlots, rng);
-
-        int slotsToClear = 1 + rng.nextInt(allSlots.size());
-        for (int i = 0; i < slotsToClear; i++) {
-            inv.setItem(allSlots.get(i), null);
-        }
+        Collections.shuffle(allSlots, r);
+        int slotsToClear = 1 + r.nextInt(allSlots.size());
+        for (int i = 0; i < slotsToClear; i++) inv.setItem(allSlots.get(i), null);
         p.updateInventory();
-
         Map<String, String> ph = new HashMap<>();
         ph.put("count", String.valueOf(slotsToClear));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
@@ -503,385 +239,86 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    public void triggerTeleport(Player p, String byUser) {
-        if (rng.nextInt(100_000) == 0) {
+    // ─── Teleport ─────────────────────────────────────────────────────────────
+    public void triggerTeleport(Player p, String byUser) { triggerTeleport(p, byUser, rng.nextLong()); }
+    public void triggerTeleport(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
+        if (r.nextInt(100_000) == 0) {
             World endWorld = Bukkit.getWorld("world_the_end");
             if (endWorld != null) {
-                int x = 1000 + rng.nextInt(500);
-                int z = 1000 + rng.nextInt(500);
-                int y = 70;
+                int x = 1000 + r.nextInt(500); int z = 1000 + r.nextInt(500); int y = 70;
                 setAirCube(endWorld, x, y, z);
-                Location tpLoc = new Location(endWorld, x + 0.5, y, z + 0.5);
-                p.teleport(tpLoc);
+                p.teleport(new Location(endWorld, x + 0.5, y, z + 0.5));
                 Map<String, String> ph = new HashMap<>();
-                ph.put("x", String.valueOf(x));
-                ph.put("y", String.valueOf(y));
-                ph.put("z", String.valueOf(z));
+                ph.put("x", String.valueOf(x)); ph.put("y", String.valueOf(y)); ph.put("z", String.valueOf(z));
                 if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-                String key = (byUser != null && !byUser.isBlank()) ? "events.teleport.advanced_end.by" : "events.teleport.advanced_end.solo";
-                p.sendMessage(i18n.tr(p, key, ph));
+                p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.teleport.advanced_end.by" : "events.teleport.advanced_end.solo", ph));
                 return;
             }
         }
-
         World w = p.getWorld();
-        int x = rng.nextInt(3000) - 1500;
-        int z = rng.nextInt(3000) - 1500;
-
+        int x = r.nextInt(3000) - 1500; int z = r.nextInt(3000) - 1500;
         int y = findSafeY(w, x, z);
-
         setAirCube(w, x, y, z);
-        Location tpLoc = new Location(w, x + 0.5, y, z + 0.5);
-        p.teleport(tpLoc);
+        p.teleport(new Location(w, x + 0.5, y, z + 0.5));
         Map<String, String> ph = new HashMap<>();
-        ph.put("x", String.valueOf(x));
-        ph.put("y", String.valueOf(y));
-        ph.put("z", String.valueOf(z));
+        ph.put("x", String.valueOf(x)); ph.put("y", String.valueOf(y)); ph.put("z", String.valueOf(z));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.teleport.random.by" : "events.teleport.random.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.teleport.random.by" : "events.teleport.random.solo", ph));
     }
 
-    private int findSafeY(World w, int x, int z) {
-        int maxY = w.getMaxHeight() - 1;
-        int minY = w.getMinHeight();
-        for (int y = maxY; y > minY; y--) {
-            Block block = w.getBlockAt(x, y, z);
-            Block above = w.getBlockAt(x, y + 1, z);
-            if (block.getType().isSolid() && !above.getType().isSolid()) {
-                return y + 1;
-            }
-        }
-        return Math.max(minY + 1, 64);
-    }
-
-    private void setAirCube(World w, int centerX, int centerY, int centerZ) {
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    int bx = centerX + dx;
-                    int by = centerY + dy;
-                    int bz = centerZ + dz;
-                    if (by < w.getMinHeight() || by > w.getMaxHeight()) continue;
-                    w.getBlockAt(bx, by, bz).setType(Material.AIR, false);
-                }
-            }
-        }
-    }
-
-    public void triggerDamageHalfHeart(Player p, String byUser) {
-        int hearts = 3 + rng.nextInt(6);
-        double damage = hearts * 2.0;
+    // ─── DamageHalfHeart ──────────────────────────────────────────────────────
+    public void triggerDamageHalfHeart(Player p, String byUser) { triggerDamageHalfHeart(p, byUser, rng.nextLong()); }
+    public void triggerDamageHalfHeart(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
+        int hearts = 3 + r.nextInt(6);
         double hp = p.getHealth();
-        if (hp > 1.0) p.setHealth(Math.max(1.0, hp - damage));
+        if (hp > 1.0) p.setHealth(Math.max(1.0, hp - hearts * 2.0));
         Map<String, String> ph = new HashMap<>();
         ph.put("hearts", String.valueOf(hearts));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.damage.half_heart.by" : "events.damage.half_heart.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.damage.half_heart.by" : "events.damage.half_heart.solo", ph));
     }
 
-    public void triggerFire(Player p, String byUser) {
-        int seconds = 2 + rng.nextInt(6);
+    // ─── Fire ─────────────────────────────────────────────────────────────────
+    public void triggerFire(Player p, String byUser) { triggerFire(p, byUser, rng.nextLong()); }
+    public void triggerFire(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
+        int seconds = 2 + r.nextInt(6);
         p.setFireTicks(seconds * 20);
         Map<String, String> ph = new HashMap<>();
         ph.put("seconds", String.valueOf(seconds));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.fire.by" : "events.fire.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.fire.by" : "events.fire.solo", ph));
     }
 
-    public void triggerInvShuffle(Player p, String byUser) {
+    // ─── InvShuffle ───────────────────────────────────────────────────────────
+    public void triggerInvShuffle(Player p, String byUser) { triggerInvShuffle(p, byUser, rng.nextLong()); }
+    public void triggerInvShuffle(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
         PlayerInventory inv = p.getInventory();
-        ItemStack[] items = inv.getContents();
-        List<ItemStack> itemList = new ArrayList<>(Arrays.asList(items));
-        Collections.shuffle(itemList, rng);
+        List<ItemStack> itemList = new ArrayList<>(Arrays.asList(inv.getContents()));
+        Collections.shuffle(itemList, r);
         inv.setContents(itemList.toArray(new ItemStack[0]));
         p.updateInventory();
         Map<String, String> ph = new HashMap<>();
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.inv_shuffle.by" : "events.inv_shuffle.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.inv_shuffle.by" : "events.inv_shuffle.solo", ph));
     }
 
-    public void triggerSafeCreepers(Player p, String byUser) {
-        FileConfiguration cfg = plugin.getConfig();
-        int radius = Math.max(1, cfg.getInt("events.settings.safe_creepers.radius", 2));
-        boolean powered = cfg.getBoolean("events.settings.safe_creepers.powered", true);
-
-        Location center = p.getLocation();
-        NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
-
-        double[] angles = {0, 60, 120, 180, 240, 300};
-
-        List<Creeper> spawnedCreepers = new ArrayList<>();
-
-        for (double angleDeg : angles) {
-            double angleRad = Math.toRadians(angleDeg);
-            double offsetX = Math.sin(angleRad) * radius;
-            double offsetZ = -Math.cos(angleRad) * radius;
-            Location spawnLoc = center.clone().add(offsetX, 0, offsetZ);
-
-            Creeper creeper = (Creeper) p.getWorld().spawnEntity(spawnLoc, EntityType.CREEPER);
-            if (powered) {
-                creeper.setPowered(true);
-            }
-            creeper.getPersistentDataContainer().set(safeKey, PersistentDataType.BYTE, (byte) 1);
-            creeper.setAI(false);
-            creeper.setCustomName("§c⚠ Creeper");
-            creeper.setCustomNameVisible(true);
-
-            Location creeperLoc = creeper.getLocation();
-            double dx = center.getX() - creeperLoc.getX();
-            double dz = center.getZ() - creeperLoc.getZ();
-            double dy = center.getY() - creeperLoc.getY();
-            double dist = Math.sqrt(dx * dx + dz * dz);
-            float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
-            float pitch = (float) Math.toDegrees(-Math.atan2(dy, dist));
-            creeperLoc.setYaw(yaw);
-            creeperLoc.setPitch(pitch);
-            creeper.teleport(creeperLoc);
-
-            spawnedCreepers.add(creeper);
-        }
-
-        p.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-        p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20 * 4, 127, false, false, false));
-        p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 20 * 4, 128, false, false, false));
-
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            for (Creeper c : spawnedCreepers) {
-                if (c.isValid() && !c.isDead()) {
-                    c.explode();
-                }
-            }
-            p.removePotionEffect(PotionEffectType.SLOWNESS);
-            p.removePotionEffect(PotionEffectType.JUMP_BOOST);
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                p.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-            });
-        }, 30L);
-
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            for (Creeper c : spawnedCreepers) {
-                if (c.isValid() && !c.isDead()) {
-                    c.remove();
-                }
-            }
-            p.removePotionEffect(PotionEffectType.SLOWNESS);
-            p.removePotionEffect(PotionEffectType.JUMP_BOOST);
-        }, 100L);
-
-        Map<String, String> ph = new HashMap<>();
-        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.safe_creepers.explode_by" : "events.safe_creepers.explode";
-        p.sendMessage(i18n.tr(p, key, ph));
-    }
-
-    @EventHandler
-    public void onSafeCreeperExplode(EntityExplodeEvent event) {
-        if (!(event.getEntity() instanceof Creeper creeper)) return;
-        NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
-        if (!creeper.getPersistentDataContainer().has(safeKey, PersistentDataType.BYTE)) return;
-        event.blockList().clear();
-    }
-
-    @EventHandler
-    public void onSafeCreeperDamage(EntityDamageByEntityEvent event) {
-        Entity damager = event.getDamager();
-        if (!(damager instanceof Creeper creeper)) return;
-        NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
-        if (!creeper.getPersistentDataContainer().has(safeKey, PersistentDataType.BYTE)) return;
-        event.setCancelled(true);
-        if (event.getEntity() instanceof Player victim) {
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                victim.setVelocity(new org.bukkit.util.Vector(0, victim.getVelocity().getY() > 0 ? 0 : victim.getVelocity().getY(), 0));
-            });
-        }
-    }
-
-    public void triggerFloorIsLava(Player p, String byUser) {
-        if (isAnyGroundEventActive(p)) return;
-        FileConfiguration cfg = plugin.getConfig();
-        int min = Math.max(10, cfg.getInt("events.settings.floor_is_lava.min_seconds", 10));
-        int max = Math.max(min, cfg.getInt("events.settings.floor_is_lava.max_seconds", 180));
-        int seconds = randomBetween(min, max);
-        lavaActive.add(p.getUniqueId());
-        showEventBossbar(p, "floor_is_lava", seconds);
-        Map<String, String> ph = new HashMap<>();
-        ph.put("seconds", String.valueOf(seconds));
-        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.floor_is_lava.start_by" : "events.floor_is_lava.start";
-        p.sendMessage(i18n.tr(p, key, ph));
-        Map<Block, Material> replaced = new HashMap<>();
-        int ticksPerRun = 5;
-        int totalRuns = seconds * 20 / ticksPerRun;
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            int runsLeft = totalRuns;
-            boolean hasEnded = false;
-            @Override
-            public void run() {
-                if (runsLeft % (20 / ticksPerRun) == 0) {
-                    int sekundenRest = runsLeft / (20 / ticksPerRun);
-                    updateEventBossbar(p, sekundenRest, seconds, "floor_is_lava");
-                }
-                Location loc = p.getLocation();
-                Block block = loc.getBlock().getRelative(0, -1, 0);
-                if (block.getType().isSolid() && block.getType() != Material.MAGMA_BLOCK
-                        && block.getType() != Material.AIR && !block.isLiquid()) {
-                    if (!replaced.containsKey(block)) {
-                        replaced.put(block, block.getType());
-                        block.setType(Material.MAGMA_BLOCK);
-                    }
-                }
-                runsLeft--;
-                if (runsLeft <= 0 && !hasEnded) {
-                    hasEnded = true;
-                    cancelGroundEvent(p, "lava");
-                    for (Map.Entry<Block, Material> entry : replaced.entrySet()) {
-                        Block b = entry.getKey();
-                        if (b.getType() == Material.MAGMA_BLOCK) {
-                            b.setType(entry.getValue());
-                        }
-                    }
-                    replaced.clear();
-                    p.sendMessage(i18n.tr(p, "events.floor_is_lava.end"));
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        BukkitTask t = groundTasks.remove(p.getUniqueId());
-                        if (t != null) t.cancel();
-                    });
-                }
-            }
-        }, 0L, ticksPerRun);
-        groundTasks.put(p.getUniqueId(), task);
-    }
-
-    public void triggerSlipperyGround(Player p, String byUser) {
-        if (isAnyGroundEventActive(p)) return;
-        FileConfiguration cfg = plugin.getConfig();
-        int min = Math.max(10, cfg.getInt("events.settings.slippery_ground.min_seconds", 10));
-        int max = Math.max(min, cfg.getInt("events.settings.slippery_ground.max_seconds", 180));
-        int seconds = randomBetween(min, max);
-        slipperyActive.add(p.getUniqueId());
-        showEventBossbar(p, "slippery_ground", seconds);
-        Map<String, String> ph = new HashMap<>();
-        ph.put("seconds", String.valueOf(seconds));
-        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.slippery_ground.start_by" : "events.slippery_ground.start";
-        p.sendMessage(i18n.tr(p, key, ph));
-        Map<Block, Material> replaced = new HashMap<>();
-        int ticksPerRun = 5;
-        int totalRuns = seconds * 20 / ticksPerRun;
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            int runsLeft = totalRuns;
-            boolean hasEnded = false;
-            @Override
-            public void run() {
-                if (runsLeft % (20 / ticksPerRun) == 0) {
-                    int sekundenRest = runsLeft / (20 / ticksPerRun);
-                    updateEventBossbar(p, sekundenRest, seconds, "slippery_ground");
-                }
-                Location loc = p.getLocation();
-                int cx = loc.getBlockX();
-                int cy = loc.getBlockY() - 1;
-                int cz = loc.getBlockZ();
-                for (int dx = -1; dx <= 1; dx++) {
-                    for (int dz = -1; dz <= 1; dz++) {
-                        Block b = p.getWorld().getBlockAt(cx + dx, cy, cz + dz);
-                        if (b.getType().isSolid() && b.getType() != Material.PACKED_ICE
-                                && b.getType() != Material.AIR && !b.isLiquid()) {
-                            if (!replaced.containsKey(b)) {
-                                replaced.put(b, b.getType());
-                                b.setType(Material.PACKED_ICE);
-                            }
-                        }
-                    }
-                }
-                runsLeft--;
-                if (runsLeft <= 0 && !hasEnded) {
-                    hasEnded = true;
-                    cancelGroundEvent(p, "ice");
-                    for (Map.Entry<Block, Material> entry : replaced.entrySet()) {
-                        Block b = entry.getKey();
-                        if (b.getType() == Material.PACKED_ICE) {
-                            b.setType(entry.getValue());
-                        }
-                    }
-                    replaced.clear();
-                    p.sendMessage(i18n.tr(p, "events.slippery_ground.end"));
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        BukkitTask t = groundTasks.remove(p.getUniqueId());
-                        if (t != null) t.cancel();
-                    });
-                }
-            }
-        }, 0L, ticksPerRun);
-        groundTasks.put(p.getUniqueId(), task);
-    }
-
-    public void triggerHellIsCalling(Player p, String byUser) {
-        int count = 1 + rng.nextInt(5);
-        Location base = p.getLocation();
-        World w = p.getWorld();
-        for (int i = 0; i < count; i++) {
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                Location spawn = base.clone().add(rng.nextDouble() * 4 - 2, 16 + rng.nextInt(12), rng.nextDouble() * 4 - 2);
-                org.bukkit.entity.Fireball ball = (org.bukkit.entity.Fireball) w.spawnEntity(spawn, EntityType.FIREBALL);
-                ball.setYield(2.5F);
-                ball.setIsIncendiary(true);
-
-                UUID targetId = p.getUniqueId();
-
-                new BukkitRunnable() {
-                    int ticks = 0;
-                    @Override
-                    public void run() {
-                        if (!ball.isValid() || ball.isDead() || ball.isOnGround() || ticks > 200) {
-                            this.cancel();
-                            return;
-                        }
-                        Player target = Bukkit.getPlayer(targetId);
-                        if (target == null || !target.isOnline() || target.isDead()) {
-                            this.cancel();
-                            return;
-                        }
-                        org.bukkit.util.Vector toTarget = target.getLocation().add(0, 1.5, 0).toVector()
-                                .subtract(ball.getLocation().toVector());
-                        org.bukkit.util.Vector velocity = toTarget.normalize().multiply(0.7);
-                        ball.setVelocity(velocity);
-                        ticks += 2;
-                    }
-                }.runTaskTimer(plugin, 0L, 2L);
-            }, i * 10L);
-        }
-        Map<String, String> ph = new HashMap<>();
-        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.hell_is_calling.by" : "events.hell_is_calling.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
-    }
-
-    public void triggerNasaCall(Player p, String byUser) {
-        p.setVelocity(p.getVelocity().setY(5.5));
-        Map<String, String> ph = new HashMap<>();
-        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.nasa_call.by" : "events.nasa_call.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
-    }
-
-    public void triggerHotPotato(Player p, String byUser) {
+    // ─── HotPotato ────────────────────────────────────────────────────────────
+    public void triggerHotPotato(Player p, String byUser) { triggerHotPotato(p, byUser, rng.nextLong()); }
+    public void triggerHotPotato(Player p, String byUser, long seed) {
         FileConfiguration cfg = plugin.getConfig();
         int duration = Math.max(3, cfg.getInt("events.settings.hot_potato.duration_seconds", 10));
         float explosionPower = 4.0f;
         endHotPotato(p);
         Zombie z = p.getWorld().spawn(p.getLocation(), Zombie.class, spawned -> {
-            spawned.setBaby(true);
-            spawned.setTarget(p);
-            spawned.setPersistent(true);
+            spawned.setBaby(true); spawned.setTarget(p); spawned.setPersistent(true);
             spawned.setRemoveWhenFarAway(false);
             spawned.getEquipment().setHelmet(new ItemStack(Material.CARVED_PUMPKIN));
             spawned.getEquipment().setDropChance(EquipmentSlot.HEAD, 0f);
-            spawned.setCustomName("Heiße Kartoffel");
-            spawned.setCustomNameVisible(true);
+            spawned.setCustomName("Heiße Kartoffel"); spawned.setCustomNameVisible(true);
             spawned.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * duration + 100, 9, false, false, true));
             spawned.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 20 * duration + 100, 2, false, false, true));
         });
@@ -889,8 +326,7 @@ public class RandomEvents implements Listener {
         Map<String, String> ph = new HashMap<>();
         ph.put("seconds", String.valueOf(duration));
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank()) ? "events.hot_potato.start_by" : "events.hot_potato.start";
-        p.sendMessage(i18n.tr(p, key, ph));
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.hot_potato.start_by" : "events.hot_potato.start", ph));
         BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             UUID zu = hotPotatoMob.remove(p.getUniqueId());
             if (zu != null) {
@@ -911,82 +347,439 @@ public class RandomEvents implements Listener {
         BukkitTask t = hotPotatoTask.remove(pu);
         if (t != null) t.cancel();
         UUID zu = hotPotatoMob.remove(pu);
-        if (zu != null) {
-            Entity e = Bukkit.getEntity(zu);
-            if (e != null) e.remove();
+        if (zu != null) { Entity e = Bukkit.getEntity(zu); if (e != null) e.remove(); }
+    }
+
+    // ─── NoCrafting ───────────────────────────────────────────────────────────
+    public void triggerNoCrafting(Player p, String byUser) { triggerNoCrafting(p, byUser, rng.nextLong()); }
+    public void triggerNoCrafting(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
+        FileConfiguration cfg = plugin.getConfig();
+        int min = Math.max(5, cfg.getInt("events.settings.no_crafting.min_seconds", 5));
+        int max = Math.max(min, cfg.getInt("events.settings.no_crafting.max_seconds", 15));
+        int seconds = min + r.nextInt(max - min + 1);
+        noCraftUntil.put(p.getUniqueId(), System.currentTimeMillis() + (seconds * 1000L));
+        showNoCraftBossbar(p, seconds);
+        BukkitTask oldTask = noCraftTasks.remove(p.getUniqueId());
+        if (oldTask != null) oldTask.cancel();
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+            int remaining = seconds;
+            @Override public void run() {
+                if (!isNoCraftingActive(p) || remaining <= 0) {
+                    hideNoCraftBossbar(p);
+                    BukkitTask t2 = noCraftTasks.remove(p.getUniqueId());
+                    if (t2 != null) t2.cancel();
+                    return;
+                }
+                updateNoCraftBossbar(p, remaining, seconds);
+                remaining--;
+            }
+        }, 0L, 20L);
+        noCraftTasks.put(p.getUniqueId(), task);
+        Map<String, String> ph = new HashMap<>();
+        ph.put("seconds", String.valueOf(seconds));
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.no_crafting.start_by" : "events.no_crafting.start", ph));
+    }
+
+    // ─── SafeCreepers ─────────────────────────────────────────────────────────
+    public void triggerSafeCreepers(Player p, String byUser) { triggerSafeCreepers(p, byUser, rng.nextLong()); }
+    public void triggerSafeCreepers(Player p, String byUser, long seed) {
+        FileConfiguration cfg = plugin.getConfig();
+        int count = Math.max(1, cfg.getInt("events.settings.safe_creepers.count", 3));
+        int radius = Math.max(1, cfg.getInt("events.settings.safe_creepers.radius", 2));
+        int lifetimeSec = Math.max(1, cfg.getInt("events.settings.safe_creepers.lifetime_seconds", 8));
+        boolean powered = cfg.getBoolean("events.settings.safe_creepers.powered", true);
+        List<Creeper> spawnedCreepers = new ArrayList<>();
+        NamespacedKey safeKey = new NamespacedKey(plugin, "safe_creeper");
+        for (int i = 0; i < count; i++) {
+            double angle = (2 * Math.PI / count) * i;
+            Location spawnLoc = p.getLocation().clone().add(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+            Creeper creeper = p.getWorld().spawn(spawnLoc, Creeper.class, c -> {
+                if (powered) c.setPowered(true);
+                c.setMaxFuseTicks(0); c.setFuseTicks(0);
+                c.getPersistentDataContainer().set(safeKey, PersistentDataType.BYTE, (byte) 1);
+            });
+            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, lifetimeSec * 20 + 40, 4, 128, false, false));
+            p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, lifetimeSec * 20 + 40, -4, 128, false, false));
+            spawnedCreepers.add(creeper);
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (Creeper c : spawnedCreepers) { if (c.isValid() && !c.isDead()) c.explode(); }
+            p.removePotionEffect(PotionEffectType.SLOWNESS); p.removePotionEffect(PotionEffectType.JUMP_BOOST);
+            Bukkit.getScheduler().runTask(plugin, () -> p.setVelocity(new org.bukkit.util.Vector(0, 0, 0)));
+        }, 30L);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (Creeper c : spawnedCreepers) { if (c.isValid() && !c.isDead()) c.remove(); }
+            p.removePotionEffect(PotionEffectType.SLOWNESS); p.removePotionEffect(PotionEffectType.JUMP_BOOST);
+        }, 100L);
+        Map<String, String> ph = new HashMap<>();
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.safe_creepers.explode_by" : "events.safe_creepers.explode", ph));
+    }
+
+    @EventHandler
+    public void onSafeCreeperExplode(EntityExplodeEvent event) {
+        if (!(event.getEntity() instanceof Creeper creeper)) return;
+        if (!creeper.getPersistentDataContainer().has(new NamespacedKey(plugin, "safe_creeper"), PersistentDataType.BYTE)) return;
+        event.blockList().clear();
+    }
+    @EventHandler
+    public void onSafeCreeperDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getDamager() instanceof Creeper creeper)) return;
+        if (!creeper.getPersistentDataContainer().has(new NamespacedKey(plugin, "safe_creeper"), PersistentDataType.BYTE)) return;
+        event.setCancelled(true);
+        if (event.getEntity() instanceof Player victim) {
+            Bukkit.getScheduler().runTask(plugin, () ->
+                victim.setVelocity(new org.bukkit.util.Vector(0, victim.getVelocity().getY() > 0 ? 0 : victim.getVelocity().getY(), 0)));
         }
     }
 
-    public void triggerPotion(Player p, String byUser) {
-        PotionEffectType[] effects = {
-                PotionEffectType.REGENERATION,
-                PotionEffectType.SATURATION,
-                PotionEffectType.WITHER,
-                PotionEffectType.DARKNESS,
-                PotionEffectType.SPEED,
-                PotionEffectType.SLOWNESS,
-                PotionEffectType.POISON,
-                PotionEffectType.BLINDNESS,
-                PotionEffectType.RAID_OMEN,
-                PotionEffectType.HERO_OF_THE_VILLAGE,
-                PotionEffectType.ABSORPTION,
-                PotionEffectType.JUMP_BOOST
-        };
-        PotionEffectType effectType = effects[rng.nextInt(effects.length)];
-        int minSeconds = 10;
-        int maxSeconds = 120;
-        int durationSec = minSeconds + rng.nextInt(maxSeconds - minSeconds + 1);
-        int durationTicks = durationSec * 20;
-        int amplifier = rng.nextInt(2);
-        p.addPotionEffect(new PotionEffect(effectType, durationTicks, amplifier));
+    // ─── FloorIsLava ──────────────────────────────────────────────────────────
+    public void triggerFloorIsLava(Player p, String byUser) { triggerFloorIsLava(p, byUser, rng.nextLong()); }
+    public void triggerFloorIsLava(Player p, String byUser, long seed) {
+        if (isAnyGroundEventActive(p)) return;
+        Random r = seededRng(seed);
+        FileConfiguration cfg = plugin.getConfig();
+        int min = Math.max(10, cfg.getInt("events.settings.floor_is_lava.min_seconds", 10));
+        int max = Math.max(min, cfg.getInt("events.settings.floor_is_lava.max_seconds", 180));
+        int seconds = min + r.nextInt(max - min + 1);
+        lavaActive.add(p.getUniqueId());
+        showEventBossbar(p, "floor_is_lava", seconds);
+        Map<String, String> ph = new HashMap<>();
+        ph.put("seconds", String.valueOf(seconds));
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.floor_is_lava.start_by" : "events.floor_is_lava.start", ph));
+        Map<Block, Material> replaced = new HashMap<>();
+        int ticksPerRun = 5;
+        int totalRuns = seconds * 20 / ticksPerRun;
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+            int runsLeft = totalRuns; boolean hasEnded = false;
+            @Override public void run() {
+                if (runsLeft % (20 / ticksPerRun) == 0) updateEventBossbar(p, runsLeft / (20 / ticksPerRun), seconds, "floor_is_lava");
+                Block block = p.getLocation().getBlock().getRelative(0, -1, 0);
+                if (block.getType().isSolid() && block.getType() != Material.MAGMA_BLOCK && block.getType() != Material.AIR && !block.isLiquid()) {
+                    if (!replaced.containsKey(block)) { replaced.put(block, block.getType()); block.setType(Material.MAGMA_BLOCK); }
+                }
+                runsLeft--;
+                if (runsLeft <= 0 && !hasEnded) {
+                    hasEnded = true;
+                    cancelGroundEvent(p, "lava");
+                    for (Map.Entry<Block, Material> entry : replaced.entrySet()) {
+                        if (entry.getKey().getType() == Material.MAGMA_BLOCK) entry.getKey().setType(entry.getValue());
+                    }
+                    replaced.clear();
+                    p.sendMessage(i18n.tr(p, "events.floor_is_lava.end"));
+                    Bukkit.getScheduler().runTask(plugin, () -> { BukkitTask t2 = groundTasks.remove(p.getUniqueId()); if (t2 != null) t2.cancel(); });
+                }
+            }
+        }, 0L, ticksPerRun);
+        groundTasks.put(p.getUniqueId(), task);
+    }
+
+    // ─── NasaCall ─────────────────────────────────────────────────────────────
+    public void triggerNasaCall(Player p, String byUser) {
+        p.setVelocity(p.getVelocity().setY(5.5));
         Map<String, String> ph = new HashMap<>();
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        ph.put("effect", pretty(effectType.getName()));
-        ph.put("seconds", String.valueOf(durationSec));
-        String key = (byUser != null && !byUser.isBlank()) ? "events.potion.applied.by" : "events.potion.applied.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.nasa_call.by" : "events.nasa_call.solo", ph));
     }
+
+    // ─── SlipperyGround ───────────────────────────────────────────────────────
+    public void triggerSlipperyGround(Player p, String byUser) { triggerSlipperyGround(p, byUser, rng.nextLong()); }
+    public void triggerSlipperyGround(Player p, String byUser, long seed) {
+        if (isAnyGroundEventActive(p)) return;
+        Random r = seededRng(seed);
+        FileConfiguration cfg = plugin.getConfig();
+        int min = Math.max(10, cfg.getInt("events.settings.slippery_ground.min_seconds", 10));
+        int max = Math.max(min, cfg.getInt("events.settings.slippery_ground.max_seconds", 180));
+        int seconds = min + r.nextInt(max - min + 1);
+        slipperyActive.add(p.getUniqueId());
+        showEventBossbar(p, "slippery_ground", seconds);
+        Map<String, String> ph = new HashMap<>();
+        ph.put("seconds", String.valueOf(seconds));
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.slippery_ground.start_by" : "events.slippery_ground.start", ph));
+        Map<Block, Material> replaced = new HashMap<>();
+        int ticksPerRun = 5;
+        int totalRuns = seconds * 20 / ticksPerRun;
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+            int runsLeft = totalRuns; boolean hasEnded = false;
+            @Override public void run() {
+                if (runsLeft % (20 / ticksPerRun) == 0) updateEventBossbar(p, runsLeft / (20 / ticksPerRun), seconds, "slippery_ground");
+                Location loc = p.getLocation();
+                int cx = loc.getBlockX(), cy = loc.getBlockY() - 1, cz = loc.getBlockZ();
+                for (int dx = -1; dx <= 1; dx++) for (int dz2 = -1; dz2 <= 1; dz2++) {
+                    Block b = p.getWorld().getBlockAt(cx + dx, cy, cz + dz2);
+                    if (b.getType().isSolid() && b.getType() != Material.PACKED_ICE && b.getType() != Material.AIR && !b.isLiquid()) {
+                        if (!replaced.containsKey(b)) { replaced.put(b, b.getType()); b.setType(Material.PACKED_ICE); }
+                    }
+                }
+                runsLeft--;
+                if (runsLeft <= 0 && !hasEnded) {
+                    hasEnded = true;
+                    cancelGroundEvent(p, "ice");
+                    for (Map.Entry<Block, Material> entry : replaced.entrySet()) {
+                        if (entry.getKey().getType() == Material.PACKED_ICE) entry.getKey().setType(entry.getValue());
+                    }
+                    replaced.clear();
+                    p.sendMessage(i18n.tr(p, "events.slippery_ground.end"));
+                    Bukkit.getScheduler().runTask(plugin, () -> { BukkitTask t2 = groundTasks.remove(p.getUniqueId()); if (t2 != null) t2.cancel(); });
+                }
+            }
+        }, 0L, ticksPerRun);
+        groundTasks.put(p.getUniqueId(), task);
+    }
+
+    @EventHandler public void onIce(org.bukkit.event.player.PlayerMoveEvent e) {
+        if (!isSlipperyActive(e.getPlayer())) return;
+    }
+
+    // ─── HellIsCalling ────────────────────────────────────────────────────────
+    public void triggerHellIsCalling(Player p, String byUser) { triggerHellIsCalling(p, byUser, rng.nextLong()); }
+    public void triggerHellIsCalling(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
+        int count = 1 + r.nextInt(5);
+        Location base = p.getLocation();
+        World w = p.getWorld();
+        for (int i = 0; i < count; i++) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                Location spawn = base.clone().add(r.nextDouble() * 4 - 2, 16 + r.nextInt(12), r.nextDouble() * 4 - 2);
+                org.bukkit.entity.Fireball ball = (org.bukkit.entity.Fireball) w.spawnEntity(spawn, EntityType.FIREBALL);
+                ball.setDirection(new org.bukkit.util.Vector(r.nextDouble() * 0.2 - 0.1, -1, r.nextDouble() * 0.2 - 0.1));
+                ball.setYield(2.5f); ball.setIsIncendiary(true);
+            }, (long)(i * 10));
+        }
+        Map<String, String> ph = new HashMap<>();
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.hell_is_calling.by" : "events.hell_is_calling.solo", ph));
+    }
+
+    // ─── TntRain ──────────────────────────────────────────────────────────────
+    public void triggerTntRain(Player p, String byUser) {
+        int duration = plugin.getConfig().getInt("events.settings.tnt_rain.duration_seconds", 30);
+        int radius = plugin.getConfig().getInt("events.settings.tnt_rain.radius", 25);
+        int intervalTicks = plugin.getConfig().getInt("events.settings.tnt_rain.interval_ticks", 6);
+        World world = p.getWorld();
+        int totalTicks = duration * 20;
+        new BukkitRunnable() {
+            int ticksRun = 0;
+            @Override public void run() {
+                if (!p.isOnline() || p.isDead()) { cancel(); return; }
+                int tntCount = 8 + rng.nextInt(5);
+                Location playerLoc = p.getLocation();
+                for (int i = 0; i < tntCount; i++) {
+                    double dx = rng.nextDouble() * radius * 2 - radius;
+                    double dz = rng.nextDouble() * radius * 2 - radius;
+                    int ySpawn = Math.min(playerLoc.getWorld().getMaxHeight() - 2, playerLoc.getBlockY() + 3 + rng.nextInt(5));
+                    world.spawnEntity(playerLoc.clone().add(dx, ySpawn - playerLoc.getY(), dz), EntityType.TNT_MINECART);
+                }
+                ticksRun += intervalTicks;
+                if (ticksRun >= totalTicks) cancel();
+            }
+        }.runTaskTimer(plugin, 0L, intervalTicks);
+        Map<String, String> ph = new HashMap<>();
+        ph.put("seconds", String.valueOf(duration));
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.tnt_rain.by" : "events.tnt_rain.solo", ph));
+    }
+
+    // ─── AnvilRain ────────────────────────────────────────────────────────────
+    public void triggerAnvilRain(Player p, String byUser) {
+        int duration = plugin.getConfig().getInt("events.settings.anvil_rain.duration_seconds", 30);
+        int radius = plugin.getConfig().getInt("events.settings.anvil_rain.radius", 25);
+        int intervalTicks = plugin.getConfig().getInt("events.settings.anvil_rain.interval_ticks", 6);
+        World world = p.getWorld();
+        int totalTicks = duration * 20;
+        new BukkitRunnable() {
+            int ticksRun = 0;
+            @Override public void run() {
+                if (!p.isOnline() || p.isDead()) { cancel(); return; }
+                int anvilCount = 8 + rng.nextInt(5);
+                Location base = p.getLocation();
+                for (int i = 0; i < anvilCount; i++) {
+                    double dx = rng.nextDouble() * radius * 2 - radius;
+                    double dz = rng.nextDouble() * radius * 2 - radius;
+                    int ySpawn = Math.min(world.getMaxHeight() - 2, base.getBlockY() + 30 + rng.nextInt(10));
+                    world.spawnFallingBlock(base.clone().add(dx, ySpawn - base.getY(), dz), Material.ANVIL.createBlockData());
+                }
+                ticksRun += intervalTicks;
+                if (ticksRun >= totalTicks) cancel();
+            }
+        }.runTaskTimer(plugin, 0L, intervalTicks);
+        Map<String, String> ph = new HashMap<>();
+        ph.put("seconds", String.valueOf(duration));
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.anvil_rain.by" : "events.anvil_rain.solo", ph));
+    }
+
+    // ─── Skyblock ─────────────────────────────────────────────────────────────
+    public void triggerSkyblock(Player p, String byUser) { triggerSkyblock(p, byUser, rng.nextLong()); }
+    public void triggerSkyblock(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
+        if (skyblockLocked.contains(p.getUniqueId())) return;
+        skyblockLocked.add(p.getUniqueId());
+        int radius = plugin.getConfig().getInt("events.settings.skyblock.radius", 2);
+        Chunk playerChunk = p.getLocation().getChunk();
+        World world = p.getWorld();
+        for (int cx = playerChunk.getX() - radius; cx <= playerChunk.getX() + radius; cx++) {
+            for (int cz = playerChunk.getZ() - radius; cz <= playerChunk.getZ() + radius; cz++) {
+                if (cx == playerChunk.getX() && cz == playerChunk.getZ()) continue;
+                Chunk chunk = world.getChunkAt(cx, cz);
+                for (int x = 0; x < 16; x++) for (int z2 = 0; z2 < 16; z2++)
+                    for (int y = world.getMinHeight(); y < world.getMaxHeight(); y++)
+                        chunk.getBlock(x, y, z2).setType(Material.AIR, false);
+            }
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> skyblockLocked.remove(p.getUniqueId()), 100L);
+        Map<String, String> ph = new HashMap<>();
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.skyblock.by" : "events.skyblock.solo", ph));
+    }
+
+    // ─── FakeTotem ────────────────────────────────────────────────────────────
+    public void triggerFakeTotem(Player p, String byUser) {
+        ItemStack totem = new ItemStack(Material.TOTEM_OF_UNDYING);
+        ItemMeta meta = totem.getItemMeta();
+        NamespacedKey key = new NamespacedKey(plugin, "fake_totem");
+        meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
+        String displayName = i18n.tr(p, "item.minecraft.totem_of_undying");
+        meta.setDisplayName(displayName);
+        totem.setItemMeta(meta);
+        p.getInventory().addItem(totem);
+        Map<String, String> ph = new HashMap<>();
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "event.fake_totem.given_by" : "event.fake_totem.given", ph));
+    }
+
+    @EventHandler
+    public void onEntityResurrect(EntityResurrectEvent event) {
+        if (!(event.getEntity() instanceof Player p)) return;
+        NamespacedKey key = new NamespacedKey(plugin, "fake_totem");
+        ItemStack offhand = p.getInventory().getItemInOffHand();
+        if (offhand != null && offhand.getType() == Material.TOTEM_OF_UNDYING) {
+            ItemMeta meta = offhand.getItemMeta();
+            if (meta != null && meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
+                event.setCancelled(true); p.getInventory().setItemInOffHand(null);
+                p.sendMessage(i18n.tr(p, "event.fake_totem.fail")); return;
+            }
+        }
+        ItemStack mainhand = p.getInventory().getItemInMainHand();
+        if (mainhand != null && mainhand.getType() == Material.TOTEM_OF_UNDYING) {
+            ItemMeta meta = mainhand.getItemMeta();
+            if (meta != null && meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) {
+                event.setCancelled(true); p.getInventory().setItemInMainHand(null);
+                p.sendMessage(i18n.tr(p, "event.fake_totem.fail"));
+            }
+        }
+    }
+
+    // ─── EquipmentShuffle ─────────────────────────────────────────────────────
+    public void triggerEquipmentShuffle(Player p, String byUser) { triggerEquipmentShuffle(p, byUser, rng.nextLong()); }
+    public void triggerEquipmentShuffle(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
+        PlayerInventory inv = p.getInventory();
+        ItemStack[] contents = inv.getContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (item == null || item.getType() == Material.AIR) continue;
+            Material[][] tiers = TOOL_TIERS;
+            for (Material[] tier : tiers) {
+                for (int j = 0; j < tier.length; j++) {
+                    if (tier[j] == item.getType()) {
+                        int delta = r.nextBoolean() ? 1 : -1;
+                        int newJ = j + delta;
+                        if (newJ >= 0 && newJ < tier.length) {
+                            String oldName = pretty(item.getType().name());
+                            String newName = pretty(tier[newJ].name());
+                            ItemStack newItem = item.clone();
+                            newItem.setType(tier[newJ]);
+                            contents[i] = newItem;
+                            Map<String, String> ph = new HashMap<>();
+                            ph.put("item", oldName); ph.put("new_item", newName);
+                            p.sendMessage(i18n.tr(p, delta > 0 ? "events.equipment_shuffle.upgrade" : "events.equipment_shuffle.downgrade", ph));
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        inv.setContents(contents);
+        p.updateInventory();
+        Map<String, String> ph = new HashMap<>();
+        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.equipment_shuffle.by" : "events.equipment_shuffle.solo", ph));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Bossbar helpers
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void showEventBossbar(Player p, String eventKey, int totalSeconds) {
         cancelEventBossbar(p);
-        String title = i18n.tr(p, "bossbar." + eventKey) + " \u2013 " + totalSeconds + "s";
-        BossBar bar = Bukkit.createBossBar(title, BarColor.RED, BarStyle.SEGMENTED_10);
-        bar.setProgress(1.0);
-        bar.addPlayer(p);
+        BossBar bar = Bukkit.createBossBar(i18n.tr(p, "bossbar." + eventKey) + " – " + totalSeconds + "s", BarColor.RED, BarStyle.SEGMENTED_10);
+        bar.setProgress(1.0); bar.addPlayer(p);
         eventBossbars.put(p.getUniqueId(), bar);
     }
     private void updateEventBossbar(Player p, int secondsLeft, int total, String eventKey) {
         BossBar bar = eventBossbars.get(p.getUniqueId());
         if (bar != null) {
-            String title = i18n.tr(p, "bossbar." + eventKey) + " \u2013 " + secondsLeft + "s";
-            bar.setTitle(title);
-            bar.setProgress(Math.max(0.0, Math.min(1.0, (double) secondsLeft / (double) total)));
+            bar.setTitle(i18n.tr(p, "bossbar." + eventKey) + " – " + secondsLeft + "s");
+            bar.setProgress(Math.max(0.0, Math.min(1.0, (double) secondsLeft / total)));
         }
     }
     private void cancelEventBossbar(Player p) {
         BossBar bar = eventBossbars.remove(p.getUniqueId());
-        if (bar != null) {
-            bar.removeAll();
-        }
+        if (bar != null) bar.removeAll();
     }
     private void cancelGroundEvent(Player p, String type) {
         BukkitTask t = groundTasks.remove(p.getUniqueId());
         if (t != null) t.cancel();
-        if (type.equals("lava")) {
-            lavaActive.remove(p.getUniqueId());
-        } else if (type.equals("ice")) {
-            slipperyActive.remove(p.getUniqueId());
-        }
+        if ("lava".equals(type)) lavaActive.remove(p.getUniqueId());
+        else if ("ice".equals(type)) slipperyActive.remove(p.getUniqueId());
         cancelEventBossbar(p);
     }
 
-    private int randomBetween(int min, int max) {
-        if (max <= min) return min;
-        return min + rng.nextInt(max - min + 1);
+    private void showNoCraftBossbar(Player p, int totalSec) {
+        hideNoCraftBossbar(p);
+        BossBar bar = Bukkit.createBossBar(i18n.tr(p, "bossbar.no_crafting") + " – " + totalSec + "s", BarColor.YELLOW, BarStyle.SEGMENTED_10);
+        bar.setProgress(1.0); bar.addPlayer(p);
+        noCraftBossbars.put(p.getUniqueId(), bar);
     }
+    private void updateNoCraftBossbar(Player p, int secondsLeft, int total) {
+        BossBar bar = noCraftBossbars.get(p.getUniqueId());
+        if (bar != null) {
+            bar.setTitle(i18n.tr(p, "bossbar.no_crafting") + " – " + secondsLeft + "s");
+            bar.setProgress(Math.max(0.0, Math.min(1.0, (double) secondsLeft / total)));
+        }
+    }
+    private void hideNoCraftBossbar(Player p) {
+        BossBar bar = noCraftBossbars.remove(p.getUniqueId());
+        if (bar != null) bar.removeAll();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private int findSafeY(World w, int x, int z) {
+        int maxY = w.getMaxHeight() - 1, minY = w.getMinHeight();
+        for (int y = maxY; y > minY; y--) {
+            if (w.getBlockAt(x, y, z).getType().isSolid() && !w.getBlockAt(x, y + 1, z).getType().isSolid()) return y + 1;
+        }
+        return Math.max(minY + 1, 64);
+    }
+
+    private void setAirCube(World w, int cx, int cy, int cz) {
+        for (int dx = -1; dx <= 1; dx++) for (int dy = -1; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++) {
+            int by = cy + dy;
+            if (by < w.getMinHeight() || by > w.getMaxHeight()) continue;
+            w.getBlockAt(cx + dx, by, cz + dz).setType(Material.AIR, false);
+        }
+    }
+
     private String pretty(String enumOrKey) {
-        String s = enumOrKey.toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
-        String[] parts = s.split(" ");
+        String[] parts = enumOrKey.toLowerCase(java.util.Locale.ROOT).replace('_', ' ').split(" ");
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.length; i++) {
             if (parts[i].isEmpty()) continue;
@@ -997,98 +790,14 @@ public class RandomEvents implements Listener {
     }
 
     private static final Material[][] TOOL_TIERS = {
-            {Material.WOODEN_SWORD, Material.STONE_SWORD, Material.IRON_SWORD, Material.DIAMOND_SWORD, Material.NETHERITE_SWORD},
+            {Material.WOODEN_SWORD,   Material.STONE_SWORD,   Material.IRON_SWORD,   Material.DIAMOND_SWORD,   Material.NETHERITE_SWORD},
             {Material.WOODEN_PICKAXE, Material.STONE_PICKAXE, Material.IRON_PICKAXE, Material.DIAMOND_PICKAXE, Material.NETHERITE_PICKAXE},
-            {Material.WOODEN_AXE, Material.STONE_AXE, Material.IRON_AXE, Material.DIAMOND_AXE, Material.NETHERITE_AXE},
-            {Material.WOODEN_SHOVEL, Material.STONE_SHOVEL, Material.IRON_SHOVEL, Material.DIAMOND_SHOVEL, Material.NETHERITE_SHOVEL},
-            {Material.WOODEN_HOE, Material.STONE_HOE, Material.IRON_HOE, Material.DIAMOND_HOE, Material.NETHERITE_HOE},
-    };
-    private static final Material[][] ARMOR_TIERS = {
-            {Material.LEATHER_HELMET, Material.CHAINMAIL_HELMET, Material.IRON_HELMET, Material.DIAMOND_HELMET, Material.NETHERITE_HELMET},
+            {Material.WOODEN_AXE,     Material.STONE_AXE,     Material.IRON_AXE,     Material.DIAMOND_AXE,     Material.NETHERITE_AXE},
+            {Material.WOODEN_SHOVEL,  Material.STONE_SHOVEL,  Material.IRON_SHOVEL,  Material.DIAMOND_SHOVEL,  Material.NETHERITE_SHOVEL},
+            {Material.WOODEN_HOE,     Material.STONE_HOE,     Material.IRON_HOE,     Material.DIAMOND_HOE,     Material.NETHERITE_HOE},
+            {Material.LEATHER_HELMET,     Material.CHAINMAIL_HELMET,     Material.IRON_HELMET,     Material.DIAMOND_HELMET,     Material.NETHERITE_HELMET},
             {Material.LEATHER_CHESTPLATE, Material.CHAINMAIL_CHESTPLATE, Material.IRON_CHESTPLATE, Material.DIAMOND_CHESTPLATE, Material.NETHERITE_CHESTPLATE},
-            {Material.LEATHER_LEGGINGS, Material.CHAINMAIL_LEGGINGS, Material.IRON_LEGGINGS, Material.DIAMOND_LEGGINGS, Material.NETHERITE_LEGGINGS},
-            {Material.LEATHER_BOOTS, Material.CHAINMAIL_BOOTS, Material.IRON_BOOTS, Material.DIAMOND_BOOTS, Material.NETHERITE_BOOTS},
+            {Material.LEATHER_LEGGINGS,   Material.CHAINMAIL_LEGGINGS,   Material.IRON_LEGGINGS,   Material.DIAMOND_LEGGINGS,   Material.NETHERITE_LEGGINGS},
+            {Material.LEATHER_BOOTS,      Material.CHAINMAIL_BOOTS,      Material.IRON_BOOTS,      Material.DIAMOND_BOOTS,      Material.NETHERITE_BOOTS},
     };
-
-    private Material[] findTierArray(Material mat) {
-        for (Material[] tier : TOOL_TIERS)
-            for (Material m : tier) if (m == mat) return tier;
-        for (Material[] tier : ARMOR_TIERS)
-            for (Material m : tier) if (m == mat) return tier;
-        return null;
-    }
-
-    public void triggerEquipmentShuffle(Player p, String byUser) {
-        PlayerInventory inv = p.getInventory();
-
-        for (int slot = 0; slot < inv.getSize(); slot++) {
-            ItemStack item = inv.getItem(slot);
-            if (item == null || item.getType() == Material.AIR) continue;
-
-            Material mat = item.getType();
-            Material[] tierArray = findTierArray(mat);
-            if (tierArray == null) continue;
-
-            int currentIndex = -1;
-            for (int i = 0; i < tierArray.length; i++) {
-                if (tierArray[i] == mat) { currentIndex = i; break; }
-            }
-            if (currentIndex == -1) continue;
-
-            boolean canUpgrade = currentIndex < tierArray.length - 1;
-            boolean canDowngrade = currentIndex > 0;
-
-            int newIndex;
-            String changeType;
-
-            if (canUpgrade && canDowngrade) {
-                if (rng.nextBoolean()) {
-                    newIndex = currentIndex + 1;
-                    changeType = "upgrade";
-                } else {
-                    newIndex = currentIndex - 1;
-                    changeType = "downgrade";
-                }
-            } else if (canUpgrade) {
-                newIndex = currentIndex + 1;
-                changeType = "upgrade";
-            } else if (canDowngrade) {
-                newIndex = currentIndex - 1;
-                changeType = "downgrade";
-            } else {
-                continue;
-            }
-
-            Material newMat = tierArray[newIndex];
-
-            ItemStack newItem = new ItemStack(newMat, item.getAmount());
-            if (item.hasItemMeta()) {
-                org.bukkit.inventory.meta.ItemMeta oldMeta = item.getItemMeta();
-                org.bukkit.inventory.meta.ItemMeta newMeta = newItem.getItemMeta();
-                if (oldMeta != null && newMeta != null) {
-                    for (var entry : oldMeta.getEnchants().entrySet()) {
-                        newMeta.addEnchant(entry.getKey(), entry.getValue(), true);
-                    }
-                    if (oldMeta.hasDisplayName()) newMeta.setDisplayName(oldMeta.getDisplayName());
-                    if (oldMeta.hasLore()) newMeta.setLore(oldMeta.getLore());
-                    newItem.setItemMeta(newMeta);
-                }
-            }
-            inv.setItem(slot, newItem);
-
-            Map<String, String> detailPh = new HashMap<>();
-            detailPh.put("item", pretty(mat.name()));
-            detailPh.put("new_item", pretty(newMat.name()));
-            p.sendMessage(i18n.tr(p, "events.equipment_shuffle." + changeType, detailPh));
-        }
-
-        p.updateInventory();
-
-        Map<String, String> ph = new HashMap<>();
-        if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
-        String key = (byUser != null && !byUser.isBlank())
-                ? "events.equipment_shuffle.by"
-                : "events.equipment_shuffle.solo";
-        p.sendMessage(i18n.tr(p, key, ph));
-    }
 }

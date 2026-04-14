@@ -1,6 +1,5 @@
 package me.exnfachjan.twitchRandomizer.twitch;
 
-import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
@@ -19,6 +18,9 @@ import java.util.*;
  *   euroPerEvent is the single configurable value.
  *   bitsPerEvent  = euroPerEvent * 100  (min 100)
  *   eventsPerSub  = ceil(5.0 / euroPerEvent)
+ *
+ * ÄNDERUNG: tipeee_api_key wurde durch tipeee_accounts ersetzt.
+ * Format: "APIKEY" oder "Channel:APIKEY" oder "Ch1:KEY1;Ch2:KEY2"
  */
 public class DonationsManager {
 
@@ -50,11 +52,9 @@ public class DonationsManager {
     public void start() {
         DonationsConfig cfg = loadFile();
         boolean debug = plugin.getConfig().getBoolean("twitch.debug", false);
-
         double euro = Math.max(MIN_EURO_PER_EVENT, cfg.euroPerEvent);
-
         seManager.start(cfg.seEnabled, cfg.seAccounts, euro, debug);
-        tipeeeManager.start(cfg.tipeeeEnabled, cfg.tipeeeApiKey, euro, debug);
+        tipeeeManager.start(cfg.tipeeeEnabled, cfg.tipeeeAccounts, euro, debug);
     }
 
     public void stop() {
@@ -66,30 +66,17 @@ public class DonationsManager {
         DonationsConfig cfg = loadFile();
         boolean debug = plugin.getConfig().getBoolean("twitch.debug", false);
         double euro = Math.max(MIN_EURO_PER_EVENT, cfg.euroPerEvent);
-
         seManager.applyConfig(cfg.seEnabled, cfg.seAccounts, euro, debug);
-        tipeeeManager.applyConfig(cfg.tipeeeEnabled, cfg.tipeeeApiKey, euro, debug);
+        tipeeeManager.applyConfig(cfg.tipeeeEnabled, cfg.tipeeeAccounts, euro, debug);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Getters (read live from file for GUI)
     // ─────────────────────────────────────────────────────────────────────────
 
-    public double getEuroPerEvent() {
-        return Math.max(MIN_EURO_PER_EVENT, loadFile().euroPerEvent);
-    }
-
-    /** Bits per event derived from euroPerEvent. Min 100. */
-    public int getBitsPerEvent() {
-        return Math.max(MIN_BITS_PER_EVENT, (int) Math.round(getEuroPerEvent() * 100.0));
-    }
-
-    /** Events per sub = ceil(5.0 / euroPerEvent). Min 1. */
-    public int getEventsPerSub() {
-        double euro = getEuroPerEvent();
-        return Math.max(1, (int) Math.ceil(SUB_VALUE_EURO / euro));
-    }
-
+    public double getEuroPerEvent() { return Math.max(MIN_EURO_PER_EVENT, loadFile().euroPerEvent); }
+    public int getBitsPerEvent() { return Math.max(MIN_BITS_PER_EVENT, (int) Math.round(getEuroPerEvent() * 100.0)); }
+    public int getEventsPerSub() { return Math.max(1, (int) Math.ceil(SUB_VALUE_EURO / getEuroPerEvent())); }
     public boolean getSeEnabled() { return loadFile().seEnabled; }
     public boolean getTipeeeEnabled() { return loadFile().tipeeeEnabled; }
 
@@ -100,21 +87,14 @@ public class DonationsManager {
     public void setEuroPerEvent(double value) {
         double clamped = Math.max(MIN_EURO_PER_EVENT, Math.round(value * 10.0) / 10.0);
         rewriteFileLine("euro_per_event:", "euro_per_event: " + clamped);
-        // also update both managers live
         boolean debug = plugin.getConfig().getBoolean("twitch.debug", false);
-        seManager.applyConfig(getSeEnabled(), loadFile().seAccounts, clamped, debug);
-        tipeeeManager.applyConfig(getTipeeeEnabled(), loadFile().tipeeeApiKey, clamped, debug);
+        DonationsConfig cfg = loadFile();
+        seManager.applyConfig(cfg.seEnabled, cfg.seAccounts, clamped, debug);
+        tipeeeManager.applyConfig(cfg.tipeeeEnabled, cfg.tipeeeAccounts, clamped, debug);
     }
 
-    public void setSeEnabled(boolean value) {
-        rewriteFileLine("se_enabled:", "se_enabled: " + value);
-        applyConfig();
-    }
-
-    public void setTipeeeEnabled(boolean value) {
-        rewriteFileLine("tipeee_enabled:", "tipeee_enabled: " + value);
-        applyConfig();
-    }
+    public void setSeEnabled(boolean value) { rewriteFileLine("se_enabled:", "se_enabled: " + value); applyConfig(); }
+    public void setTipeeeEnabled(boolean value) { rewriteFileLine("tipeee_enabled:", "tipeee_enabled: " + value); applyConfig(); }
 
     // ─────────────────────────────────────────────────────────────────────────
     // File I/O
@@ -128,17 +108,14 @@ public class DonationsManager {
             for (String line : lines) {
                 String t = line.trim();
                 if (t.startsWith("#") || t.isBlank()) continue;
-
-                if (t.startsWith("euro_per_event:")) {
-                    result.euroPerEvent = parseDouble(t.substring("euro_per_event:".length()), 5.0);
-                } else if (t.startsWith("se_enabled:")) {
-                    result.seEnabled = parseBool(t.substring("se_enabled:".length()));
-                } else if (t.startsWith("se_accounts:")) {
-                    result.seAccounts = parseString(t.substring("se_accounts:".length()));
-                } else if (t.startsWith("tipeee_enabled:")) {
-                    result.tipeeeEnabled = parseBool(t.substring("tipeee_enabled:".length()));
-                } else if (t.startsWith("tipeee_api_key:")) {
-                    result.tipeeeApiKey = parseString(t.substring("tipeee_api_key:".length()));
+                if (t.startsWith("euro_per_event:"))    result.euroPerEvent   = parseDouble(t.substring("euro_per_event:".length()), 5.0);
+                else if (t.startsWith("se_enabled:"))   result.seEnabled      = parseBool(t.substring("se_enabled:".length()));
+                else if (t.startsWith("se_accounts:"))  result.seAccounts     = parseString(t.substring("se_accounts:".length()));
+                else if (t.startsWith("tipeee_enabled:"))  result.tipeeeEnabled  = parseBool(t.substring("tipeee_enabled:".length()));
+                else if (t.startsWith("tipeee_accounts:")) result.tipeeeAccounts = parseString(t.substring("tipeee_accounts:".length()));
+                // Rückwärtskompatibilität: alter Key tipeee_api_key wird als tipeee_accounts interpretiert
+                else if (t.startsWith("tipeee_api_key:") && result.tipeeeAccounts.isBlank()) {
+                    result.tipeeeAccounts = parseString(t.substring("tipeee_api_key:".length()));
                 }
             }
         } catch (Exception e) {
@@ -152,54 +129,51 @@ public class DonationsManager {
         try {
             List<String> lines = Files.readAllLines(donationsFile.toPath(), StandardCharsets.UTF_8);
             List<String> out = new ArrayList<>();
-            boolean replaced = false;
+            boolean found = false;
             for (String line : lines) {
-                if (line.trim().startsWith(linePrefix) && !line.trim().startsWith("#")) {
-                    out.add(newLine);
-                    replaced = true;
-                } else {
-                    out.add(line);
-                }
+                if (line.trim().startsWith(linePrefix)) { out.add(newLine); found = true; }
+                else out.add(line);
             }
-            if (!replaced) out.add(newLine);
+            if (!found) out.add(newLine);
             Files.write(donationsFile.toPath(), out, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            plugin.getLogger().warning("[Donations] Konnte donations.yml nicht schreiben: " + e.getMessage());
+            plugin.getLogger().warning("[Donations] Fehler beim Schreiben von donations.yml: " + e.getMessage());
         }
     }
 
     private void ensureFileExists() {
         if (donationsFile.exists()) return;
-        if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
-        try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(
-                new FileOutputStream(donationsFile), StandardCharsets.UTF_8))) {
-            pw.println("# ═══════════════════════════════════════════════════════════");
-            pw.println("#  TwitchRandomizer – Donations Configuration");
-            pw.println("#  Edit this file manually, then run /trconfig donations reload");
-            pw.println("# ═══════════════════════════════════════════════════════════");
-            pw.println();
-            pw.println("# Universal currency value: how much €/event is needed to trigger one event.");
-            pw.println("# Minimum: 1.0 (hardcoded). Standard: 5.0");
-            pw.println("# Bits per event  = euro_per_event * 100  (min 100 bits)");
-            pw.println("# Events per sub  = ceil(5.0 / euro_per_event)");
-            pw.println("# Example: euro_per_event=5.0 → 500 bits = 1 sub = 5€ = 1 event");
-            pw.println("# Example: euro_per_event=1.0 → 100 bits = 1 sub worth 5 events = 1€ = 1 event");
-            pw.println("euro_per_event: 5.0");
-            pw.println();
-            pw.println("# ─────────────────────────────────────────────────────────────");
-            pw.println("#  STREAMELEMENTS");
-            pw.println("#  JWT Token: https://streamelements.com/dashboard/account/channels");
-            pw.println("#  Format: \"Channel:JWT\"  |  Multiple: \"Ch1:JWT1;Ch2:JWT2\"");
-            pw.println("# ─────────────────────────────────────────────────────────────");
-            pw.println("se_enabled: false");
-            pw.println("se_accounts: \"YOUR_CHANNEL:YOUR_JWT_TOKEN\"");
-            pw.println();
-            pw.println("# ─────────────────────────────────────────────────────────────");
-            pw.println("#  TIPEEESTREAM");
-            pw.println("#  API Key: https://tipeeestream.com/dashboard/stream");
-            pw.println("# ─────────────────────────────────────────────────────────────");
-            pw.println("tipeee_enabled: false");
-            pw.println("tipeee_api_key: \"YOUR_TIPEEESTREAM_APIKEY\"");
+        try {
+            if (!donationsFile.getParentFile().exists()) donationsFile.getParentFile().mkdirs();
+            try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(donationsFile), StandardCharsets.UTF_8))) {
+                pw.println("# ─────────────────────────────────────────────────────────────");
+                pw.println("#  DONATIONS CONFIGURATION");
+                pw.println("#  This file is NEVER overwritten by the plugin.");
+                pw.println("#  Reload in-game: /trconfig se reload");
+                pw.println("# ─────────────────────────────────────────────────────────────");
+                pw.println();
+                pw.println("# Universal currency (minimum: 1.0)");
+                pw.println("# bitsPerEvent = euro_per_event * 100  (min 100)");
+                pw.println("# eventsPerSub = ceil(5.0 / euro_per_event)");
+                pw.println("euro_per_event: 5.0");
+                pw.println();
+                pw.println("# ─────────────────────────────────────────────────────────────");
+                pw.println("#  STREAMELEMENTS");
+                pw.println("#  JWT Token: https://streamelements.com/dashboard/account/channels");
+                pw.println("#  Format: \"Channel:JWT\"  |  Multiple: \"Ch1:JWT1;Ch2:JWT2\"");
+                pw.println("# ─────────────────────────────────────────────────────────────");
+                pw.println("se_enabled: false");
+                pw.println("se_accounts: \"YOUR_CHANNEL:YOUR_JWT_TOKEN\"");
+                pw.println();
+                pw.println("# ─────────────────────────────────────────────────────────────");
+                pw.println("#  TIPEEESTREAM");
+                pw.println("#  API Key: https://tipeeestream.com/dashboard/stream");
+                pw.println("#  Format: \"Channel:APIKEY\"  |  Multiple: \"Ch1:KEY1;Ch2:KEY2\"");
+                pw.println("#  Or just the API key: \"YOUR_APIKEY\"");
+                pw.println("# ─────────────────────────────────────────────────────────────");
+                pw.println("tipeee_enabled: false");
+                pw.println("tipeee_accounts: \"YOUR_CHANNEL:YOUR_TIPEEESTREAM_APIKEY\"");
+            }
             plugin.getLogger().info("[Donations] donations.yml erstellt. Bitte konfigurieren.");
         } catch (Exception e) {
             plugin.getLogger().warning("[Donations] Konnte donations.yml nicht erstellen: " + e.getMessage());
@@ -230,6 +204,6 @@ public class DonationsManager {
         boolean seEnabled = false;
         String seAccounts = "";
         boolean tipeeeEnabled = false;
-        String tipeeeApiKey = "";
+        String tipeeeAccounts = "";
     }
 }

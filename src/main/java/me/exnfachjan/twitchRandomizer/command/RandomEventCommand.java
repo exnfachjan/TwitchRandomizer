@@ -80,31 +80,25 @@ public class RandomEventCommand implements CommandExecutor {
             return true;
         }
 
-        int[] weightsForPick = Arrays.copyOf(this.weights, this.weights.length);
-
-        boolean anyGroundActive = false;
-        boolean noCraftingActive = false;
+        // Gewichte kopieren und aktive Bodeneffekte / NoCrafting ausblenden
+        int[] weightsForPick = Arrays.copyOf(weights, weights.length);
+        boolean anyGroundActive = false, noCraftingActive = false;
         for (Player player : players) {
             if (events.isAnyGroundEventActive(player)) anyGroundActive = true;
             if (events.isNoCraftingActive(player)) noCraftingActive = true;
         }
-        if (anyGroundActive) {
-            weightsForPick[11] = 0;
-            weightsForPick[13] = 0;
-        }
-        if (noCraftingActive) {
-            weightsForPick[9] = 0;
-        }
+        if (anyGroundActive) { weightsForPick[11] = 0; weightsForPick[13] = 0; }
+        if (noCraftingActive) { weightsForPick[9] = 0; }
 
-        int totalWeight = 0;
-        for (int w : weightsForPick) totalWeight += w;
+        int totalWeight = Arrays.stream(weightsForPick).sum();
         if (totalWeight <= 0) {
-            sender.sendMessage("Keine aktiven Events verfügbar!");
+            sender.sendMessage("No events available (all weights 0 or blocked).");
             return true;
         }
+
+        // Event-Typ wählen
         int r = rng.nextInt(totalWeight);
-        int acc = 0;
-        int event = -1;
+        int acc = 0, event = -1;
         for (int i = 0; i < weightsForPick.length; i++) {
             acc += weightsForPick[i];
             if (r < acc) { event = i; break; }
@@ -115,28 +109,32 @@ public class RandomEventCommand implements CommandExecutor {
         }
         this.lastIndex = event;
 
+        // SYNC-SEED: Einmal für alle Spieler generieren, damit zufällige Werte
+        // (Sekunden, Items, Mobs, ...) für alle Spieler identisch sind.
+        long syncSeed = rng.nextLong();
+
         for (Player player : players) {
             switch (event) {
-                case 0 -> events.triggerSpawnMobs(player, byUser);
-                case 1 -> events.triggerPotion(player, byUser);
-                case 2 -> events.triggerGiveItem(player, byUser);
-                case 3 -> events.triggerClearInventory(player, byUser);
-                case 4 -> events.triggerTeleport(player, byUser);
-                case 5 -> events.triggerDamageHalfHeart(player, byUser);
-                case 6 -> events.triggerFire(player, byUser);
-                case 7 -> events.triggerInvShuffle(player, byUser);
-                case 8 -> events.triggerHotPotato(player, byUser);
-                case 9 -> events.triggerNoCrafting(player, byUser);
-                case 10 -> events.triggerSafeCreepers(player, byUser);
-                case 11 -> events.triggerFloorIsLava(player, byUser);
+                case 0  -> events.triggerSpawnMobs(player, byUser, syncSeed);
+                case 1  -> events.triggerPotion(player, byUser, syncSeed);
+                case 2  -> events.triggerGiveItem(player, byUser, syncSeed);
+                case 3  -> events.triggerClearInventory(player, byUser, syncSeed);
+                case 4  -> events.triggerTeleport(player, byUser, syncSeed);
+                case 5  -> events.triggerDamageHalfHeart(player, byUser, syncSeed);
+                case 6  -> events.triggerFire(player, byUser, syncSeed);
+                case 7  -> events.triggerInvShuffle(player, byUser, syncSeed);
+                case 8  -> events.triggerHotPotato(player, byUser, syncSeed);
+                case 9  -> events.triggerNoCrafting(player, byUser, syncSeed);
+                case 10 -> events.triggerSafeCreepers(player, byUser, syncSeed);
+                case 11 -> events.triggerFloorIsLava(player, byUser, syncSeed);
                 case 12 -> events.triggerNasaCall(player, byUser);
-                case 13 -> events.triggerSlipperyGround(player, byUser);
-                case 14 -> events.triggerHellIsCalling(player, byUser);
+                case 13 -> events.triggerSlipperyGround(player, byUser, syncSeed);
+                case 14 -> events.triggerHellIsCalling(player, byUser, syncSeed);
                 case 15 -> events.triggerTntRain(player, byUser);
                 case 16 -> events.triggerAnvilRain(player, byUser);
-                case 17 -> events.triggerSkyblock(player, byUser);
+                case 17 -> events.triggerSkyblock(player, byUser, syncSeed);
                 case 18 -> events.triggerFakeTotem(player, byUser);
-                case 19 -> events.triggerEquipmentShuffle(player, byUser);
+                case 19 -> events.triggerEquipmentShuffle(player, byUser, syncSeed);
             }
         }
         return true;
@@ -168,10 +166,6 @@ public class RandomEventCommand implements CommandExecutor {
             String key = EVENT_KEYS_ORDER.get(i);
             int val = Math.max(0, plugin.getConfig().getInt("events.weights." + key, 0));
             w[i] = val;
-        }
-        int sum = Arrays.stream(w).sum();
-        if (sum <= 0) {
-            plugin.getLogger().warning("Keine positiven Event-Gewichte gefunden – Events sind deaktiviert.");
         }
         return w;
     }

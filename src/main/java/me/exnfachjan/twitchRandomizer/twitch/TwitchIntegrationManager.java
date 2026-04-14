@@ -1,25 +1,31 @@
 package me.exnfachjan.twitchRandomizer.twitch;
 
-import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
-import me.exnfachjan.twitchRandomizer.command.RandomEventCommand;
-import me.exnfachjan.twitchRandomizer.events.RandomEvents;
-import me.exnfachjan.twitchRandomizer.timer.TimerManager;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.event.Listener;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-
-import com.github.philippheuer.credentialmanager.domain.OAuth2Credential;
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.TwitchClientBuilder;
+import com.github.twitch4j.auth.providers.TwitchIdentityProvider;
 import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
-import com.github.twitch4j.chat.events.channel.CheerEvent;
-import com.github.twitch4j.chat.events.channel.SubscriptionEvent;
+import com.github.twitch4j.common.events.domain.EventUser;
+import com.github.twitch4j.events.ChannelGoLiveEvent;
+import com.github.twitch4j.helix.domain.Subscription;
+import com.github.twitch4j.pubsub.events.ChannelBitsEvent;
+import com.github.twitch4j.pubsub.events.CheerEvent;
+import com.github.twitch4j.pubsub.events.SubscriptionEvent;
+import com.netflix.hystrix.exception.HystrixRuntimeException;
+import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
+import me.exnfachjan.twitchRandomizer.timer.TimerManager;
+import me.exnfachjan.twitchRandomizer.command.RandomEventCommand;
+import me.exnfachjan.twitchRandomizer.events.RandomEvents;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
+
+import com.github.philippheuer.credentialmanager.domain.OAuth2Credential;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -36,7 +42,6 @@ public class TwitchIntegrationManager {
 
     private boolean subsEnabled;
     private boolean chatTriggerEnabled;
-
     private boolean bitsEnabled;
 
     private static final String TEST_TRIGGER = "!test";
@@ -65,27 +70,15 @@ public class TwitchIntegrationManager {
         this.plugin = plugin;
         this.queueFile = new File(plugin.getDataFolder(), "queue.txt");
         Bukkit.getPluginManager().registerEvents(new Listener() {
-            @EventHandler
-            public void onPlayerDeath(PlayerDeathEvent event) {
-                deathScreenPlayers.add(event.getEntity().getUniqueId());
-            }
-            @EventHandler
-            public void onPlayerRespawn(PlayerRespawnEvent event) {
-                deathScreenPlayers.remove(event.getPlayer().getUniqueId());
-            }
-            @EventHandler
-            public void onPlayerQuit(PlayerQuitEvent event) {
-                deathScreenPlayers.remove(event.getPlayer().getUniqueId());
-            }
+            @EventHandler public void onPlayerDeath(PlayerDeathEvent event) { deathScreenPlayers.add(event.getEntity().getUniqueId()); }
+            @EventHandler public void onPlayerRespawn(PlayerRespawnEvent event) { deathScreenPlayers.remove(event.getPlayer().getUniqueId()); }
+            @EventHandler public void onPlayerQuit(PlayerQuitEvent event) { deathScreenPlayers.remove(event.getPlayer().getUniqueId()); }
         }, plugin);
     }
 
     private boolean isAnyPlayerInDeathScreen() {
         if (deathScreenPlayers.isEmpty()) return false;
-        deathScreenPlayers.removeIf(uuid -> {
-            Player p = Bukkit.getPlayer(uuid);
-            return p == null || !p.isDead();
-        });
+        deathScreenPlayers.removeIf(uuid -> { Player p = Bukkit.getPlayer(uuid); return p == null || !p.isDead(); });
         return !deathScreenPlayers.isEmpty();
     }
 
@@ -96,9 +89,17 @@ public class TwitchIntegrationManager {
                 if (tm != null && tm.isRunning() && !((t.getPauseService() != null) && t.getPauseService().isPaused())) {
                     return true;
                 }
-                if (isAnyPlayerInDeathScreen()) {
-                    return true;
-                }
+                if (isAnyPlayerInDeathScreen()) return true;
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    private boolean isTimerRunning() {
+        try {
+            if (plugin instanceof TwitchRandomizer t) {
+                TimerManager tm = t.getTimerManager();
+                return tm != null && tm.isRunning() && !((t.getPauseService() != null) && t.getPauseService().isPaused());
             }
         } catch (Throwable ignored) {}
         return false;
@@ -108,23 +109,15 @@ public class TwitchIntegrationManager {
     // Currency helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Returns bitsPerEvent from DonationsManager (min 100). */
     private int getBitsPerEvent() {
-        try {
-            if (plugin instanceof TwitchRandomizer t && t.getDonations() != null) {
-                return t.getDonations().getBitsPerEvent();
-            }
-        } catch (Throwable ignored) {}
+        try { if (plugin instanceof TwitchRandomizer t && t.getDonations() != null) return t.getDonations().getBitsPerEvent(); }
+        catch (Throwable ignored) {}
         return 500;
     }
 
-    /** Returns eventsPerSub from DonationsManager (min 1). */
     private int getEventsPerSub() {
-        try {
-            if (plugin instanceof TwitchRandomizer t && t.getDonations() != null) {
-                return t.getDonations().getEventsPerSub();
-            }
-        } catch (Throwable ignored) {}
+        try { if (plugin instanceof TwitchRandomizer t && t.getDonations() != null) return t.getDonations().getEventsPerSub(); }
+        catch (Throwable ignored) {}
         return 1;
     }
 
@@ -142,6 +135,7 @@ public class TwitchIntegrationManager {
         this.subsEnabled = plugin.getConfig().getBoolean("twitch.triggers.subscriptions.enabled", true);
         this.chatTriggerEnabled = plugin.getConfig().getBoolean("twitch.triggers.chat_test.enabled", legacyChatTriggerFlag);
         this.bitsEnabled = plugin.getConfig().getBoolean("twitch.triggers.bits.enabled", false);
+        this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
 
         String raw = plugin.getConfig().getString("twitch.trigger_interval_seconds", "1.0");
         double seconds;
@@ -149,8 +143,6 @@ public class TwitchIntegrationManager {
         catch (Exception e) { seconds = 1.0; plugin.getLogger().warning("Ungültiger Wert für twitch.trigger_interval_seconds: '" + raw + "'. Fallback 1.0s."); }
         if (seconds < 0.05) seconds = 0.05;
         this.gapTicks = Math.max(1, (int) Math.round(seconds * 20.0));
-
-        this.debug = plugin.getConfig().getBoolean("twitch.debug", false);
 
         this.simGiftEnabled = plugin.getConfig().getBoolean("twitch.triggers.sim_gift.enabled", false);
         this.simGiftBombEnabled = plugin.getConfig().getBoolean("twitch.triggers.sim_giftbomb.enabled", false);
@@ -172,76 +164,65 @@ public class TwitchIntegrationManager {
         this.currentToken = normToken;
 
         plugin.getLogger().info("Trigger-Intervall: " + seconds + "s (" + gapTicks + " Ticks)");
-        plugin.getLogger().info("Triggers: subs=" + subsEnabled
-                + ", chat_test=" + chatTriggerEnabled
-                + ", bits=" + bitsEnabled);
+        plugin.getLogger().info("Triggers: subs=" + subsEnabled + ", chat_test=" + chatTriggerEnabled + ", bits=" + bitsEnabled);
 
-        if (!queueLoaded) {
-            loadQueue();
-            queueLoaded = true;
-        }
+        if (!queueLoaded) { loadQueue(); queueLoaded = true; }
 
+        // ── Subscriptions ──────────────────────────────────────────────────
         twitchClient.getEventManager().onEvent(SubscriptionEvent.class, event -> {
             if (!subsEnabled) return;
             if (!isTimerRunningOrDeathscreen()) return;
-            String user = resolveUserFromSubscription(event);
+            // Channel-Tag nur wenn mehr als ein Channel konfiguriert ist
+            String channelTag = resolveChannelTag(event.getChannel() != null ? event.getChannel().getName() : null);
+            String user = appendChannelTag(resolveUserFromSubscription(event), channelTag);
             int eventsPerSub = getEventsPerSub();
             enqueueMultiple(eventsPerSub, user);
-            if (debug) plugin.getLogger().info("[Twitch] Sub von " + user + " -> +" + eventsPerSub + " Events (eventsPerSub=" + eventsPerSub + ")");
+            if (debug) plugin.getLogger().info("[Twitch] Sub von " + user + " -> +" + eventsPerSub + " Events");
         });
 
+        // ── Bits/Cheer ─────────────────────────────────────────────────────
         twitchClient.getEventManager().onEvent(CheerEvent.class, event -> {
             if (!bitsEnabled) return;
             if (!isTimerRunningOrDeathscreen()) return;
-
             int bits = Math.max(0, event.getBits());
             int bitsPerEvent = getBitsPerEvent();
             if (bits < bitsPerEvent) return;
-
             String user = resolveAuthorFromCheer(event);
             if (isLikelyAnonymousCheer(event, user)) {
                 if (debug) plugin.getLogger().info("[Twitch] Cheer ignoriert (anonym) – bits=" + bits);
                 return;
             }
-
+            String channelTag = resolveChannelTag(event.getChannel() != null ? event.getChannel().getName() : null);
+            user = appendChannelTag(user, channelTag);
             int count = bits / bitsPerEvent;
             enqueueMultiple(count, user);
-            if (debug) plugin.getLogger().info("[Twitch] Cheer: " + user + " -> " + bits + " bits -> +" + count + " Events (bitsPerEvent=" + bitsPerEvent + ", queue=" + commandQueue.size() + ")");
+            if (debug) plugin.getLogger().info("[Twitch] Cheer: " + user + " -> " + bits + " bits -> +" + count + " Events");
         });
 
+        // ── Chat messages (!test, !gift, !giftbomb) ────────────────────────
         twitchClient.getEventManager().onEvent(ChannelMessageEvent.class, event -> {
             if (!isTimerRunningOrDeathscreen()) return;
-
             String msg = event.getMessage();
             if (msg == null) return;
-
             String author = resolveAuthorFromChat(event);
+            // Channel-Tag für Chat-Events
+            String channelTag = resolveChannelTag(event.getChannel() != null ? event.getChannel().getName() : null);
+            author = appendChannelTag(author, channelTag);
             String trimmed = msg.trim();
             String lower = trimmed.toLowerCase(Locale.ROOT);
 
-            boolean chatTestEnabledNow = plugin.getConfig().getBoolean(
-                    "twitch.triggers.chat_test.enabled",
+            boolean chatTestEnabledNow = plugin.getConfig().getBoolean("twitch.triggers.chat_test.enabled",
                     plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false));
             boolean simGiftNow = plugin.getConfig().getBoolean("twitch.triggers.sim_gift.enabled", false);
             boolean simGiftBombNow = plugin.getConfig().getBoolean("twitch.triggers.sim_giftbomb.enabled", false);
             int simGiftBombDefaultNow = Math.max(1, plugin.getConfig().getInt("twitch.triggers.sim_giftbomb.default_count", 5));
 
-            if (chatTestEnabledNow && lower.equals(TEST_TRIGGER)) {
-                enqueue("randomevent " + author);
-                return;
-            }
-
-            if (simGiftNow && lower.equals(CMD_GIFT)) {
-                enqueue("randomevent " + author);
-                return;
-            }
-
+            if (chatTestEnabledNow && lower.equals(TEST_TRIGGER)) { enqueue("randomevent " + author); return; }
+            if (simGiftNow && lower.equals(CMD_GIFT)) { enqueue("randomevent " + author); return; }
             if (simGiftBombNow && lower.startsWith(CMD_GIFTBOMB)) {
                 int n = simGiftBombDefaultNow;
                 String[] parts = trimmed.split("\\s+");
-                if (parts.length > 1) {
-                    try { n = Math.max(1, Integer.parseInt(parts[1])); } catch (Exception ignored) {}
-                }
+                if (parts.length > 1) { try { n = Math.max(1, Integer.parseInt(parts[1])); } catch (Exception ignored) {} }
                 enqueueMultiple(n, author);
             }
         });
@@ -250,10 +231,7 @@ public class TwitchIntegrationManager {
     }
 
     public void stop() {
-        if (queueWorker != null) {
-            try { queueWorker.cancel(); } catch (Exception ignored) {}
-            queueWorker = null;
-        }
+        if (queueWorker != null) { try { queueWorker.cancel(); } catch (Exception ignored) {} queueWorker = null; }
         if (twitchClient != null) {
             try { twitchClient.getChat().close(); } catch (Exception ignored) {}
             try { twitchClient.close(); } catch (Exception ignored) {}
@@ -283,43 +261,27 @@ public class TwitchIntegrationManager {
         List<String> newChannels = plugin.getConfig().getStringList("twitch.channels");
         if (newChannels == null || newChannels.isEmpty()) {
             String fallback = plugin.getConfig().getString("twitch.channel", "");
-            if (fallback != null && !fallback.isBlank()) {
-                newChannels = List.of(fallback);
-            }
+            if (fallback != null && !fallback.isBlank()) newChannels = List.of(fallback);
         }
         String newTokenRaw = plugin.getConfig().getString("twitch.oauth_token", "");
         String newToken = normalizeToken(newTokenRaw);
         boolean haveCreds = newChannels != null && !newChannels.isEmpty() && !newToken.isBlank();
 
         boolean needRestart = false;
-        if (twitchClient == null && haveCreds) {
-            needRestart = true;
-        } else if (twitchClient != null) {
-            if (!haveCreds) {
-                stop();
-                return;
-            }
-            if (!Objects.equals(currentChannels, newChannels) || !Objects.equals(currentToken, newToken)) {
-                needRestart = true;
-            }
+        if (twitchClient == null && haveCreds) needRestart = true;
+        else if (twitchClient != null) {
+            if (!haveCreds) { stop(); return; }
+            if (!Objects.equals(currentChannels, newChannels) || !Objects.equals(currentToken, newToken)) needRestart = true;
         }
-
         if (needRestart) {
             stop();
-            boolean legacy = plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false);
-            start(newChannels, newTokenRaw, legacy);
+            start(newChannels, newTokenRaw, plugin.getConfig().getBoolean("twitch.chat_trigger.enabled", false));
         }
     }
 
-    private boolean isTimerRunning() {
-        try {
-            if (plugin instanceof TwitchRandomizer t) {
-                TimerManager tm = t.getTimerManager();
-                return tm != null && tm.isRunning() && !((t.getPauseService() != null) && t.getPauseService().isPaused());
-            }
-        } catch (Throwable ignored) {}
-        return false;
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Queue Worker
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void startQueueWorker() {
         this.queueWorker = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
@@ -330,45 +292,32 @@ public class TwitchIntegrationManager {
                 RandomEventCommand randomEventExecutor = null;
                 RandomEvents randomEvents = null;
                 List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
-
                 if (plugin instanceof TwitchRandomizer tr) {
                     randomEventExecutor = tr.getRandomEventExecutor();
-                    if (randomEventExecutor != null) {
-                        randomEvents = randomEventExecutor.events;
-                    }
+                    if (randomEventExecutor != null) randomEvents = randomEventExecutor.events;
                 }
                 int[] weights = randomEventExecutor != null ? randomEventExecutor.getWeights() : null;
-
                 if (weights == null || weights.length == 0) return;
 
                 int[] weightsForPick = Arrays.copyOf(weights, weights.length);
-
-                boolean anyGroundActive = false;
-                boolean noCraftingActive = false;
+                boolean anyGroundActive = false, noCraftingActive = false;
                 if (randomEvents != null && !players.isEmpty()) {
                     for (Player player : players) {
                         if (randomEvents.isAnyGroundEventActive(player)) anyGroundActive = true;
                         if (randomEvents.isNoCraftingActive(player)) noCraftingActive = true;
                     }
                 }
-                if (anyGroundActive) {
-                    weightsForPick[11] = 0;
-                    weightsForPick[13] = 0;
-                }
-                if (noCraftingActive) {
-                    weightsForPick[9] = 0;
-                }
+                if (anyGroundActive) { weightsForPick[11] = 0; weightsForPick[13] = 0; }
+                if (noCraftingActive) weightsForPick[9] = 0;
 
                 int pickable = Arrays.stream(weightsForPick).sum();
                 if (pickable <= 0) return;
             } catch (Throwable t) {
-                plugin.getLogger().warning("[Twitch] Fehler beim Queue-Event-Check: " + t.getMessage());
-                return;
+                plugin.getLogger().warning("[Twitch] Fehler beim Queue-Event-Check: " + t.getMessage()); return;
             }
 
             if (ticksSinceLastDispatch < gapTicks) ticksSinceLastDispatch += 2;
             else cooledAndReady = true;
-
             if (!cooledAndReady) return;
 
             String cmd = commandQueue.poll();
@@ -378,19 +327,47 @@ public class TwitchIntegrationManager {
             if (debug) plugin.getLogger().info("[Twitch] Dispatch: " + cmd + " -> " + ok + " (queue=" + commandQueue.size() + ")");
             ticksSinceLastDispatch = 0;
             cooledAndReady = false;
-
             saveQueueAsync();
-
         }, 1L, 2L);
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Channel-Tag Helpers (NEU)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Gibt den Channel-Tag zurück der hinter dem Username angehängt werden soll.
+     * Nur wenn mehr als 1 Channel konfiguriert ist und channelName nicht null/leer.
+     */
+    private String resolveChannelTag(String channelName) {
+        if (channelName == null || channelName.isBlank()) return null;
+        if (currentChannels.size() <= 1) return null; // Nur bei Multi-Channel anzeigen
+        return channelName;
+    }
+
+    /**
+     * Hängt "(ChannelName)" hinter den user-String wenn tag != null.
+     * Das Format "role:XYZ:Username" wird dabei korrekt behandelt.
+     */
+    private String appendChannelTag(String user, String channelTag) {
+        if (channelTag == null) return user;
+        if (user == null) return "(" + channelTag + ")";
+        // Wenn es ein role-präfixierter String ist, Tag am Ende des Namens anhängen
+        if (user.startsWith("role:")) {
+            // Format: role:ROLE:NAME  →  role:ROLE:NAME (Channel)
+            return user + " \u00a77(" + channelTag + ")\u00a7r";
+        }
+        return user + " \u00a77(" + channelTag + ")\u00a7r";
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // User-Resolution Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
     private String resolveAuthorFromChat(ChannelMessageEvent event) {
-        String name = "unknown";
-        String role = "";
+        String name = "unknown", role = "";
         try {
-            String display = (event.getMessageEvent() != null)
-                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
-                    : null;
+            String display = (event.getMessageEvent() != null) ? event.getMessageEvent().getTagValue("display-name").orElse(null) : null;
             if (display != null && !display.isBlank()) name = display;
             else if (event.getMessageEvent() != null) {
                 String loginFromIrc = event.getMessageEvent().getUserName();
@@ -404,17 +381,11 @@ public class TwitchIntegrationManager {
     }
 
     private String resolveAuthorFromCheer(CheerEvent event) {
-        String name = "unknown";
-        String role = "";
+        String name = "unknown", role = "";
         try {
-            String display = (event.getMessageEvent() != null)
-                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
-                    : null;
+            String display = (event.getMessageEvent() != null) ? event.getMessageEvent().getTagValue("display-name").orElse(null) : null;
             if (display != null && !display.isBlank()) name = display;
-            else if (event.getMessageEvent() != null) {
-                String loginFromIrc = event.getMessageEvent().getUserName();
-                if (loginFromIrc != null && !loginFromIrc.isBlank()) name = loginFromIrc;
-            } else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
+            else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
                 name = event.getUser().getName();
             }
             role = resolveTwitchRoleFromIRC(event.getMessageEvent());
@@ -423,12 +394,9 @@ public class TwitchIntegrationManager {
     }
 
     private String resolveUserFromSubscription(SubscriptionEvent event) {
-        String name = "unknown";
-        String role = "";
+        String name = "unknown", role = "";
         try {
-            String display = (event.getMessageEvent() != null)
-                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
-                    : null;
+            String display = (event.getMessageEvent() != null) ? event.getMessageEvent().getTagValue("display-name").orElse(null) : null;
             if (display != null && !display.isBlank()) name = display;
             else if (event.getUser() != null && event.getUser().getName() != null && !event.getUser().getName().isBlank()) {
                 name = event.getUser().getName();
@@ -455,9 +423,7 @@ public class TwitchIntegrationManager {
     }
 
     private String colorizeByRole(String name, String role) {
-        if (role != null && !role.isEmpty()) {
-            return "role:" + role + ":" + name;
-        }
+        if (role != null && !role.isEmpty()) return "role:" + role + ":" + name;
         return name;
     }
 
@@ -467,30 +433,15 @@ public class TwitchIntegrationManager {
         if (low.isBlank()) return true;
         if (low.contains("anonymous")) return true;
         try {
-            String display = (event.getMessageEvent() != null)
-                    ? event.getMessageEvent().getTagValue("display-name").orElse(null)
-                    : null;
+            String display = (event.getMessageEvent() != null) ? event.getMessageEvent().getTagValue("display-name").orElse(null) : null;
             if (display != null && display.toLowerCase(Locale.ROOT).contains("anonymous")) return true;
         } catch (Throwable ignored) {}
         return false;
     }
 
-    private String normalizeToken(String raw) {
-        if (raw == null) return "";
-        String t = raw.trim();
-        if (t.length() >= 2 && ((t.startsWith("\"") && t.endsWith("\"")) || (t.startsWith("'") && t.endsWith("'")))) {
-            t = t.substring(1, t.length() - 1).trim();
-        }
-        if (t.toLowerCase(Locale.ROOT).startsWith("oauth:")) {
-            t = t.substring("oauth:".length());
-        }
-        return t;
-    }
-
-    private OAuth2Credential buildCredential(String raw) {
-        String token = normalizeToken(raw);
-        return new OAuth2Credential("twitch", token);
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Queue I/O
+    // ─────────────────────────────────────────────────────────────────────────
 
     public void enqueue(String cmd) {
         commandQueue.offer(cmd);
@@ -503,20 +454,18 @@ public class TwitchIntegrationManager {
         String base = (byUserNullable != null && !byUserNullable.isBlank())
                 ? "randomevent " + byUserNullable.trim()
                 : "randomevent";
-        for (int i = 0; i < count; i++) {
-            commandQueue.offer(base);
-        }
+        for (int i = 0; i < count; i++) commandQueue.offer(base);
         if (debug) plugin.getLogger().info("[Twitch] EnqueueMultiple: +" + count + " as '" + base + "' (queue=" + commandQueue.size() + ")");
         saveQueueAsync();
     }
 
+    public int getQueueSize() { return commandQueue.size(); }
+    public int getTicksUntilNextDispatch() { return Math.max(0, gapTicks - ticksSinceLastDispatch); }
+
     private void loadQueue() {
         try {
             if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
-            if (!queueFile.exists()) {
-                plugin.getLogger().info("Keine bestehende Queue-Datei gefunden (skip).");
-                return;
-            }
+            if (!queueFile.exists()) { plugin.getLogger().info("Keine bestehende Queue-Datei gefunden (skip)."); return; }
             int loaded = 0;
             try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(queueFile), StandardCharsets.UTF_8))) {
                 String line;
@@ -529,52 +478,33 @@ public class TwitchIntegrationManager {
             }
             plugin.getLogger().info("Queue geladen: " + loaded + " Einträge.");
         } catch (Exception e) {
-            plugin.getLogger().warning("Konnte Queue nicht laden: " + e.getMessage());
+            plugin.getLogger().warning("Fehler beim Laden der Queue: " + e.getMessage());
         }
     }
 
     private void saveQueueAsync() {
-        if (!plugin.isEnabled()) {
-            saveQueueSync();
-            return;
-        }
-        java.util.List<String> snapshot = new ArrayList<>(commandQueue);
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> saveQueueSync(snapshot));
-    }
-
-    private void saveQueueSync() {
-        saveQueueSync(new ArrayList<>(commandQueue));
-    }
-
-    private void saveQueueSync(java.util.List<String> snapshot) {
         try {
-            if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
-            try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(queueFile, false), StandardCharsets.UTF_8))) {
-                for (String s : snapshot) {
-                    bw.write(s);
-                    bw.newLine();
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                try {
+                    if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
+                    List<String> snapshot = new ArrayList<>(commandQueue);
+                    try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(queueFile), StandardCharsets.UTF_8))) {
+                        for (String line : snapshot) pw.println(line);
+                    }
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Fehler beim Speichern der Queue: " + e.getMessage());
                 }
-            }
-        } catch (Exception e) {
-            plugin.getLogger().warning("Konnte Queue nicht speichern: " + e.getMessage());
-        }
+            });
+        } catch (Throwable ignored) {}
     }
 
-    public int getQueueSize() {
-        return commandQueue.size();
+    private String normalizeToken(String raw) {
+        if (raw == null) return "";
+        String t = raw.trim();
+        if (t.length() >= 2 && ((t.startsWith("\"") && t.endsWith("\"")) || (t.startsWith("'") && t.endsWith("'")))) t = t.substring(1, t.length() - 1).trim();
+        if (t.toLowerCase(Locale.ROOT).startsWith("oauth:")) t = t.substring("oauth:".length());
+        return t;
     }
 
-    public int getTicksUntilNextDispatch() {
-        return cooledAndReady ? 0 : Math.max(0, gapTicks - ticksSinceLastDispatch);
-    }
-
-    public int clearQueue() {
-        int n = commandQueue.size();
-        commandQueue.clear();
-        ticksSinceLastDispatch = 0;
-        cooledAndReady = true;
-        saveQueueAsync();
-        if (debug) plugin.getLogger().info("[Twitch] Queue cleared (" + n + ")");
-        return n;
-    }
+    private OAuth2Credential buildCredential(String raw) { return new OAuth2Credential("twitch", normalizeToken(raw)); }
 }
