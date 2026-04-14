@@ -170,7 +170,9 @@ public class GuiListener implements Listener {
                 double step  = e.isShiftClick() ? 1.0 : 0.5;
                 double delta = e.isRightClick() ? +step : -step;
                 double cur = don.getEuroPerEvent();
-                double val = Math.max(DonationsManager.MIN_EURO_PER_EVENT, Math.round((cur + delta) * 10.0) / 10.0);
+                // FIX: Maximum ist der Standard-Preis (SUB_VALUE_EURO = 5.0€), Minimum ist MIN_EURO_PER_EVENT (1.0€)
+                double val = Math.min(DonationsManager.MAX_EURO_PER_EVENT,
+                             Math.max(DonationsManager.MIN_EURO_PER_EVENT, Math.round((cur + delta) * 10.0) / 10.0));
 
                 don.setEuroPerEvent(val);
 
@@ -250,8 +252,7 @@ public class GuiListener implements Listener {
                     p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.reset"); return;
                 }
                 p.closeInventory();
-                Bukkit.getScheduler().runTask(plugin, () ->
-                        Bukkit.dispatchCommand(p, "reset"));
+                Bukkit.getScheduler().runTask(plugin, () -> Bukkit.dispatchCommand(p, "reset"));
             }
 
             case "lang_set" -> {
@@ -433,35 +434,50 @@ public class GuiListener implements Listener {
             case WEIGHTS  -> gui.openWeights(p);
             case MISC     -> gui.openMisc(p);
             case LANGUAGE -> gui.openLanguage(p);
+            default       -> gui.openMain(p);
         }
     }
 
-    private void giveSecureBook(Player p, EditType type) {
-        ItemStack book = new ItemStack(org.bukkit.Material.WRITABLE_BOOK);
-        BookMeta meta = (BookMeta) book.getItemMeta();
-        if (meta != null) {
-            try { meta.setTitle(plugin.getMessages().tr(p, "gui.book.title")); } catch (Throwable ignored) {}
-            meta.setAuthor("TwitchRandomizer");
-
-            String pageText = switch (type) {
+    private void giveSecureBook(Player p, EditType edit) {
+        org.bukkit.inventory.ItemStack book = new org.bukkit.inventory.ItemStack(org.bukkit.Material.WRITABLE_BOOK);
+        ItemMeta meta = book.getItemMeta();
+        if (meta instanceof BookMeta bm) {
+            String pageText = switch (edit) {
                 case CHANNEL -> plugin.getMessages().tr(p, "gui.book.page.channel");
-                case TOKEN   -> plugin.getMessages().tr(p, "gui.book.page.token.text",
-                        java.util.Map.of("url", TOKEN_URL));
+                case TOKEN   -> {
+                    String url = TOKEN_URL;
+                    yield plugin.getMessages().tr(p, "gui.book.page.token.text", Map.of("url", url));
+                }
             };
-            meta.addPage(pageText);
-
-            meta.getPersistentDataContainer().set(keySecureBook, PersistentDataType.STRING, type.name());
-            book.setItemMeta(meta);
+            bm.addPage(pageText);
         }
+        meta.getPersistentDataContainer().set(keySecureBook, PersistentDataType.STRING, edit.name());
+        book.setItemMeta(meta);
 
-        java.util.Map<Integer, org.bukkit.inventory.ItemStack> left = p.getInventory().addItem(book);
-        if (!left.isEmpty()) {
-            p.getWorld().dropItemNaturally(p.getLocation(), book);
+        // Attempt to give book; drop if inventory is full
+        java.util.HashMap<Integer, org.bukkit.inventory.ItemStack> leftover = p.getInventory().addItem(book);
+        if (!leftover.isEmpty()) {
+            p.getWorld().dropItem(p.getLocation(), book);
             p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.inventory_full"));
         }
+
+        // Open the book after 1 tick
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!p.isOnline()) return;
+            // Find the book in inventory and open it
+            for (int i = 0; i < p.getInventory().getSize(); i++) {
+                ItemStack it = p.getInventory().getItem(i);
+                if (it == null || !it.hasItemMeta()) continue;
+                ItemMeta im = it.getItemMeta();
+                String v = im.getPersistentDataContainer().get(keySecureBook, PersistentDataType.STRING);
+                if (v != null) {
+                    p.getInventory().setHeldItemSlot(i < 9 ? i : 0);
+                    break;
+                }
+            }
+        }, 1L);
     }
 
-    @SuppressWarnings("unused")
     private String normalizeToken(String raw) {
         if (raw == null) return "";
         String t = raw.trim();
