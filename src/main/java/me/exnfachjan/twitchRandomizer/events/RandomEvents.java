@@ -35,6 +35,7 @@ public class RandomEvents implements Listener {
     private final Map<UUID, BukkitTask> hotPotatoTask = new HashMap<>();
     private final Random rng = new Random();
     private final Set<UUID> skyblockLocked = new HashSet<>();
+    private final Set<String> skyblockChunksCleaned = new HashSet<>();
 
     private final Map<UUID, BukkitTask> groundTasks = new HashMap<>();
     private final Set<UUID> slipperyActive = new HashSet<>();
@@ -614,24 +615,84 @@ public class RandomEvents implements Listener {
     }
 
     // ─── Skyblock ─────────────────────────────────────────────────────────────
-    public void triggerSkyblock(Player p, String byUser) { triggerSkyblock(p, byUser, rng.nextLong()); }
-    public void triggerSkyblock(Player p, String byUser, long seed) {
-        Random r = seededRng(seed);
+    // triggerSkyblock ohne meetingPoint: nur für Einzelspieler-Aufruf (Legacy-Fallback)
+    public void triggerSkyblock(Player p, String byUser) { triggerSkyblock(p, byUser, p.getLocation()); }
+    public void triggerSkyblock(Player p, String byUser, long seed) { triggerSkyblock(p, byUser, p.getLocation()); }
+
+    /**
+     * Hauptmethode: Teleportiert Spieler zum meetingPoint und cleared umliegende Chunks.
+     * meetingPoint wird von RandomEventCommand einmalig für alle Spieler bestimmt –
+     * dadurch landen alle am selben Punkt und es wird nur einmal gecleard.
+     * Nur der erste Aufruf (erkennbar an skyblockLocked leer) führt den Chunk-Clear durch.
+     */
+    public void triggerSkyblock(Player p, String byUser, Location meetingPoint) {
         if (skyblockLocked.contains(p.getUniqueId())) return;
         skyblockLocked.add(p.getUniqueId());
+
+        World world = meetingPoint.getWorld();
         int radius = plugin.getConfig().getInt("events.settings.skyblock.radius", 2);
-        Chunk playerChunk = p.getLocation().getChunk();
-        World world = p.getWorld();
-        for (int cx = playerChunk.getX() - radius; cx <= playerChunk.getX() + radius; cx++) {
-            for (int cz = playerChunk.getZ() - radius; cz <= playerChunk.getZ() + radius; cz++) {
-                if (cx == playerChunk.getX() && cz == playerChunk.getZ()) continue;
-                Chunk chunk = world.getChunkAt(cx, cz);
-                for (int x = 0; x < 16; x++) for (int z2 = 0; z2 < 16; z2++)
-                    for (int y = world.getMinHeight(); y < world.getMaxHeight(); y++)
-                        chunk.getBlock(x, y, z2).setType(Material.AIR, false);
+        Chunk centerChunk = meetingPoint.getChunk();
+
+        // Spieler auf Sammelpunkt teleportieren (1 Tick verzögert damit Chunks geladen sind)
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (p.isOnline() && !p.isDead()) {
+                p.teleport(meetingPoint);
+            }
+        }, 1L);
+
+        // Chunk-Clear nur vom "ersten" Aufruf ausführen – erkennbar daran dass der Chunk
+        // noch nicht in skyblockChunksCleared registriert ist.
+        // Wir verwenden den Chunk-Key als Marker damit es nur einmal passiert.
+        String chunkKey = world.getName() + ":" + centerChunk.getX() + ":" + centerChunk.getZ();
+        if (skyblockChunksCleaned.contains(chunkKey)) {
+            // Chunk-Clear wurde bereits von einem anderen Spieler dieses Events ausgelöst
+            sendSkyblockMessage(p, byUser);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> skyblockLocked.remove(p.getUniqueId()), 200L);
+            return;
+        }
+        skyblockChunksCleaned.add(chunkKey);
+
+        // Umliegende Chunks sammeln (Center-Chunk wird NICHT gelöscht – da stehen die Spieler)
+        List<int[]> chunksToDelete = new ArrayList<>();
+        for (int cx = centerChunk.getX() - radius; cx <= centerChunk.getX() + radius; cx++) {
+            for (int cz = centerChunk.getZ() - radius; cz <= centerChunk.getZ() + radius; cz++) {
+                if (cx == centerChunk.getX() && cz == centerChunk.getZ()) continue;
+                chunksToDelete.add(new int[]{cx, cz});
             }
         }
-        Bukkit.getScheduler().runTaskLater(plugin, () -> skyblockLocked.remove(p.getUniqueId()), 100L);
+
+        // Verzögert clearen damit Teleport zuerst abgeschlossen ist
+        new BukkitRunnable() {
+            int index = 0;
+            @Override
+            public void run() {
+                int processed = 0;
+                while (index < chunksToDelete.size() && processed < 2) {
+                    int[] coords = chunksToDelete.get(index++);
+                    Chunk targetChunk = world.getChunkAt(coords[0], coords[1]);
+                    if (!targetChunk.isLoaded()) world.loadChunk(targetChunk);
+                    int minY = world.getMinHeight(), maxY = world.getMaxHeight();
+                    for (int x = 0; x < 16; x++) {
+                        for (int z2 = 0; z2 < 16; z2++) {
+                            for (int y = minY; y < maxY; y++) {
+                                targetChunk.getBlock(x, y, z2).setType(Material.AIR, false);
+                            }
+                        }
+                    }
+                    processed++;
+                }
+                if (index >= chunksToDelete.size()) {
+                    skyblockChunksCleaned.remove(chunkKey);
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 5L, 1L); // 5 Ticks warten damit TP fertig ist
+
+        sendSkyblockMessage(p, byUser);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> skyblockLocked.remove(p.getUniqueId()), 200L);
+    }
+
+    private void sendSkyblockMessage(Player p, String byUser) {
         Map<String, String> ph = new HashMap<>();
         if (byUser != null && !byUser.isBlank()) ph.put("user", byUser);
         p.sendMessage(i18n.tr(p, (byUser != null && !byUser.isBlank()) ? "events.skyblock.by" : "events.skyblock.solo", ph));
