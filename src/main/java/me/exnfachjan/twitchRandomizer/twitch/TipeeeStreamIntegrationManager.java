@@ -158,6 +158,27 @@ public class TipeeeStreamIntegrationManager {
         return json.substring(start, end);
     }
 
+    /** Sucht "key" erst nach dem ersten Vorkommen von "section" */
+    private String extractJsonStringAfter(String json, String section, String key) {
+        int sectionIdx = json.indexOf("\"" + section + "\"");
+        if (sectionIdx < 0) return null;
+        return extractJsonString(json.substring(sectionIdx), key);
+    }
+
+    /** Gibt das N-te Vorkommen von "key" zurück (1-basiert) */
+    private String extractJsonStringNth(String json, String key, int n) {
+        String search = "\"" + key + "\":\"";
+        int idx = -1;
+        for (int i = 0; i < n; i++) {
+            idx = json.indexOf(search, idx + 1);
+            if (idx < 0) return null;
+        }
+        int start = idx + search.length();
+        int end = json.indexOf("\"", start);
+        if (end < 0) return null;
+        return json.substring(start, end);
+    }
+
     private double extractJsonDouble(String json, String key) {
         String search = "\"" + key + "\":";
         int idx = json.indexOf(search);
@@ -256,7 +277,11 @@ public class TipeeeStreamIntegrationManager {
             if (!content.contains("\"donation\"") && !content.contains("\"tip\"")) return;
             if (content.contains("\"event:update\"")) return;
 
-            String username = extractJsonString(content, "username");
+            // Spender-Username: zuerst aus "parameters"-Block, dann 2. Vorkommen, dann Fallback
+            String username = extractJsonStringAfter(content, "parameters", "username");
+            if (username == null || username.isBlank()) {
+                username = extractJsonStringNth(content, "username", 2);
+            }
             if (username == null || username.isBlank()) username = "TipeeeStreamTip";
 
             // Channel-Tag anzeigen wenn mehr als ein Twitch-Channel konfiguriert ist
