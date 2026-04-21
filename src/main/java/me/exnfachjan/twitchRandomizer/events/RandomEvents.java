@@ -113,7 +113,7 @@ public class RandomEvents implements Listener {
         try {
             Double delta = p.getPersistentDataContainer().get(key, PersistentDataType.DOUBLE);
             if (delta == null || delta == 0.0) return;
-            org.bukkit.attribute.AttributeInstance attr = p.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH);
+            org.bukkit.attribute.AttributeInstance attr = p.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
             if (attr == null) return;
             double base = Math.max(2.0, 20.0 + delta);
             attr.setBaseValue(base);
@@ -270,7 +270,7 @@ public class RandomEvents implements Listener {
             spawned.setBaby(true); spawned.setTarget(p); spawned.setPersistent(true); spawned.setRemoveWhenFarAway(false);
             // 3× HP (Baby Zombie = 20 HP → 60 HP)
             try {
-                org.bukkit.attribute.AttributeInstance attr = spawned.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH);
+                org.bukkit.attribute.AttributeInstance attr = spawned.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
                 if (attr != null) { attr.setBaseValue(60.0); spawned.setHealth(60.0); }
             } catch (Throwable ignored) {}
             spawned.getEquipment().setHelmet(new ItemStack(Material.CARVED_PUMPKIN));
@@ -528,7 +528,7 @@ public class RandomEvents implements Listener {
         boolean gain = r.nextBoolean();          // gewinnen oder verlieren
         double delta  = (gain ? 1.0 : -1.0) * hearts * 2.0; // 1 Herz = 2 HP
 
-        org.bukkit.attribute.AttributeInstance attr = p.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH);
+        org.bukkit.attribute.AttributeInstance attr = p.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
         if (attr == null) return;
 
         double current = attr.getBaseValue();

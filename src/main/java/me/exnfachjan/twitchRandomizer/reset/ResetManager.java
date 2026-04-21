@@ -100,7 +100,7 @@ public class ResetManager {
             for (Player online : Bukkit.getOnlinePlayers()) {
                 online.getPersistentDataContainer().remove(permKey);
                 org.bukkit.attribute.AttributeInstance attr =
-                        online.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH);
+                        online.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
                 if (attr != null) attr.setBaseValue(20.0);
             }
             plugin.getLogger().info("[Reset] Permanente Herzen zurückgesetzt.");
