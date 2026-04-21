@@ -2,6 +2,7 @@
 
 [![Modrinth](https://img.shields.io/badge/Modrinth-exnfachjanTTV-1bd96a?logo=modrinth&logoColor=white)](https://modrinth.com/user/exnfachjanTTV)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue)](https://github.com/exnfachjan/TwitchRandomizer)
 
 TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings interactive, randomized challenges to your server — all controlled by your Twitch viewers! It seamlessly integrates your Minecraft gameplay with Twitch chat, letting your audience influence and trigger in-game events in real time.
 
@@ -57,6 +58,12 @@ TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings intera
 - **Session and World Reset:**  
   Reset your seed after a death if you want a REAL challenge! Supports BungeeCord fallback servers.
 
+- **Ender Dragon Stats:**  
+  When the Ender Dragon is defeated, the plugin automatically broadcasts a full run summary (time, deaths, events triggered, subs, donations, bits) and saves it to `stats.yml` for review. Timer and queue are reset automatically.
+
+- **Permanent Hearts Event:**  
+  A new event that permanently changes a player's maximum hearts — up or down. The change persists across disconnects and is reset when the world is reset.
+
 ---
 
 ## ✔️ Main Commands
@@ -85,18 +92,19 @@ Optional commands (not necessary, because you can manage everything seamlessly f
 | **damage_half_heart** | Take heart damage                                                                |
 | **fire**              | Set the player on fire                                                           |
 | **inv_shuffle**       | Shuffle the entire inventory                                                     |
-| **hot_potato**        | A fast zombie chases you — if it catches you, it explodes!                       |
+| **hot_potato**        | A fast zombie (3× HP) chases you — if it catches you, it explodes!               |
 | **no_crafting**       | Block crafting for a random duration (with boss bar countdown)                   |
 | **safe_creepers**     | Creepers surround you clock-style and explode (no damage, no block destruction)  |
 | **floor_is_lava**     | The floor beneath you turns to magma blocks (with block restore)                 |
-| **nasa_call**         | Launch the player sky-high                                                       |
+| **nasa_call**         | Launch the player sky-high — flies through blocks!                               |
 | **slippery_ground**   | The ground turns to packed ice (with block restore)                              |
 | **hell_is_calling**   | Homing fireballs rain down on you                                                |
 | **tnt_rain**          | TNT Minecarts rain from the sky                                                  |
 | **anvil_rain**        | Anvils fall from the sky                                                         |
 | **skyblock**          | All players are teleported together — surrounding chunks get deleted!            |
-| **fake_totem**        | Receive a Totem of Undying that doesn't actually work                            |
+| **fake_totem**        | Receive a Totem of Undying — 50/50 chance it actually works!                     |
 | **equipment_shuffle** | All tiered tools and armor in your inventory are randomly upgraded or downgraded |
+| **permanent_hearts**  | Permanently gain or lose 1–2 maximum hearts (persists across disconnects)        |
 
 ---
 
@@ -183,28 +191,38 @@ The GUI uses sensible permission checks for each action.
 
 ## 📋 Changelog
 
+### v1.6.0
+
+- **New event: `permanent_hearts`** — Permanently gain or lose 1–2 maximum hearts (chosen randomly). The change persists across disconnects via PersistentDataContainer and is reset on world reset.
+- **Fake Totem 50/50** — The `fake_totem` event now gives a real 50/50 chance: half the time it's a real totem, half the time it's fake. Both look identical in the inventory.
+- **NASA Call through blocks** — The `nasa_call` event now detects when a player is blocked mid-flight and teleports them 1 block upward, allowing them to fly through ceilings.
+- **Hot Potato 3× HP** — The Hot Potato zombie now spawns with 60 HP (3× the normal amount), making it much harder to kill before it explodes.
+- **GUI Reset Confirmation** — The reset button in the Misc menu now opens a dedicated confirmation screen instead of running `/reset confirm` in chat.
+- **Timer not reset on world reset** — The timer is no longer zeroed when the world is reset. It can only be reset manually via the Misc menu (same behavior as Deaths).
+- **Ender Dragon Stats** — When the Ender Dragon is defeated, the plugin broadcasts a full run summary (time, deaths/tries, events triggered, total subs, donations in €, bits) and saves it to `stats.yml`. Timer is reset to 00:00:00, death counter is cleared, and the queue is emptied automatically.
+- **Donation Stats Tracking** — StreamElements and Tipeeestream donations are now correctly tracked for the end-of-run stats. Test commands (`!test`, `!gift`, `!giftbomb`) are tracked as simulated subs.
+
+### v1.5.1
+
+- Various bug fixes and stability improvements.
+
 ### v1.5.0
 
 - **Tipeeestream multi-account support** — `donations.yml` now uses `tipeee_accounts` with the same `"Channel:APIKEY;Channel2:APIKEY2"` format as StreamElements.
 - **Channel tag display** — When playing with multiple Twitch channels, the source channel name is shown in brackets after every event trigger.
 - **Synced multi-player events** — All random values (duration, item, mob type, potion effect, etc.) are now identical for every player in the same event dispatch.
-- **Skyblock team fix** — All players are now teleported to a single meeting point before chunks are cleared. Prevents players from voiding each other.
-- **Spectator-after-death team fix** — When a player dies, all online players are now moved to Spectator simultaneously. Timer and queue pause correctly.
-- **Tries vs Deaths counter** — When Spectator-after-death is enabled, the counter is labeled "Tries/Versuche" and only counts once per team-death. When disabled, it counts individual deaths as before.
-- **Euro/Event maximum** — The donation value per event is now capped at 5.0€ (the standard price). You can only go lower, not higher.
-- **Recent event cooldown** — A new anti-repeat algorithm reduces the weight of recently triggered events for the next 2–3 picks, making the event pool feel more varied.
+- **Skyblock team fix** — All players are now teleported to a single meeting point before chunks are cleared.
+- **Spectator-after-death team fix** — When a player dies, all online players are now moved to Spectator simultaneously.
+- **Tries vs Deaths counter** — When Spectator-after-death is enabled, the counter is labeled "Tries/Versuche".
+- **Euro/Event maximum** — The donation value per event is now capped at 5.0€.
+- **Recent event cooldown** — A new anti-repeat algorithm reduces the weight of recently triggered events.
 - **Queue pause on all-spectator** — Timer and queue now correctly pause as soon as all players are in Spectator mode.
 
 ### v1.4.0
 
-- **New event: `equipment_shuffle`** — All tiered tools and armor in the inventory are randomly upgraded or downgraded by one tier. Enchantments, display names, and lore are preserved.
-- **StreamElements donation integration** — Donations via StreamElements now trigger in-game events. Supports multiple streamer accounts simultaneously.
+- **New event: `equipment_shuffle`** — All tiered tools and armor in the inventory are randomly upgraded or downgraded by one tier.
+- **StreamElements donation integration** — Donations via StreamElements now trigger in-game events.
 - **Pause aura** — A spiral flame particle effect is displayed around all online players while the timer is paused.
-- **Weights:** small default value changes.
-
-### v1.3.1
-
-- Initial public release.
 
 ---
 
