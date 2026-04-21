@@ -198,13 +198,23 @@ public class TwitchIntegrationManager {
             boolean simGiftNow = plugin.getConfig().getBoolean("twitch.triggers.sim_gift.enabled",false);
             boolean simGiftBombNow = plugin.getConfig().getBoolean("twitch.triggers.sim_giftbomb.enabled",false);
             int simGiftBombDefaultNow = Math.max(1, plugin.getConfig().getInt("twitch.triggers.sim_giftbomb.default_count",5));
-            if (chatTestEnabledNow && lower.equals(TEST_TRIGGER)) { enqueue("randomevent "+author); return; }
-            if (simGiftNow && lower.equals(CMD_GIFT)) { enqueue("randomevent "+author); return; }
+            String chName = event.getChannel()!=null ? event.getChannel().getName() : "unknown";
+            if (chatTestEnabledNow && lower.equals(TEST_TRIGGER)) {
+                enqueue("randomevent "+author);
+                trackSub(chName); // sim !test = 1 Sub
+                return;
+            }
+            if (simGiftNow && lower.equals(CMD_GIFT)) {
+                enqueue("randomevent "+author);
+                trackSub(chName); // sim !gift = 1 Sub
+                return;
+            }
             if (simGiftBombNow && lower.startsWith(CMD_GIFTBOMB)) {
                 int n = simGiftBombDefaultNow;
                 String[] parts = trimmed.split("\\s+");
                 if (parts.length>1) { try { n=Math.max(1,Integer.parseInt(parts[1])); } catch (Exception ignored) {} }
                 enqueueMultiple(n, author);
+                for (int i=0; i<n; i++) trackSub(chName); // sim !giftbomb N = N Subs
             }
         });
 
