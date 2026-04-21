@@ -75,8 +75,18 @@ public class TwitchIntegrationManager {
         totalBitsThisRun.addAndGet(bits);
         bitsPerChannel.computeIfAbsent(channelName, k -> new AtomicInteger(0)).addAndGet(bits);
     }
+    // Zählt alle tatsächlich dispatched Events (unabhängig von Subs/Bits/Donations)
+    private final AtomicInteger totalEventsDispatchedThisRun = new AtomicInteger(0);
+    public int getTotalEventsDispatchedThisRun() { return totalEventsDispatchedThisRun.get(); }
+
+    public void clearQueue() {
+        commandQueue.clear();
+        saveQueueAsync();
+    }
+
     public void resetRunStats() {
         totalSubsThisRun.set(0); totalBitsThisRun.set(0);
+        totalEventsDispatchedThisRun.set(0);
         subsPerChannel.clear(); bitsPerChannel.clear();
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -250,6 +260,7 @@ public class TwitchIntegrationManager {
             if(!cooledAndReady)return;
             String cmd=commandQueue.poll(); if(cmd==null)return;
             boolean ok=Bukkit.dispatchCommand(Bukkit.getConsoleSender(),cmd);
+            if (ok) totalEventsDispatchedThisRun.incrementAndGet();
             if(debug)plugin.getLogger().info("[Twitch] Dispatch: "+cmd+" -> "+ok+" (queue="+commandQueue.size()+")");
             ticksSinceLastDispatch=0; cooledAndReady=false; saveQueueAsync();
         }, 1L, 2L);

@@ -28,11 +28,15 @@ public class DragonKillListener implements Listener {
     public void onEntityDeath(EntityDeathEvent e) {
         if (!(e.getEntity() instanceof EnderDragon)) return;
 
+        // Stats sammeln BEVOR Timer gestoppt / Queue geleert wird
         int    subs   = collectSubs();
         double euro   = collectEuro();
         int    bits   = collectBits();
         long   time   = plugin.getTimerManager() != null ? plugin.getTimerManager().getElapsedSeconds() : 0L;
         int    deaths = plugin.getDeathCounter()  != null ? plugin.getDeathCounter().get() : 0;
+        // Events getriggert = Subs + ceil(Bits/bitsPerEvent) + ceil(Euro/euroPerEvent)
+        // Einfachste Annäherung: direkt den dispatched-Counter aus TwitchIntegrationManager
+        int eventsTriggered = collectEventsTriggered();
 
         List<String> channels = new ArrayList<>();
         try {
@@ -41,12 +45,30 @@ public class DragonKillListener implements Listener {
             else { String s = plugin.getConfig().getString("twitch.channel",""); if (s!=null&&!s.isBlank()) channels.add(s); }
         } catch (Throwable ignored) {}
 
-        broadcastGlobal("stats.dragon.header",           Map.of());
-        broadcastGlobal("stats.dragon.time",             Map.of("time",  formatTime(time)));
-        broadcastGlobal("stats.dragon.deaths",           Map.of("deaths",String.valueOf(deaths)));
-        broadcastGlobal("stats.dragon.subs",             Map.of("subs",  String.valueOf(subs)));
-        broadcastGlobal("stats.dragon.donations",        Map.of("euro",  String.format(Locale.US,"%.2f",euro)));
-        broadcastGlobal("stats.dragon.bits",             Map.of("bits",  String.valueOf(bits)));
+        // 1) Timer stoppen
+        try {
+            if (plugin.getTimerManager() != null) {
+                plugin.getTimerManager().stop();
+                plugin.getLogger().info("[Dragon] Timer gestoppt.");
+            }
+        } catch (Throwable ignored) {}
+
+        // 2) Queue leeren
+        try {
+            if (plugin.getTwitch() != null) {
+                plugin.getTwitch().clearQueue();
+                plugin.getLogger().info("[Dragon] Queue geleert.");
+            }
+        } catch (Throwable ignored) {}
+
+        // 3) Stats broadcasten
+        broadcastGlobal("stats.dragon.header",    Map.of());
+        broadcastGlobal("stats.dragon.time",      Map.of("time",   formatTime(time)));
+        broadcastGlobal("stats.dragon.deaths",    Map.of("deaths", String.valueOf(deaths)));
+        broadcastGlobal("stats.dragon.events",    Map.of("events", String.valueOf(eventsTriggered)));
+        broadcastGlobal("stats.dragon.subs",      Map.of("subs",   String.valueOf(subs)));
+        broadcastGlobal("stats.dragon.donations", Map.of("euro",   String.format(Locale.US,"%.2f",euro)));
+        broadcastGlobal("stats.dragon.bits",      Map.of("bits",   String.valueOf(bits)));
 
         if (channels.size() > 1) {
             broadcastGlobal("stats.dragon.per_channel_header", Map.of());
@@ -59,17 +81,18 @@ public class DragonKillListener implements Listener {
             }
         }
 
-        saveStats(channels, subs, euro, bits, time, deaths);
+        saveStats(channels, subs, euro, bits, time, deaths, eventsTriggered);
     }
 
     // ── Aggregation ──────────────────────────────────────────────────────────
 
-    private int    collectSubs()                   { try { return plugin.getTwitch()!=null ? plugin.getTwitch().getTotalSubsThisRun()  : 0;   } catch (Throwable ignored) { return 0;   } }
-    private double collectEuro()                   { try { return plugin.getDonations()!=null ? plugin.getDonations().getTotalEuroThisRun() : 0.0; } catch (Throwable ignored) { return 0.0; } }
-    private int    collectBits()                   { try { return plugin.getTwitch()!=null ? plugin.getTwitch().getTotalBitsThisRun()  : 0;   } catch (Throwable ignored) { return 0;   } }
-    private int    collectSubsForChannel(String ch){ try { return plugin.getTwitch()!=null ? plugin.getTwitch().getSubsForChannel(ch)  : 0;   } catch (Throwable ignored) { return 0;   } }
+    private int    collectSubs()                   { try { return plugin.getTwitch()!=null ? plugin.getTwitch().getTotalSubsThisRun()       : 0;   } catch (Throwable ignored) { return 0;   } }
+    private double collectEuro()                   { try { return plugin.getDonations()!=null ? plugin.getDonations().getTotalEuroThisRun()  : 0.0; } catch (Throwable ignored) { return 0.0; } }
+    private int    collectBits()                   { try { return plugin.getTwitch()!=null ? plugin.getTwitch().getTotalBitsThisRun()       : 0;   } catch (Throwable ignored) { return 0;   } }
+    private int    collectEventsTriggered()        { try { return plugin.getTwitch()!=null ? plugin.getTwitch().getTotalEventsDispatchedThisRun() : 0; } catch (Throwable ignored) { return 0; } }
+    private int    collectSubsForChannel(String ch){ try { return plugin.getTwitch()!=null ? plugin.getTwitch().getSubsForChannel(ch)       : 0;   } catch (Throwable ignored) { return 0;   } }
     private double collectEuroForChannel(String ch){ try { return plugin.getDonations()!=null ? plugin.getDonations().getEuroForChannel(ch) : 0.0; } catch (Throwable ignored) { return 0.0; } }
-    private int    collectBitsForChannel(String ch){ try { return plugin.getTwitch()!=null ? plugin.getTwitch().getBitsForChannel(ch)  : 0;   } catch (Throwable ignored) { return 0;   } }
+    private int    collectBitsForChannel(String ch){ try { return plugin.getTwitch()!=null ? plugin.getTwitch().getBitsForChannel(ch)       : 0;   } catch (Throwable ignored) { return 0;   } }
 
     // ── Broadcast ─────────────────────────────────────────────────────────────
 
@@ -80,17 +103,18 @@ public class DragonKillListener implements Listener {
 
     // ── stats.yml ─────────────────────────────────────────────────────────────
 
-    private void saveStats(List<String> channels, int subs, double euro, int bits, long timeSec, int deaths) {
+    private void saveStats(List<String> channels, int subs, double euro, int bits, long timeSec, int deaths, int eventsTriggered) {
         try {
             File f = new File(plugin.getDataFolder(), "stats.yml");
             YamlConfiguration cfg = f.exists() ? YamlConfiguration.loadConfiguration(f) : new YamlConfiguration();
             String runKey = "run_" + System.currentTimeMillis();
-            cfg.set(runKey+".timestamp",    new Date().toString());
-            cfg.set(runKey+".time_seconds", timeSec);
-            cfg.set(runKey+".deaths",       deaths);
-            cfg.set(runKey+".total.subs",   subs);
-            cfg.set(runKey+".total.euro",   euro);
-            cfg.set(runKey+".total.bits",   bits);
+            cfg.set(runKey+".timestamp",         new Date().toString());
+            cfg.set(runKey+".time_seconds",       timeSec);
+            cfg.set(runKey+".deaths",             deaths);
+            cfg.set(runKey+".total.subs",         subs);
+            cfg.set(runKey+".total.euro",         euro);
+            cfg.set(runKey+".total.bits",         bits);
+            cfg.set(runKey+".total.events_dispatched", eventsTriggered);
             for (String ch : channels) {
                 cfg.set(runKey+".channels."+ch+".subs",  collectSubsForChannel(ch));
                 cfg.set(runKey+".channels."+ch+".euro",  collectEuroForChannel(ch));

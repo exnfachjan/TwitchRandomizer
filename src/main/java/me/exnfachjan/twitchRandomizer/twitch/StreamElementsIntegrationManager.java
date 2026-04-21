@@ -135,7 +135,11 @@ public class StreamElementsIntegrationManager {
         return null;
     }
 
-    /** True wenn mehr als ein Twitch-Channel konfiguriert ist – dann Channel-Tag anzeigen */
+    private DonationsManager getDonations() {
+        if (plugin instanceof TwitchRandomizer t) return t.getDonations();
+        return null;
+    }
+
     private boolean isMultiChannel() {
         try {
             if (plugin instanceof TwitchRandomizer t && t.getTwitch() != null) {
@@ -252,7 +256,6 @@ public class StreamElementsIntegrationManager {
             String username = extractJsonString(content, "username");
             if (username == null || username.isBlank()) username = "StreamElementsTip";
 
-            // Channel-Tag anzeigen wenn mehr als ein Twitch-Channel konfiguriert ist
             String taggedUsername;
             if (isMultiChannel()) {
                 taggedUsername = "role:donation:" + username + " \u00a77(" + channelName + ")\u00a7r";
@@ -277,6 +280,11 @@ public class StreamElementsIntegrationManager {
             if (twitch != null) {
                 twitch.enqueueMultiple(count, taggedUsername);
                 plugin.getLogger().info("[SE:" + channelName + "] Tip: " + username + " -> " + amount + " -> +" + count + " Event(s) in Queue.");
+            }
+            // Stats tracken
+            DonationsManager don = getDonations();
+            if (don != null) {
+                don.trackDonation(channelName, amount);
             }
         }
 

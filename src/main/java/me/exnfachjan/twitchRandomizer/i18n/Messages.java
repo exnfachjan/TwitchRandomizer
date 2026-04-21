@@ -228,6 +228,7 @@ public class Messages {
         de.put("stats.dragon.header", "§6§l⚔ Enderdrache besiegt! Challenge abgeschlossen! ⚔");
         de.put("stats.dragon.time", "§7⏱ Zeit: §f{time}");
         de.put("stats.dragon.deaths", "§7💀 Tode/Versuche: §f{deaths}");
+        de.put("stats.dragon.events", "§7🎲 Events getriggert: §f{events}");
         de.put("stats.dragon.subs", "§7🎟 Subs gesamt: §f{subs}");
         de.put("stats.dragon.donations", "§7💰 Donations gesamt: §f{euro} €");
         de.put("stats.dragon.bits", "§7💎 Bits gesamt: §f{bits}");
@@ -430,6 +431,7 @@ public class Messages {
         en.put("stats.dragon.header", "§6§l⚔ Ender Dragon defeated! Challenge complete! ⚔");
         en.put("stats.dragon.time", "§7⏱ Time: §f{time}");
         en.put("stats.dragon.deaths", "§7💀 Deaths/Tries: §f{deaths}");
+        en.put("stats.dragon.events", "§7🎲 Events triggered: §f{events}");
         en.put("stats.dragon.subs", "§7🎟 Total Subs: §f{subs}");
         en.put("stats.dragon.donations", "§7💰 Total Donations: §f{euro} €");
         en.put("stats.dragon.bits", "§7💎 Total Bits: §f{bits}");

@@ -13,7 +13,6 @@ import java.util.concurrent.*;
  * Tipeeestream donation integration via WebSocket.
  * Config is read from donations.yml (shared with StreamElements).
  * Supports multiple accounts via "accounts" string: "APIKEY1;APIKEY2" or "Channel1:APIKEY1;Channel2:APIKEY2"
- * API key: https://tipeeestream.com/dashboard/stream
  */
 public class TipeeeStreamIntegrationManager {
 
@@ -38,7 +37,7 @@ public class TipeeeStreamIntegrationManager {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Public API (called by DonationsManager)
+    // Public API
     // ─────────────────────────────────────────────────────────────────────────
 
     public void start(boolean enabled, String accounts, double amountPerTrigger, boolean debug) {
@@ -90,7 +89,6 @@ public class TipeeeStreamIntegrationManager {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Account parsing
-    // accounts format: "APIKEY" or "Channel:APIKEY" or "Ch1:KEY1;Ch2:KEY2"
     // ─────────────────────────────────────────────────────────────────────────
 
     private List<AccountEntry> parseAccounts(String raw) {
@@ -100,15 +98,12 @@ public class TipeeeStreamIntegrationManager {
         for (String entry : entries) {
             String e = entry.trim();
             if (e.isBlank() || e.equals("YOUR_TIPEEESTREAM_APIKEY")) continue;
-            // Format: "Channel:APIKEY"  or just "APIKEY"
-            // Aber APIKEY selbst kann auch Sonderzeichen enthalten, daher nur am ersten ":" splitten
             int colonIdx = e.indexOf(':');
             String channelName, apiKey;
             if (colonIdx > 0 && colonIdx < e.length() - 1) {
                 channelName = e.substring(0, colonIdx).trim();
                 apiKey = e.substring(colonIdx + 1).trim();
             } else {
-                // Kein Channel-Name angegeben – verwende generischen Namen
                 channelName = "Tipeee#" + (result.size() + 1);
                 apiKey = e;
             }
@@ -138,7 +133,11 @@ public class TipeeeStreamIntegrationManager {
         return null;
     }
 
-    /** True wenn mehr als ein Twitch-Channel konfiguriert ist – dann Channel-Tag anzeigen */
+    private DonationsManager getDonations() {
+        if (plugin instanceof TwitchRandomizer t) return t.getDonations();
+        return null;
+    }
+
     private boolean isMultiChannel() {
         try {
             if (plugin instanceof TwitchRandomizer t && t.getTwitch() != null) {
@@ -158,14 +157,12 @@ public class TipeeeStreamIntegrationManager {
         return json.substring(start, end);
     }
 
-    /** Sucht "key" erst nach dem ersten Vorkommen von "section" */
     private String extractJsonStringAfter(String json, String section, String key) {
         int sectionIdx = json.indexOf("\"" + section + "\"");
         if (sectionIdx < 0) return null;
         return extractJsonString(json.substring(sectionIdx), key);
     }
 
-    /** Gibt das N-te Vorkommen von "key" zurück (1-basiert) */
     private String extractJsonStringNth(String json, String key, int n) {
         String search = "\"" + key + "\":\"";
         int idx = -1;
@@ -195,7 +192,7 @@ public class TipeeeStreamIntegrationManager {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // TipeeeConnection (eine Verbindung pro Account)
+    // TipeeeConnection
     // ─────────────────────────────────────────────────────────────────────────
 
     private class TipeeeConnection {
@@ -273,18 +270,15 @@ public class TipeeeStreamIntegrationManager {
                 return;
             }
 
-            // Donation/Tip event
             if (!content.contains("\"donation\"") && !content.contains("\"tip\"")) return;
             if (content.contains("\"event:update\"")) return;
 
-            // Spender-Username: zuerst aus "parameters"-Block, dann 2. Vorkommen, dann Fallback
             String username = extractJsonStringAfter(content, "parameters", "username");
             if (username == null || username.isBlank()) {
                 username = extractJsonStringNth(content, "username", 2);
             }
             if (username == null || username.isBlank()) username = "TipeeeStreamTip";
 
-            // Channel-Tag anzeigen wenn mehr als ein Twitch-Channel konfiguriert ist
             String taggedUsername;
             if (isMultiChannel()) {
                 taggedUsername = "role:donation:" + username + " \u00a77(" + channelName + ")\u00a7r";
@@ -309,6 +303,11 @@ public class TipeeeStreamIntegrationManager {
             if (twitch != null) {
                 twitch.enqueueMultiple(count, taggedUsername);
                 plugin.getLogger().info("[Tipeee:" + channelName + "] Tip: " + username + " -> " + amount + " -> +" + count + " Event(s) in Queue.");
+            }
+            // Stats tracken
+            DonationsManager don = getDonations();
+            if (don != null) {
+                don.trackDonation(channelName, amount);
             }
         }
 
