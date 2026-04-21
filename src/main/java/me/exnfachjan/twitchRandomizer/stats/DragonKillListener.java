@@ -45,15 +45,24 @@ public class DragonKillListener implements Listener {
             else { String s = plugin.getConfig().getString("twitch.channel",""); if (s!=null&&!s.isBlank()) channels.add(s); }
         } catch (Throwable ignored) {}
 
-        // 1) Timer stoppen
+        // 1) Timer auf 0 zurücksetzen (pausiert ihn gleichzeitig)
         try {
             if (plugin.getTimerManager() != null) {
-                plugin.getTimerManager().stop();
-                plugin.getLogger().info("[Dragon] Timer gestoppt.");
+                plugin.getTimerManager().reset();
+                plugin.getLogger().info("[Dragon] Timer zurückgesetzt.");
             }
         } catch (Throwable ignored) {}
 
-        // 2) Queue leeren
+        // 2a) Deathcounter auf 0
+        try {
+            if (plugin.getDeathCounter() != null) {
+                plugin.getDeathCounter().clear();
+                plugin.getDeathCounter().broadcastActionbar();
+                plugin.getLogger().info("[Dragon] Deathcounter zurückgesetzt.");
+            }
+        } catch (Throwable ignored) {}
+
+        // 2b) Queue leeren
         try {
             if (plugin.getTwitch() != null) {
                 plugin.getTwitch().clearQueue();
