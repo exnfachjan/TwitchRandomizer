@@ -28,9 +28,12 @@ public class Messages {
             String norm = normalizeLang(def);
             this.defaultLang = norm != null ? norm : "en";
         } catch (Throwable ignored) { }
+        initMaps();
+    }
 
-        // ===================== DEUTSCH =====================
+    private void initMaps() {
         de.clear();
+        // ===================== DEUTSCH =====================
         de.put("commands.saved_and_reconfigured", "&aKonfiguration gespeichert und (re)konfiguriert.");
         de.put("commands.randomevent.triggered", "&aRandom-Event ausgelöst.");
         de.put("commands.randomevent.triggered_by", "&aRandom-Event ausgelöst von &f{user}&a.");
@@ -86,14 +89,16 @@ public class Messages {
         de.put("events.equipment_shuffle.solo", "Dein Equipment wurde zufällig verändert!");
         de.put("events.equipment_shuffle.upgrade", "§a⬆ {item} → {new_item}");
         de.put("events.equipment_shuffle.downgrade", "§c⬇ {item} → {new_item}");
+        de.put("events.permanent_hearts.solo", "§dDein Maximum an Herzen verändert sich dauerhaft!");
+        de.put("events.permanent_hearts.by", "§d{user} verändert dein Maximum an Herzen dauerhaft!");
+        de.put("events.permanent_hearts.gain", "§a+{hearts} ❤ permanent! (Gesamt: {total} ❤)");
+        de.put("events.permanent_hearts.loss", "§c-{hearts} ❤ permanent! (Gesamt: {total} ❤)");
         de.put("actionbar.timer.running_prefix", "⏱ {time}");
         de.put("actionbar.timer.paused", "TIMER PAUSIERT");
         de.put("actionbar.queue_label", "Queue");
         de.put("actionbar.next_label", "Nächstes");
         de.put("actionbar.next_none", "–");
-        // Deaths-Modus (auto_spectator_on_death = false): zählt jeden einzelnen Tod
         de.put("actionbar.deaths_label", "Tode");
-        // Tries-Modus (auto_spectator_on_death = true): zählt 1x pro Team-Versuch
         de.put("actionbar.tries_label", "Versuche");
         de.put("gui.weights.paper_name", "&d{key}");
         de.put("gui.weights.paper_lore", java.util.List.of("&7Gewicht: &f{weight}", "&7Links/Rechts: &f±1", "&7Shift + Klick: &f±10"));
@@ -108,13 +113,7 @@ public class Messages {
         de.put("gui.common.save_reconnect_name", "&eSpeichern & (Re)verbinden");
         de.put("gui.common.save_reconnect_lore", java.util.List.of("&7Änderungen übernehmen"));
         de.put("gui.main.twitch_info_name", "&6Twitch-Info");
-        de.put("gui.main.twitch_info_lore", java.util.List.of(
-                "&7Channel: &f{channel}",
-                "&7Token: &f{token_masked}",
-                "&4Achtung: sensible Daten!",
-                "&7Links: &fChannel setzen",
-                "&7Rechts: &fToken setzen",
-                "&7Donations: &8Nur über donations.yml"));
+        de.put("gui.main.twitch_info_lore", java.util.List.of("&7Channel: &f{channel}", "&7Token: &f{token_masked}", "&4Achtung: sensible Daten!", "&7Links: &fChannel setzen", "&7Rechts: &fToken setzen", "&7Donations: &8Nur über donations.yml"));
         de.put("gui.main.misc_name", "&6Misc");
         de.put("gui.main.misc_lore", java.util.List.of("&7Diverse Einstellungen", "&7z. B. 'Spectator after death' & Deathcounter"));
         de.put("gui.main.debug_name", "&dDebug Menü");
@@ -139,25 +138,11 @@ public class Messages {
         de.put("gui.trigger.se_toggle", "StreamElements Donations");
         de.put("gui.trigger.tipeee_toggle", "Tipeeestream Donations");
         de.put("gui.trigger.value_name", "&bWert/Event: &f{euro}€  |  {bits} Bits");
-        de.put("gui.trigger.value_lore", java.util.List.of(
-                "&7Universal-Währung: wie viel pro Event.",
-                "&7Standard: &f5€ = 500 Bits = 1 Sub = 1 Event",
-                "&7Minimum: &f1€ / 100 Bits",
-                "&7Abgeleitet:",
-                "&7  Bits/Event  = &f{bits}",
-                "&7  Events/Sub  = &f{sub_events}",
-                "&7Links: &f-0.5€  &7Rechts: &f+0.5€",
-                "&7Shift + Klick: &f±1.0€"));
+        de.put("gui.trigger.value_lore", java.util.List.of("&7Universal-Währung: wie viel pro Event.", "&7Standard: &f5€ = 500 Bits = 1 Sub = 1 Event", "&7Minimum: &f1€ / 100 Bits", "&7Abgeleitet:", "&7  Bits/Event  = &f{bits}", "&7  Events/Sub  = &f{sub_events}", "&7Links: &f-0.5€  &7Rechts: &f+0.5€", "&7Shift + Klick: &f±1.0€"));
         de.put("gui.trigger.sub_info_name", "&71 Sub = &f{sub_events} Event(s)");
-        de.put("gui.trigger.sub_info_lore", java.util.List.of(
-                "&7Sub-Wert: &f5€ (fest bei Twitch)",
-                "&7Bei aktuellem Wert ({euro}€/Event):",
-                "&7ceil(5 / {euro}) = &f{sub_events} Events"));
+        de.put("gui.trigger.sub_info_lore", java.util.List.of("&7Sub-Wert: &f5€ (fest bei Twitch)", "&7Bei aktuellem Wert ({euro}€/Event):", "&7ceil(5 / {euro}) = &f{sub_events} Events"));
         de.put("gui.trigger.bits_info_name", "&7100 Bits = 1€ → &f{bits} Bits/Event");
-        de.put("gui.trigger.bits_info_lore", java.util.List.of(
-                "&7Bits/Event = euro_per_event × 100",
-                "&7Aktuell: &f{euro}€ × 100 = {bits} Bits",
-                "&7Minimum: &f100 Bits (1€)"));
+        de.put("gui.trigger.bits_info_lore", java.util.List.of("&7Bits/Event = euro_per_event × 100", "&7Aktuell: &f{euro}€ × 100 = {bits} Bits", "&7Minimum: &f100 Bits (1€)"));
         de.put("gui.debug.test_toggle", "!test erlaubt");
         de.put("gui.debug.gift_toggle", "!gift Simulation");
         de.put("gui.debug.giftbomb_toggle", "!giftbomb Simulation");
@@ -173,10 +158,14 @@ public class Messages {
         de.put("gui.lang.current_prefix", "&eAktuell: &f{lang}");
         de.put("gui.reset_confirm.cancel", "&cAbbrechen");
         de.put("gui.reset_confirm.confirm", "&aReset bestätigen");
+        de.put("gui.reset_confirm.cancel_name", "§cAbbrechen");
+        de.put("gui.reset_confirm.cancel_lore", java.util.List.of("§7Kein Reset – zurück zum Misc-Menü."));
+        de.put("gui.reset_confirm.title_name", "§6Server-Reset");
+        de.put("gui.reset_confirm.title_lore", java.util.List.of("§7Bist du sicher?", "§7Diese Aktion kann nicht rückgängig gemacht werden!"));
+        de.put("gui.reset_confirm.confirm_name", "§aReset bestätigen");
+        de.put("gui.reset_confirm.confirm_lore", java.util.List.of("§7Klicke um den Reset zu starten."));
         de.put("gui.book.title", "Twitch Eingabe");
-        de.put("gui.book.page.channel", "Trage hier einen oder mehrere Twitch-Kanalnamen ein.\n" +
-                "Du kannst mehrere Channels durch Komma, Semikolon oder Zeilenumbruch trennen.\n" +
-                "Beispiel: Kanal1, Kanal2, Kanal3");
+        de.put("gui.book.page.channel", "Trage hier einen oder mehrere Twitch-Kanalnamen ein.\nDu kannst mehrere Channels durch Komma, Semikolon oder Zeilenumbruch trennen.\nBeispiel: Kanal1, Kanal2, Kanal3");
         de.put("gui.book.page.token.text", "Ersetzte diesen Text mit den Access Token deines Bots, welchen du unter {url} erhalten kannst.");
         de.put("gui.book.page.token.link_text", "Token-Generator öffnen");
         de.put("gui.book.page.reward", "Schreibe auf die erste Seite den EXAKTEN Namen deiner Kanalpunkte-Belohnung und signiere das Buch.");
@@ -235,9 +224,18 @@ public class Messages {
         de.put("event.name.skyblock", "Skyblock");
         de.put("event.name.fake_totem", "Fake Totem");
         de.put("event.name.equipment_shuffle", "Equipment mischen");
+        de.put("event.name.permanent_hearts", "Permanente Herzen");
+        de.put("stats.dragon.header", "§6§l⚔ Enderdrache besiegt! Challenge abgeschlossen! ⚔");
+        de.put("stats.dragon.time", "§7⏱ Zeit: §f{time}");
+        de.put("stats.dragon.deaths", "§7💀 Tode/Versuche: §f{deaths}");
+        de.put("stats.dragon.subs", "§7🎟 Subs gesamt: §f{subs}");
+        de.put("stats.dragon.donations", "§7💰 Donations gesamt: §f{euro} €");
+        de.put("stats.dragon.bits", "§7💎 Bits gesamt: §f{bits}");
+        de.put("stats.dragon.per_channel_header", "§e§l--- Stats pro Kanal ---");
+        de.put("stats.dragon.per_channel_entry", "§e{channel}: §7Subs: §f{subs} §7| Donations: §f{euro}€ §7| Bits: §f{bits}");
 
-        // ===================== ENGLISCH =====================
         en.clear();
+        // ===================== ENGLISCH =====================
         en.put("commands.saved_and_reconfigured", "&aConfiguration saved and (re)configured.");
         en.put("commands.randomevent.triggered", "&aRandom event triggered.");
         en.put("commands.randomevent.triggered_by", "&aRandom event triggered by &f{user}&a.");
@@ -293,14 +291,16 @@ public class Messages {
         en.put("events.equipment_shuffle.solo", "Your equipment was randomly changed!");
         en.put("events.equipment_shuffle.upgrade", "§a⬆ {item} → {new_item}");
         en.put("events.equipment_shuffle.downgrade", "§c⬇ {item} → {new_item}");
+        en.put("events.permanent_hearts.solo", "§dYour maximum hearts change permanently!");
+        en.put("events.permanent_hearts.by", "§d{user} permanently changes your max hearts!");
+        en.put("events.permanent_hearts.gain", "§a+{hearts} ❤ permanently! (Total: {total} ❤)");
+        en.put("events.permanent_hearts.loss", "§c-{hearts} ❤ permanently! (Total: {total} ❤)");
         en.put("actionbar.timer.running_prefix", "⏱ {time}");
         en.put("actionbar.timer.paused", "TIMER PAUSED");
         en.put("actionbar.queue_label", "Queue");
         en.put("actionbar.next_label", "Next");
         en.put("actionbar.next_none", "–");
-        // Deaths-Modus (auto_spectator_on_death = false): zählt jeden einzelnen Tod
         en.put("actionbar.deaths_label", "Deaths");
-        // Tries-Modus (auto_spectator_on_death = true): zählt 1x pro Team-Versuch
         en.put("actionbar.tries_label", "Tries");
         en.put("gui.weights.paper_name", "&d{key}");
         en.put("gui.weights.paper_lore", java.util.List.of("&7Weight: &f{weight}", "&7Left/Right: &f±1", "&7Shift + Click: &f±10"));
@@ -315,13 +315,7 @@ public class Messages {
         en.put("gui.common.save_reconnect_name", "&eSave & (Re)connect");
         en.put("gui.common.save_reconnect_lore", java.util.List.of("&7Apply changes"));
         en.put("gui.main.twitch_info_name", "&6Twitch Info");
-        en.put("gui.main.twitch_info_lore", java.util.List.of(
-                "&7Channel: &f{channel}",
-                "&7Token: &f{token_masked}",
-                "&4Warning: sensitive data!",
-                "&7Left: &fSet channel",
-                "&7Right: &fSet token",
-                "&7Donations: &8Via donations.yml only"));
+        en.put("gui.main.twitch_info_lore", java.util.List.of("&7Channel: &f{channel}", "&7Token: &f{token_masked}", "&4Warning: sensitive data!", "&7Left: &fSet channel", "&7Right: &fSet token", "&7Donations: &8Via donations.yml only"));
         en.put("gui.main.misc_name", "&6Misc");
         en.put("gui.main.misc_lore", java.util.List.of("&7Various settings", "&7e.g. 'Spectator after death' & Death counter"));
         en.put("gui.main.debug_name", "&dDebug Menu");
@@ -346,25 +340,11 @@ public class Messages {
         en.put("gui.trigger.se_toggle", "StreamElements Donations");
         en.put("gui.trigger.tipeee_toggle", "Tipeeestream Donations");
         en.put("gui.trigger.value_name", "&bValue/Event: &f{euro}€  |  {bits} Bits");
-        en.put("gui.trigger.value_lore", java.util.List.of(
-                "&7Universal currency: how much per event.",
-                "&7Default: &f5€ = 500 Bits = 1 Sub = 1 Event",
-                "&7Minimum: &f1€ / 100 Bits",
-                "&7Derived:",
-                "&7  Bits/Event  = &f{bits}",
-                "&7  Events/Sub  = &f{sub_events}",
-                "&7Left: &f-0.5€  &7Right: &f+0.5€",
-                "&7Shift + Click: &f±1.0€"));
+        en.put("gui.trigger.value_lore", java.util.List.of("&7Universal currency: how much per event.", "&7Default: &f5€ = 500 Bits = 1 Sub = 1 Event", "&7Minimum: &f1€ / 100 Bits", "&7Derived:", "&7  Bits/Event  = &f{bits}", "&7  Events/Sub  = &f{sub_events}", "&7Left: &f-0.5€  &7Right: &f+0.5€", "&7Shift + Click: &f±1.0€"));
         en.put("gui.trigger.sub_info_name", "&71 Sub = &f{sub_events} Event(s)");
-        en.put("gui.trigger.sub_info_lore", java.util.List.of(
-                "&7Sub value: &f5€ (fixed by Twitch)",
-                "&7At current value ({euro}€/Event):",
-                "&7ceil(5 / {euro}) = &f{sub_events} Events"));
+        en.put("gui.trigger.sub_info_lore", java.util.List.of("&7Sub value: &f5€ (fixed by Twitch)", "&7At current value ({euro}€/Event):", "&7ceil(5 / {euro}) = &f{sub_events} Events"));
         en.put("gui.trigger.bits_info_name", "&7100 Bits = 1€ → &f{bits} Bits/Event");
-        en.put("gui.trigger.bits_info_lore", java.util.List.of(
-                "&7Bits/Event = euro_per_event × 100",
-                "&7Currently: &f{euro}€ × 100 = {bits} Bits",
-                "&7Minimum: &f100 Bits (1€)"));
+        en.put("gui.trigger.bits_info_lore", java.util.List.of("&7Bits/Event = euro_per_event × 100", "&7Currently: &f{euro}€ × 100 = {bits} Bits", "&7Minimum: &f100 Bits (1€)"));
         en.put("gui.debug.test_toggle", "!test allowed");
         en.put("gui.debug.gift_toggle", "!gift Simulation");
         en.put("gui.debug.giftbomb_toggle", "!giftbomb Simulation");
@@ -380,10 +360,14 @@ public class Messages {
         en.put("gui.lang.current_prefix", "&eCurrent: &f{lang}");
         en.put("gui.reset_confirm.cancel", "&cCancel");
         en.put("gui.reset_confirm.confirm", "&aConfirm reset");
+        en.put("gui.reset_confirm.cancel_name", "§cCancel");
+        en.put("gui.reset_confirm.cancel_lore", java.util.List.of("§7No reset – back to Misc menu."));
+        en.put("gui.reset_confirm.title_name", "§6Server Reset");
+        en.put("gui.reset_confirm.title_lore", java.util.List.of("§7Are you sure?", "§7This action cannot be undone!"));
+        en.put("gui.reset_confirm.confirm_name", "§aConfirm Reset");
+        en.put("gui.reset_confirm.confirm_lore", java.util.List.of("§7Click to start the reset."));
         en.put("gui.book.title", "Twitch Input");
-        en.put("gui.book.page.channel", "Enter one or more Twitch channel names here.\n" +
-                "You can separate multiple channels with commas, semicolons or line breaks.\n" +
-                "Example: Channel1, Channel2, Channel3");
+        en.put("gui.book.page.channel", "Enter one or more Twitch channel names here.\nYou can separate multiple channels with commas, semicolons or line breaks.\nExample: Channel1, Channel2, Channel3");
         en.put("gui.book.page.token.text", "Replace this text with the access token of your bot, which you can get at {url}.");
         en.put("gui.book.page.token.link_text", "Open token generator");
         en.put("gui.book.page.reward", "Write the EXACT name of your channel points reward on the first page and sign the book.");
@@ -442,15 +426,22 @@ public class Messages {
         en.put("event.name.skyblock", "Skyblock");
         en.put("event.name.fake_totem", "Fake Totem");
         en.put("event.name.equipment_shuffle", "Equipment Shuffle");
+        en.put("event.name.permanent_hearts", "Permanent Hearts");
+        en.put("stats.dragon.header", "§6§l⚔ Ender Dragon defeated! Challenge complete! ⚔");
+        en.put("stats.dragon.time", "§7⏱ Time: §f{time}");
+        en.put("stats.dragon.deaths", "§7💀 Deaths/Tries: §f{deaths}");
+        en.put("stats.dragon.subs", "§7🎟 Total Subs: §f{subs}");
+        en.put("stats.dragon.donations", "§7💰 Total Donations: §f{euro} €");
+        en.put("stats.dragon.bits", "§7💎 Total Bits: §f{bits}");
+        en.put("stats.dragon.per_channel_header", "§e§l--- Stats per Channel ---");
+        en.put("stats.dragon.per_channel_entry", "§e{channel}: §7Subs: §f{subs} §7| Donations: §f{euro}€ §7| Bits: §f{bits}");
     }
 
-    // Separate Datei für player_locales – VÖLLIG unabhängig von config.yml
     private java.io.File getLocalesFile() {
         return new java.io.File(plugin.getDataFolder(), "player_locales.yml");
     }
 
     public void load() {
-        // Spracheinstellungen aus config.yml lesen (mode, default)
         try {
             String m = String.valueOf(plugin.getConfig().getString("language.mode", "auto")).toLowerCase(java.util.Locale.ROOT);
             this.mode = "manual".equals(m) ? Mode.MANUAL : Mode.AUTO;
@@ -459,15 +450,10 @@ public class Messages {
             this.defaultLang = norm != null ? norm : "en";
         } catch (Throwable ignored) {}
 
-        // player_locales aus separater Datei lesen
         try {
             java.io.File f = getLocalesFile();
-            if (!f.exists()) {
-                migrateLocalesFromConfig();
-                return;
-            }
-            org.bukkit.configuration.file.YamlConfiguration yaml =
-                    org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(f);
+            if (!f.exists()) { migrateLocalesFromConfig(); return; }
+            org.bukkit.configuration.file.YamlConfiguration yaml = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(f);
             store.clear();
             for (String key : yaml.getKeys(false)) {
                 try {
@@ -480,7 +466,6 @@ public class Messages {
         } catch (Throwable ignored) {}
     }
 
-    /** Einmalige Migration: player_locales aus config.yml in eigene Datei verschieben */
     private void migrateLocalesFromConfig() {
         try {
             org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
@@ -510,9 +495,7 @@ public class Messages {
             java.io.File f = getLocalesFile();
             if (!f.getParentFile().exists()) f.getParentFile().mkdirs();
             org.bukkit.configuration.file.YamlConfiguration yaml = new org.bukkit.configuration.file.YamlConfiguration();
-            for (var e : store.entrySet()) {
-                yaml.set(e.getKey().toString(), e.getValue());
-            }
+            for (var e : store.entrySet()) yaml.set(e.getKey().toString(), e.getValue());
             yaml.save(f);
         } catch (Throwable ignored) {}
     }
@@ -543,7 +526,7 @@ public class Messages {
         if (n == null) store.remove(p.getUniqueId()); else store.put(p.getUniqueId(), n);
     }
     public void clearPlayerLanguage(Player p) { store.remove(p.getUniqueId()); }
-    public String currentLanguage(Player p) { return resolveLang(p); }
+    public String currentLanguage(Player p)   { return resolveLang(p); }
 
     private Object rawFor(String lang, String key) {
         Object val = getMap(lang).get(key);
@@ -551,7 +534,9 @@ public class Messages {
         return val;
     }
     private Map<String, Object> getMap(String lang) { return "de".equals(lang) ? de : en; }
+
     private String resolveLang(Player p) {
+        if (p == null) return defaultLang; // null-safe for broadcasts
         String override = store.get(p.getUniqueId());
         if (override != null) return override;
         if (mode == Mode.MANUAL) return defaultLang;
@@ -561,6 +546,7 @@ public class Messages {
             return l.startsWith("de") ? "de" : "en";
         } catch (Throwable ignored) { return defaultLang; }
     }
+
     private String normalizeLang(String lang) {
         if (lang == null) return null;
         String l = lang.trim().toLowerCase(Locale.ROOT);

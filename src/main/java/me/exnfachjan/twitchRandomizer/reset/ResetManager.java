@@ -43,7 +43,6 @@ public class ResetManager {
         for (String name : worlds) {
             try {
                 FileUtils.unloadWorldIfLoaded(name);
-
                 File target = new File(Bukkit.getWorldContainer(), name);
                 FileUtils.deleteWorldFolder(target);
                 plugin.getLogger().info("[Reset] Deleted world " + name);
@@ -53,15 +52,11 @@ public class ResetManager {
                     if (source.exists() && source.isDirectory()) {
                         FileUtils.copyDirectory(source, target);
                         plugin.getLogger().info("[Reset] Copied pregenerated world to " + name);
-
                         File playerDataDir = new File(target, "playerdata");
                         if (!playerDataDir.exists()) {
                             boolean created = playerDataDir.mkdirs();
-                            if (created) {
-                                plugin.getLogger().info("[Reset] Created missing playerdata directory for " + name);
-                            } else {
-                                plugin.getLogger().warning("[Reset] Could not create playerdata directory for " + name);
-                            }
+                            if (created) plugin.getLogger().info("[Reset] Created missing playerdata directory for " + name);
+                            else plugin.getLogger().warning("[Reset] Could not create playerdata directory for " + name);
                         }
                     } else {
                         plugin.getLogger().warning("[Reset] Pregenerated world does not exist: " + source.getName());
@@ -97,23 +92,28 @@ public class ResetManager {
 
         String requester = (requestedBy instanceof Player p) ? p.getName() : "Console";
 
-        // FIX: Timer zurücksetzen bei World Reset
+        // Timer wird NICHT zurückgesetzt — nur manuell über das Misc-Menü (wie Deaths)
+
+        // Permanente Herzen bei World-Reset zurücksetzen
         try {
-            if (plugin.getTimerManager() != null) {
-                plugin.getTimerManager().reset();
-                plugin.getLogger().info("[Reset] Timer zurückgesetzt.");
+            org.bukkit.NamespacedKey permKey = new org.bukkit.NamespacedKey(plugin, "perm_hearts_delta");
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                online.getPersistentDataContainer().remove(permKey);
+                org.bukkit.attribute.AttributeInstance attr =
+                        online.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH);
+                if (attr != null) attr.setBaseValue(20.0);
             }
+            plugin.getLogger().info("[Reset] Permanente Herzen zurückgesetzt.");
         } catch (Throwable ignored) {}
 
-        // Deaths werden NICHT zurückgesetzt — das geht manuell über das Misc-Menü
-
-        // Queue bleibt bei Reset bestehen (wie Deaths)
+        // Deaths werden NICHT zurückgesetzt — manuell über das Misc-Menü
+        // Queue bleibt bestehen
         try {
             int queueSize = (plugin.getTwitch() != null) ? plugin.getTwitch().getQueueSize() : 0;
             plugin.getLogger().info("[Reset] Queue wird beibehalten (" + queueSize + " Einträge).");
         } catch (Throwable ignored) {}
 
-        // 1) Titel (sofort)
+        // 1) Titel sofort
         for (Player player : Bukkit.getOnlinePlayers()) {
             try {
                 String title = i18n.tr(player, "title.reset.line1");
@@ -127,9 +127,7 @@ public class ResetManager {
         // 2) Transfer/Kick verzögert
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (doTransfer) {
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    sendToBungeeServer(player, fallbackServer);
-                }
+                for (Player player : Bukkit.getOnlinePlayers()) sendToBungeeServer(player, fallbackServer);
             } else {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     try {
@@ -142,21 +140,15 @@ public class ResetManager {
 
         // 3) Pregeneration
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            try {
-                preGenerateSeedWorlds(seed, levelName);
-            } catch (Throwable t) {
-                plugin.getLogger().warning("[Reset] Failed to pre-generate seed worlds: " + t.getMessage());
-            }
+            try { preGenerateSeedWorlds(seed, levelName); }
+            catch (Throwable t) { plugin.getLogger().warning("[Reset] Failed to pre-generate seed worlds: " + t.getMessage()); }
         }, titleLeadTicks + 10L);
 
         // 4) Shutdown/Restart
         long shutdownDelay = titleLeadTicks + Math.max(3L, transferWaitTicks);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (restartOnReset) {
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "restart");
-            } else {
-                Bukkit.shutdown();
-            }
+            if (restartOnReset) Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "restart");
+            else Bukkit.shutdown();
         }, shutdownDelay);
     }
 
@@ -164,19 +156,12 @@ public class ResetManager {
         String[] names = new String[] { levelName, levelName + "_nether", levelName + "_the_end" };
         for (String name : names) {
             World src = Bukkit.getWorld(name);
-            if (src == null) {
-                plugin.getLogger().warning("[Reset] Source world not loaded: " + name + " - skipping pregeneration");
-                continue;
-            }
+            if (src == null) { plugin.getLogger().warning("[Reset] Source world not loaded: " + name + " - skipping pregeneration"); continue; }
             String newWorldName = CUSTOM_PREFIX + name;
-
             File target = new File(Bukkit.getWorldContainer(), newWorldName);
             FileUtils.deleteWorldFolder(target);
-
             try {
-                WorldCreator wc = new WorldCreator(newWorldName)
-                        .seed(seed)
-                        .environment(src.getEnvironment());
+                WorldCreator wc = new WorldCreator(newWorldName).seed(seed).environment(src.getEnvironment());
                 try { wc.generator(src.getGenerator()); } catch (Throwable ignored) {}
                 try { wc.biomeProvider(src.getBiomeProvider()); } catch (Throwable ignored) {}
                 try { wc.type(src.getWorldType()); } catch (Throwable ignored) {}
@@ -184,7 +169,6 @@ public class ResetManager {
                     boolean genStruct = (boolean) src.getClass().getMethod("canGenerateStructures").invoke(src);
                     wc.generateStructures(genStruct);
                 } catch (Throwable ignored) {}
-
                 World created = wc.createWorld();
                 if (created != null) {
                     try { created.save(); } catch (Throwable ignored) {}

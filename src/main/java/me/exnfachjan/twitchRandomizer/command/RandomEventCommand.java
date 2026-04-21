@@ -38,16 +38,15 @@ public class RandomEventCommand implements CommandExecutor {
             "anvil_rain",
             "skyblock",
             "fake_totem",
-            "equipment_shuffle"
+            "equipment_shuffle",
+            "permanent_hearts"
     );
 
     private int[] weights;
     private Integer lastIndex = null;
 
-    // Cooldown-System: Die letzten N Events merken und deren Gewicht temporär reduzieren.
-    // Verhindert dass dasselbe Event kurz hintereinander erscheint.
-    private static final int RECENT_WINDOW  = 3;    // Wie viele zurückliegende Events berücksichtigt werden
-    private static final double PENALTY_FACTOR = 0.2; // Auf 20% des normalen Gewichts reduzieren
+    private static final int RECENT_WINDOW  = 3;
+    private static final double PENALTY_FACTOR = 0.2;
     private final ArrayDeque<Integer> recentEvents = new ArrayDeque<>(RECENT_WINDOW);
 
     public RandomEventCommand(TwitchRandomizer plugin) {
@@ -86,7 +85,6 @@ public class RandomEventCommand implements CommandExecutor {
             return true;
         }
 
-        // Gewichte kopieren und aktive Bodeneffekte / NoCrafting ausblenden
         int[] weightsForPick = Arrays.copyOf(weights, weights.length);
         boolean anyGroundActive = false, noCraftingActive = false;
         for (Player player : players) {
@@ -96,15 +94,11 @@ public class RandomEventCommand implements CommandExecutor {
         if (anyGroundActive) { weightsForPick[11] = 0; weightsForPick[13] = 0; }
         if (noCraftingActive) { weightsForPick[9] = 0; }
 
-        // Cooldown-Penalty: Kürzlich gespielte Events bekommen reduziertes Gewicht.
-        // Jedes Event in recentEvents wird auf PENALTY_FACTOR * normalWeight gesetzt,
-        // wobei das älteste Event weniger bestraft wird als das jüngste.
         int penaltyPos = 0;
         for (int recentIdx : recentEvents) {
             if (weightsForPick[recentIdx] > 0) {
-                // Jüngste Events stärker bestrafen: ältestes = PENALTY_FACTOR, jüngstes stärker
                 double penalty = PENALTY_FACTOR * (1.0 - (penaltyPos * 0.1));
-                penalty = Math.max(0.05, penalty); // Minimum 5% damit Event nie komplett ausgeschlossen
+                penalty = Math.max(0.05, penalty);
                 weightsForPick[recentIdx] = Math.max(1, (int)(weightsForPick[recentIdx] * penalty));
             }
             penaltyPos++;
@@ -116,7 +110,6 @@ public class RandomEventCommand implements CommandExecutor {
             return true;
         }
 
-        // Event-Typ wählen
         int r = rng.nextInt(totalWeight);
         int acc = 0, event = -1;
         for (int i = 0; i < weightsForPick.length; i++) {
@@ -129,16 +122,10 @@ public class RandomEventCommand implements CommandExecutor {
         }
         this.lastIndex = event;
 
-        // Cooldown-History aktualisieren
         recentEvents.addFirst(event);
         while (recentEvents.size() > RECENT_WINDOW) recentEvents.removeLast();
 
-        // SYNC-SEED: Einmal für alle Spieler generieren, damit zufällige Werte
-        // (Sekunden, Items, Mobs, ...) für alle Spieler identisch sind.
         long syncSeed = rng.nextLong();
-
-        // SKYBLOCK: Sammelpunkt einmal bestimmen (erster online Spieler).
-        // Alle Spieler werden dorthin teleportiert, Chunks nur einmal gecleaned.
         org.bukkit.Location skyblockMeetingPoint = players.isEmpty() ? null : players.get(0).getLocation().clone();
 
         for (Player player : players) {
@@ -163,6 +150,7 @@ public class RandomEventCommand implements CommandExecutor {
                 case 17 -> events.triggerSkyblock(player, byUser, skyblockMeetingPoint);
                 case 18 -> events.triggerFakeTotem(player, byUser);
                 case 19 -> events.triggerEquipmentShuffle(player, byUser, syncSeed);
+                case 20 -> events.triggerPermanentHearts(player, byUser, syncSeed);
             }
         }
         return true;

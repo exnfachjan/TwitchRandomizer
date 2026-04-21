@@ -19,7 +19,7 @@ import java.util.*;
 
 public class ConfigGui {
 
-    public enum MenuType { MAIN, WEIGHTS, TRIGGER, DEBUG, MISC, LANGUAGE }
+    public enum MenuType { MAIN, WEIGHTS, TRIGGER, DEBUG, MISC, LANGUAGE, RESET_CONFIRM }
 
     private final TwitchRandomizer plugin;
     private final Messages i18n;
@@ -31,38 +31,37 @@ public class ConfigGui {
     public ConfigGui(TwitchRandomizer plugin) {
         this.plugin = plugin;
         this.i18n = plugin.getMessages();
-        this.keyMenu = new org.bukkit.NamespacedKey(plugin, "tr_menu");
+        this.keyMenu   = new org.bukkit.NamespacedKey(plugin, "tr_menu");
         this.keyAction = new org.bukkit.NamespacedKey(plugin, "tr_action");
-        this.keyPath = new org.bukkit.NamespacedKey(plugin, "tr_path");
-        this.keyExtra = new org.bukkit.NamespacedKey(plugin, "tr_extra");
+        this.keyPath   = new org.bukkit.NamespacedKey(plugin, "tr_path");
+        this.keyExtra  = new org.bukkit.NamespacedKey(plugin, "tr_extra");
     }
 
     private static final Map<String, Material> EVENT_ICON = Map.ofEntries(
-            Map.entry("spawn_mobs", Material.SPAWNER),
-            Map.entry("potion", Material.POTION),
-            Map.entry("give_item", Material.CHEST),
-            Map.entry("clear_inventory", Material.BARRIER),
-            Map.entry("teleport", Material.ENDER_PEARL),
-            Map.entry("damage_half_heart", Material.GOLDEN_APPLE),
-            Map.entry("fire", Material.FLINT_AND_STEEL),
-            Map.entry("inv_shuffle", Material.SHULKER_BOX),
-            Map.entry("hot_potato", Material.BAKED_POTATO),
-            Map.entry("no_crafting", Material.CRAFTING_TABLE),
-            Map.entry("safe_creepers", Material.CREEPER_HEAD),
-            Map.entry("floor_is_lava", Material.MAGMA_BLOCK),
-            Map.entry("nasa_call", Material.FIREWORK_ROCKET),
-            Map.entry("slippery_ground", Material.PACKED_ICE),
-            Map.entry("hell_is_calling", Material.FIRE_CHARGE),
-            Map.entry("tnt_rain", Material.TNT_MINECART),
-            Map.entry("anvil_rain", Material.ANVIL),
-            Map.entry("skyblock", Material.GRASS_BLOCK),
-            Map.entry("fake_totem", Material.TOTEM_OF_UNDYING),
-            Map.entry("equipment_shuffle", Material.SMITHING_TABLE)
+            Map.entry("spawn_mobs",       Material.SPAWNER),
+            Map.entry("potion",           Material.POTION),
+            Map.entry("give_item",        Material.CHEST),
+            Map.entry("clear_inventory",  Material.BARRIER),
+            Map.entry("teleport",         Material.ENDER_PEARL),
+            Map.entry("damage_half_heart",Material.GOLDEN_APPLE),
+            Map.entry("fire",             Material.FLINT_AND_STEEL),
+            Map.entry("inv_shuffle",      Material.SHULKER_BOX),
+            Map.entry("hot_potato",       Material.BAKED_POTATO),
+            Map.entry("no_crafting",      Material.CRAFTING_TABLE),
+            Map.entry("safe_creepers",    Material.CREEPER_HEAD),
+            Map.entry("floor_is_lava",    Material.MAGMA_BLOCK),
+            Map.entry("nasa_call",        Material.FIREWORK_ROCKET),
+            Map.entry("slippery_ground",  Material.PACKED_ICE),
+            Map.entry("hell_is_calling",  Material.FIRE_CHARGE),
+            Map.entry("tnt_rain",         Material.TNT_MINECART),
+            Map.entry("anvil_rain",       Material.ANVIL),
+            Map.entry("skyblock",         Material.GRASS_BLOCK),
+            Map.entry("fake_totem",       Material.TOTEM_OF_UNDYING),
+            Map.entry("equipment_shuffle",Material.SMITHING_TABLE),
+            Map.entry("permanent_hearts", Material.HEART_OF_THE_SEA)
     );
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // MAIN
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── MAIN ────────────────────────────────────────────────────────────────
     public void openMain(Player p) {
         Inventory inv = Bukkit.createInventory(p, 27, i18n.tr(p, "gui.titles.main"));
         FileConfiguration cfg = plugin.getConfig();
@@ -72,322 +71,155 @@ public class ConfigGui {
             String fallback = cfg.getString("twitch.channel", "");
             if (fallback != null && !fallback.isBlank()) channels = List.of(fallback);
         }
-        String channelDisplay = (channels == null || channels.isEmpty())
-                ? "(leer/empty)" : String.join(", ", channels);
-
+        String channelDisplay = (channels == null || channels.isEmpty()) ? "(leer/empty)" : String.join(", ", channels);
         String token = String.valueOf(cfg.getString("twitch.oauth_token", ""));
-
         Map<String, String> ph = new HashMap<>();
         ph.put("channel", channelDisplay);
         ph.put("token_masked", token.isBlank() ? "(leer/empty)" : mask(token));
 
-        inv.setItem(0, tag(MenuType.MAIN,
-                item(Material.BOOK,
-                        i18n.tr(p, "gui.main.twitch_info_name"),
-                        i18n.trList(p, "gui.main.twitch_info_lore", ph)),
-                "edit_twitch", null, null));
-
-        inv.setItem(4, tag(MenuType.MAIN,
-                item(Material.CHEST,
-                        i18n.tr(p, "gui.main.misc_name"),
-                        i18n.trList(p, "gui.main.misc_lore")),
-                "open_misc", null, null));
-
-        inv.setItem(8, tag(MenuType.MAIN,
-                item(Material.KNOWLEDGE_BOOK,
-                        i18n.tr(p, "gui.main.ui_language_name"),
-                        i18n.trList(p, "gui.main.ui_language_lore")),
-                "open_lang", null, null));
-
-        inv.setItem(11, tag(MenuType.MAIN,
-                item(Material.COMMAND_BLOCK,
-                        i18n.tr(p, "gui.main.debug_name"),
-                        i18n.trList(p, "gui.main.debug_lore")),
-                "open_debug", null, null));
-
-        inv.setItem(13, tag(MenuType.MAIN,
-                item(Material.GOLD_INGOT,
-                        i18n.tr(p, "gui.main.trigger_name"),
-                        i18n.trList(p, "gui.main.trigger_lore")),
-                "open_trigger", null, null));
-
-        inv.setItem(15, tag(MenuType.MAIN,
-                item(Material.PAPER,
-                        i18n.tr(p, "gui.main.weights_name"),
-                        i18n.trList(p, "gui.main.weights_lore")),
-                "open_weights", null, null));
-
-        inv.setItem(18, tag(MenuType.MAIN,
-                item(Material.REPEATER,
-                        i18n.tr(p, "gui.common.save_reconnect_name"),
-                        i18n.trList(p, "gui.common.save_reconnect_lore")),
-                "save_reconnect", null, null));
-
-        inv.setItem(21, tag(MenuType.MAIN,
-                item(Material.LIME_DYE,
-                        i18n.tr(p, "gui.main.timer_start"),
-                        i18n.trList(p, "gui.main.timer_start_lore")),
-                "timer_start", null, null));
-        inv.setItem(22, tag(MenuType.MAIN,
-                item(Material.ORANGE_DYE,
-                        i18n.tr(p, "gui.main.timer_stop"),
-                        i18n.trList(p, "gui.main.timer_stop_lore")),
-                "timer_stop", null, null));
-        inv.setItem(23, tag(MenuType.MAIN,
-                item(Material.RED_DYE,
-                        i18n.tr(p, "gui.main.timer_reset"),
-                        i18n.trList(p, "gui.main.timer_reset_lore")),
-                "timer_reset", null, null));
-
-        inv.setItem(26, tag(MenuType.MAIN,
-                item(Material.BARRIER,
-                        i18n.tr(p, "gui.main.close"), null),
-                "close", null, null));
-
+        inv.setItem(0, tag(MenuType.MAIN, item(Material.BOOK, i18n.tr(p,"gui.main.twitch_info_name"), i18n.trList(p,"gui.main.twitch_info_lore",ph)), "edit_twitch",null,null));
+        inv.setItem(4, tag(MenuType.MAIN, item(Material.CHEST, i18n.tr(p,"gui.main.misc_name"), i18n.trList(p,"gui.main.misc_lore")), "open_misc",null,null));
+        inv.setItem(8, tag(MenuType.MAIN, item(Material.KNOWLEDGE_BOOK, i18n.tr(p,"gui.main.ui_language_name"), i18n.trList(p,"gui.main.ui_language_lore")), "open_lang",null,null));
+        inv.setItem(11, tag(MenuType.MAIN, item(Material.COMMAND_BLOCK, i18n.tr(p,"gui.main.debug_name"), i18n.trList(p,"gui.main.debug_lore")), "open_debug",null,null));
+        inv.setItem(13, tag(MenuType.MAIN, item(Material.GOLD_INGOT, i18n.tr(p,"gui.main.trigger_name"), i18n.trList(p,"gui.main.trigger_lore")), "open_trigger",null,null));
+        inv.setItem(15, tag(MenuType.MAIN, item(Material.PAPER, i18n.tr(p,"gui.main.weights_name"), i18n.trList(p,"gui.main.weights_lore")), "open_weights",null,null));
+        inv.setItem(18, tag(MenuType.MAIN, item(Material.REPEATER, i18n.tr(p,"gui.common.save_reconnect_name"), i18n.trList(p,"gui.common.save_reconnect_lore")), "save_reconnect",null,null));
+        inv.setItem(21, tag(MenuType.MAIN, item(Material.LIME_DYE, i18n.tr(p,"gui.main.timer_start"), i18n.trList(p,"gui.main.timer_start_lore")), "timer_start",null,null));
+        inv.setItem(22, tag(MenuType.MAIN, item(Material.ORANGE_DYE, i18n.tr(p,"gui.main.timer_stop"), i18n.trList(p,"gui.main.timer_stop_lore")), "timer_stop",null,null));
+        inv.setItem(23, tag(MenuType.MAIN, item(Material.RED_DYE, i18n.tr(p,"gui.main.timer_reset"), i18n.trList(p,"gui.main.timer_reset_lore")), "timer_reset",null,null));
+        inv.setItem(26, tag(MenuType.MAIN, item(Material.BARRIER, i18n.tr(p,"gui.main.close"),null), "close",null,null));
         fillEmptyWithPane(inv);
         p.openInventory(inv);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // TRIGGER  (54 slots)
-    //
-    // Row 0 (0–8):   [leer]
-    // Row 1 (9–17):  _ 10=Subs 11=Bits _ _ 14=SE 15=Tipeee _ _
-    // Row 2 (18–26): [leer]
-    // Row 3 (27–35): _ _ _ 30=Uhr _ 32=Sunflower _ _ _
-    // Row 4 (36–44): [leer]
-    // Row 5 (45–53): 45=Repeater _ _ _ _ _ _ _ 53=Pfeil
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── TRIGGER ─────────────────────────────────────────────────────────────
     public void openTrigger(Player p) {
         Inventory inv = Bukkit.createInventory(p, 54, i18n.tr(p, "gui.titles.trigger"));
         FileConfiguration cfg = plugin.getConfig();
         DonationsManager don = plugin.getDonations();
 
-        // ── Row 1: Zwei Gruppen mit Gap ──────────────────────────────────────
-        inv.setItem(10, toggle(p, MenuType.TRIGGER, "twitch.triggers.subscriptions.enabled",
-                i18n.tr(p, "gui.trigger.subs_toggle")));
+        inv.setItem(10, toggle(p, MenuType.TRIGGER, "twitch.triggers.subscriptions.enabled", i18n.tr(p,"gui.trigger.subs_toggle")));
+        inv.setItem(11, toggle(p, MenuType.TRIGGER, "twitch.triggers.bits.enabled", i18n.tr(p,"gui.trigger.bits_toggle")));
 
-        inv.setItem(11, toggle(p, MenuType.TRIGGER, "twitch.triggers.bits.enabled",
-                i18n.tr(p, "gui.trigger.bits_toggle")));
-
-        // SE toggle (Slot 14 — nach Gap)
         {
             boolean seEnabled = don != null && don.getSeEnabled();
             Material mat = seEnabled ? Material.LIME_DYE : Material.GRAY_DYE;
-            Map<String, String> phSE = Map.of("label", i18n.tr(p, "gui.trigger.se_toggle"));
+            Map<String,String> phSE = Map.of("label", i18n.tr(p,"gui.trigger.se_toggle"));
             String name = i18n.tr(p, seEnabled ? "toggles.on_prefix" : "toggles.off_prefix", phSE);
-            ItemStack it = item(mat, name, List.of(ChatColor.GRAY + "Klick/Click to toggle"));
-            inv.setItem(14, tag(MenuType.TRIGGER, it, "toggle_se", null, null));
+            inv.setItem(14, tag(MenuType.TRIGGER, item(mat, name, List.of(ChatColor.GRAY+"Klick/Click to toggle")), "toggle_se",null,null));
         }
-
-        // Tipeeestream toggle (Slot 15 — direkt nach SE)
         {
             boolean tipeeeEnabled = don != null && don.getTipeeeEnabled();
             Material mat = tipeeeEnabled ? Material.LIME_DYE : Material.GRAY_DYE;
-            Map<String, String> phT = Map.of("label", i18n.tr(p, "gui.trigger.tipeee_toggle"));
+            Map<String,String> phT = Map.of("label", i18n.tr(p,"gui.trigger.tipeee_toggle"));
             String name = i18n.tr(p, tipeeeEnabled ? "toggles.on_prefix" : "toggles.off_prefix", phT);
-            ItemStack it = item(mat, name, List.of(ChatColor.GRAY + "Klick/Click to toggle"));
-            inv.setItem(15, tag(MenuType.TRIGGER, it, "toggle_tipeee", null, null));
+            inv.setItem(15, tag(MenuType.TRIGGER, item(mat, name, List.of(ChatColor.GRAY+"Klick/Click to toggle")), "toggle_tipeee",null,null));
         }
 
-        // ── Row 2: Uhr (21) und Sunflower (23) nebeneinander, mittig ─────────
         double euroPerEvent = don != null ? don.getEuroPerEvent() : 5.0;
         int bitsPerEvent = don != null ? don.getBitsPerEvent() : 500;
         int eventsPerSub = don != null ? don.getEventsPerSub() : 1;
-
-        Map<String, String> phVal = new HashMap<>();
-        phVal.put("euro", String.format(Locale.US, "%.1f", euroPerEvent));
+        Map<String,String> phVal = new HashMap<>();
+        phVal.put("euro", String.format(Locale.US,"%.1f",euroPerEvent));
         phVal.put("bits", String.valueOf(bitsPerEvent));
         phVal.put("sub_events", String.valueOf(eventsPerSub));
 
         double seconds = cfg.getDouble("twitch.trigger_interval_seconds", 1.0);
-        Map<String, String> phInt = Map.of("seconds", String.format(Locale.US, "%.2f", seconds));
-        inv.setItem(30, tag(MenuType.TRIGGER,
-                item(Material.CLOCK,
-                        i18n.tr(p, "gui.trigger.interval_name", phInt),
-                        i18n.trList(p, "gui.trigger.interval_lore")),
-                "adjust_double_interval", "twitch.trigger_interval_seconds", null));
-
-        inv.setItem(32, tag(MenuType.TRIGGER,
-                item(Material.SUNFLOWER,
-                        i18n.tr(p, "gui.trigger.value_name", phVal),
-                        i18n.trList(p, "gui.trigger.value_lore", phVal)),
-                "adjust_euro_per_event", null, null));
-
-        // ── Row 5: Save + Back ───────────────────────────────────────────────
-        inv.setItem(45, tag(MenuType.TRIGGER,
-                item(Material.REPEATER,
-                        i18n.tr(p, "gui.common.save_reconnect_name"),
-                        i18n.trList(p, "gui.common.save_reconnect_lore")),
-                "save_reconnect", null, null));
-
-        inv.setItem(53, tag(MenuType.TRIGGER,
-                item(Material.ARROW, i18n.tr(p, "gui.common.back"), null),
-                "back_main", null, null));
-
+        Map<String,String> phInt = Map.of("seconds", String.format(Locale.US,"%.2f",seconds));
+        inv.setItem(30, tag(MenuType.TRIGGER, item(Material.CLOCK, i18n.tr(p,"gui.trigger.interval_name",phInt), i18n.trList(p,"gui.trigger.interval_lore")), "adjust_double_interval","twitch.trigger_interval_seconds",null));
+        inv.setItem(32, tag(MenuType.TRIGGER, item(Material.SUNFLOWER, i18n.tr(p,"gui.trigger.value_name",phVal), i18n.trList(p,"gui.trigger.value_lore",phVal)), "adjust_euro_per_event",null,null));
+        inv.setItem(45, tag(MenuType.TRIGGER, item(Material.REPEATER, i18n.tr(p,"gui.common.save_reconnect_name"), i18n.trList(p,"gui.common.save_reconnect_lore")), "save_reconnect",null,null));
+        inv.setItem(53, tag(MenuType.TRIGGER, item(Material.ARROW, i18n.tr(p,"gui.common.back"),null), "back_main",null,null));
         fillEmptyWithPane(inv);
         p.openInventory(inv);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // DEBUG
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── DEBUG ───────────────────────────────────────────────────────────────
     public void openDebug(Player p) {
         Inventory inv = Bukkit.createInventory(p, 27, i18n.tr(p, "gui.titles.debug"));
-
-        inv.setItem(18, tag(MenuType.DEBUG,
-                item(Material.REPEATER,
-                        i18n.tr(p, "gui.common.save_reconnect_name"),
-                        i18n.trList(p, "gui.common.save_reconnect_lore")),
-                "save_reconnect", null, null));
-
-        inv.setItem(11, toggle(p, MenuType.DEBUG, "twitch.triggers.chat_test.enabled", i18n.tr(p, "gui.debug.test_toggle")));
-        inv.setItem(13, toggle(p, MenuType.DEBUG, "twitch.triggers.sim_gift.enabled", i18n.tr(p, "gui.debug.gift_toggle")));
-        inv.setItem(15, toggle(p, MenuType.DEBUG, "twitch.triggers.sim_giftbomb.enabled", i18n.tr(p, "gui.debug.giftbomb_toggle")));
-
-        inv.setItem(26, tag(MenuType.DEBUG,
-                item(Material.ARROW, i18n.tr(p, "gui.common.back"), null),
-                "back_main", null, null));
-
+        inv.setItem(11, toggle(p, MenuType.DEBUG, "twitch.triggers.chat_test.enabled", i18n.tr(p,"gui.debug.test_toggle")));
+        inv.setItem(13, toggle(p, MenuType.DEBUG, "twitch.triggers.sim_gift.enabled", i18n.tr(p,"gui.debug.gift_toggle")));
+        inv.setItem(15, toggle(p, MenuType.DEBUG, "twitch.triggers.sim_giftbomb.enabled", i18n.tr(p,"gui.debug.giftbomb_toggle")));
+        inv.setItem(18, tag(MenuType.DEBUG, item(Material.REPEATER, i18n.tr(p,"gui.common.save_reconnect_name"), i18n.trList(p,"gui.common.save_reconnect_lore")), "save_reconnect",null,null));
+        inv.setItem(26, tag(MenuType.DEBUG, item(Material.ARROW, i18n.tr(p,"gui.common.back"),null), "back_main",null,null));
         fillEmptyWithPane(inv);
         p.openInventory(inv);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // WEIGHTS
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── WEIGHTS ─────────────────────────────────────────────────────────────
     public void openWeights(Player p) {
         int size = 54;
         Inventory inv = Bukkit.createInventory(p, size, i18n.tr(p, "gui.titles.weights"));
         FileConfiguration cfg = plugin.getConfig();
-
         int slot = 0;
         for (String key : RandomEventCommand.EVENT_KEYS_ORDER) {
             int w = Math.max(0, cfg.getInt("events.weights." + key, 0));
             String eventName = i18n.tr(p, "event.name." + key);
-            Map<String, String> ph = Map.of("key", eventName, "weight", String.valueOf(w));
+            Map<String,String> ph = Map.of("key", eventName, "weight", String.valueOf(w));
             Material icon = EVENT_ICON.getOrDefault(key, Material.PAPER);
-            inv.setItem(slot++, tag(MenuType.WEIGHTS,
-                    item(icon,
-                            i18n.tr(p, "gui.weights.paper_name", ph),
-                            i18n.trList(p, "gui.weights.paper_lore", ph)),
-                    "weight_adjust", "events.weights." + key, key));
+            inv.setItem(slot++, tag(MenuType.WEIGHTS, item(icon, i18n.tr(p,"gui.weights.paper_name",ph), i18n.trList(p,"gui.weights.paper_lore",ph)), "weight_adjust","events.weights."+key,key));
         }
-
-        inv.setItem(45, tag(MenuType.WEIGHTS,
-                item(Material.REPEATER,
-                        i18n.tr(p, "gui.common.save_reconnect_name"),
-                        i18n.trList(p, "gui.common.save_reconnect_lore")),
-                "save_reconnect", null, null));
-
-        inv.setItem(46, item(Material.GRAY_STAINED_GLASS_PANE, " ", null));
-        inv.setItem(47, item(Material.GRAY_STAINED_GLASS_PANE, " ", null));
-        inv.setItem(48, item(Material.GRAY_STAINED_GLASS_PANE, " ", null));
-
-        inv.setItem(49, tag(MenuType.WEIGHTS,
-                item(Material.BARRIER,
-                        i18n.tr(p, "gui.weights.reset_defaults_name"),
-                        i18n.trList(p, "gui.weights.reset_defaults_lore")),
-                "reset_weights_defaults", null, null));
-
-        inv.setItem(50, item(Material.GRAY_STAINED_GLASS_PANE, " ", null));
-        inv.setItem(51, item(Material.GRAY_STAINED_GLASS_PANE, " ", null));
-        inv.setItem(52, item(Material.GRAY_STAINED_GLASS_PANE, " ", null));
-
-        inv.setItem(size - 1, tag(MenuType.WEIGHTS,
-                item(Material.ARROW, i18n.tr(p, "gui.common.back"), null),
-                "back_main", null, null));
-
+        inv.setItem(45, tag(MenuType.WEIGHTS, item(Material.REPEATER, i18n.tr(p,"gui.common.save_reconnect_name"), i18n.trList(p,"gui.common.save_reconnect_lore")), "save_reconnect",null,null));
+        inv.setItem(46, item(Material.GRAY_STAINED_GLASS_PANE," ",null));
+        inv.setItem(47, item(Material.GRAY_STAINED_GLASS_PANE," ",null));
+        inv.setItem(48, item(Material.GRAY_STAINED_GLASS_PANE," ",null));
+        inv.setItem(49, tag(MenuType.WEIGHTS, item(Material.BARRIER, i18n.tr(p,"gui.weights.reset_defaults_name"), i18n.trList(p,"gui.weights.reset_defaults_lore")), "reset_weights_defaults",null,null));
+        inv.setItem(50, item(Material.GRAY_STAINED_GLASS_PANE," ",null));
+        inv.setItem(51, item(Material.GRAY_STAINED_GLASS_PANE," ",null));
+        inv.setItem(52, item(Material.GRAY_STAINED_GLASS_PANE," ",null));
+        inv.setItem(size-1, tag(MenuType.WEIGHTS, item(Material.ARROW, i18n.tr(p,"gui.common.back"),null), "back_main",null,null));
         p.openInventory(inv);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // MISC
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── MISC ────────────────────────────────────────────────────────────────
     public void openMisc(Player p) {
         Inventory inv = Bukkit.createInventory(p, 27, i18n.tr(p, "gui.titles.misc"));
-
-        inv.setItem(18, tag(MenuType.MISC,
-                item(Material.REPEATER,
-                        i18n.tr(p, "gui.common.save_reconnect_name"),
-                        i18n.trList(p, "gui.common.save_reconnect_lore")),
-                "save_reconnect", null, null));
-
-        inv.setItem(11, toggle(p, MenuType.MISC,
-                "challenge.auto_spectator_on_death",
-                i18n.tr(p, "gui.misc.spectator_toggle")));
-
+        inv.setItem(18, tag(MenuType.MISC, item(Material.REPEATER, i18n.tr(p,"gui.common.save_reconnect_name"), i18n.trList(p,"gui.common.save_reconnect_lore")), "save_reconnect",null,null));
+        inv.setItem(11, toggle(p, MenuType.MISC, "challenge.auto_spectator_on_death", i18n.tr(p,"gui.misc.spectator_toggle")));
         int deaths = plugin.getDeathCounter() != null ? plugin.getDeathCounter().get() : 0;
-        Map<String, String> ph = Map.of("value", String.valueOf(deaths));
-        inv.setItem(13, tag(MenuType.MISC,
-                item(Material.SKELETON_SKULL,
-                        i18n.tr(p, "gui.misc.deaths_name", ph),
-                        i18n.trList(p, "gui.misc.deaths_lore")),
-                "misc_deaths_adjust", null, null));
-
-        inv.setItem(15, tag(MenuType.MISC,
-                item(Material.TNT,
-                        i18n.tr(p, "gui.misc.reset_button_name"),
-                        i18n.trList(p, "gui.misc.reset_button_lore")),
-                "misc_reset_confirm", null, null));
-
-        inv.setItem(26, tag(MenuType.MISC,
-                item(Material.ARROW, i18n.tr(p, "gui.common.back"), null),
-                "back_main", null, null));
-
+        Map<String,String> ph = Map.of("value", String.valueOf(deaths));
+        inv.setItem(13, tag(MenuType.MISC, item(Material.SKELETON_SKULL, i18n.tr(p,"gui.misc.deaths_name",ph), i18n.trList(p,"gui.misc.deaths_lore")), "misc_deaths_adjust",null,null));
+        // TNT-Button öffnet Bestätigungs-Seite (nicht mehr direkt /reset)
+        inv.setItem(15, tag(MenuType.MISC, item(Material.TNT, i18n.tr(p,"gui.misc.reset_button_name"), i18n.trList(p,"gui.misc.reset_button_lore")), "misc_open_reset_confirm",null,null));
+        inv.setItem(26, tag(MenuType.MISC, item(Material.ARROW, i18n.tr(p,"gui.common.back"),null), "back_main",null,null));
         fillEmptyWithPane(inv);
         p.openInventory(inv);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // LANGUAGE
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── RESET CONFIRM ───────────────────────────────────────────────────────
+    public void openResetConfirm(Player p) {
+        Inventory inv = Bukkit.createInventory(p, 27, i18n.tr(p, "gui.titles.reset_confirm"));
+        inv.setItem(11, tag(MenuType.RESET_CONFIRM, item(Material.RED_TERRACOTTA, i18n.tr(p,"gui.reset_confirm.cancel_name"), i18n.trList(p,"gui.reset_confirm.cancel_lore")), "reset_confirm_cancel",null,null));
+        inv.setItem(13, tag(MenuType.RESET_CONFIRM, item(Material.TNT, i18n.tr(p,"gui.reset_confirm.title_name"), i18n.trList(p,"gui.reset_confirm.title_lore")), "noop",null,null));
+        inv.setItem(15, tag(MenuType.RESET_CONFIRM, item(Material.LIME_TERRACOTTA, i18n.tr(p,"gui.reset_confirm.confirm_name"), i18n.trList(p,"gui.reset_confirm.confirm_lore")), "reset_confirm_execute",null,null));
+        inv.setItem(26, tag(MenuType.RESET_CONFIRM, item(Material.ARROW, i18n.tr(p,"gui.common.back"),null), "back_misc",null,null));
+        fillEmptyWithPane(inv);
+        p.openInventory(inv);
+    }
+
+    // ─── LANGUAGE ────────────────────────────────────────────────────────────
     public void openLanguage(Player p) {
         Inventory inv = Bukkit.createInventory(p, 27, i18n.tr(p, "gui.titles.ui_language"));
         String cur = i18n.currentLanguage(p);
-
-        inv.setItem(11, tag(MenuType.LANGUAGE,
-                item(Material.YELLOW_DYE,
-                        i18n.tr(p, "gui.lang.de_name"),
-                        mergeLore(i18n.trList(p, "gui.lang.de_lore"),
-                                i18n.tr(p, "gui.lang.current_prefix", Map.of("lang", "de")),
-                                "de".equals(cur))),
-                "lang_set", null, "de"));
-
-        inv.setItem(13, tag(MenuType.LANGUAGE,
-                item(Material.LIGHT_BLUE_DYE,
-                        i18n.tr(p, "gui.lang.en_name"),
-                        mergeLore(i18n.trList(p, "gui.lang.en_lore"),
-                                i18n.tr(p, "gui.lang.current_prefix", Map.of("lang", "en")),
-                                "en".equals(cur))),
-                "lang_set", null, "en"));
-
-        inv.setItem(26, tag(MenuType.LANGUAGE,
-                item(Material.ARROW, i18n.tr(p, "gui.common.back"), null),
-                "back_main", null, null));
-
+        inv.setItem(11, tag(MenuType.LANGUAGE, item(Material.YELLOW_DYE, i18n.tr(p,"gui.lang.de_name"), mergeLore(i18n.trList(p,"gui.lang.de_lore"), i18n.tr(p,"gui.lang.current_prefix",Map.of("lang","de")), "de".equals(cur))), "lang_set",null,"de"));
+        inv.setItem(13, tag(MenuType.LANGUAGE, item(Material.LIGHT_BLUE_DYE, i18n.tr(p,"gui.lang.en_name"), mergeLore(i18n.trList(p,"gui.lang.en_lore"), i18n.tr(p,"gui.lang.current_prefix",Map.of("lang","en")), "en".equals(cur))), "lang_set",null,"en"));
+        inv.setItem(26, tag(MenuType.LANGUAGE, item(Material.ARROW, i18n.tr(p,"gui.common.back"),null), "back_main",null,null));
         fillEmptyWithPane(inv);
         p.openInventory(inv);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
-
+    // ─── Helpers ─────────────────────────────────────────────────────────────
     private void fillEmptyWithPane(Inventory inv) {
         ItemStack pane = item(Material.GRAY_STAINED_GLASS_PANE, " ", null);
-        for (int i = 0; i < inv.getSize(); i++) {
-            if (inv.getItem(i) == null) inv.setItem(i, pane);
-        }
+        for (int i = 0; i < inv.getSize(); i++) { if (inv.getItem(i) == null) inv.setItem(i, pane); }
     }
 
     private ItemStack toggle(Player p, MenuType menu, String path, String label) {
         boolean val = plugin.getConfig().getBoolean(path, false);
         Material mat = val ? Material.LIME_DYE : Material.GRAY_DYE;
-        Map<String, String> ph = Map.of("label", label);
+        Map<String,String> ph = Map.of("label", label);
         String name = i18n.tr(p, val ? "toggles.on_prefix" : "toggles.off_prefix", ph);
-        List<String> lore = List.of(ChatColor.GRAY + "Klick/Click to toggle");
-        ItemStack it = item(mat, name, lore);
+        ItemStack it = item(mat, name, List.of(ChatColor.GRAY + "Klick/Click to toggle"));
         return tag(menu, it, "toggle", path, null);
     }
 
@@ -396,9 +228,7 @@ public class ConfigGui {
         ItemMeta meta = it.getItemMeta();
         meta.setDisplayName(name);
         if (lore != null) meta.setLore(new ArrayList<>(lore));
-        addFlag(meta, "HIDE_ATTRIBUTES");
-        addFlag(meta, "HIDE_POTION_EFFECTS");
-        addFlag(meta, "HIDE_ENCHANTS");
+        addFlag(meta, "HIDE_ATTRIBUTES"); addFlag(meta, "HIDE_POTION_EFFECTS"); addFlag(meta, "HIDE_ENCHANTS");
         it.setItemMeta(meta);
         return it;
     }
@@ -411,15 +241,14 @@ public class ConfigGui {
     }
 
     private void addFlag(ItemMeta meta, String flagName) {
-        try { meta.addItemFlags(ItemFlag.valueOf(flagName)); }
-        catch (IllegalArgumentException ignored) {}
+        try { meta.addItemFlags(ItemFlag.valueOf(flagName)); } catch (IllegalArgumentException ignored) {}
     }
 
     private ItemStack tag(MenuType type, ItemStack it, String action, String path, String extra) {
         ItemMeta m = it.getItemMeta();
         m.getPersistentDataContainer().set(keyMenu, PersistentDataType.STRING, type.name());
         m.getPersistentDataContainer().set(keyAction, PersistentDataType.STRING, action);
-        if (path != null) m.getPersistentDataContainer().set(keyPath, PersistentDataType.STRING, path);
+        if (path  != null) m.getPersistentDataContainer().set(keyPath,  PersistentDataType.STRING, path);
         if (extra != null) m.getPersistentDataContainer().set(keyExtra, PersistentDataType.STRING, extra);
         it.setItemMeta(m);
         return it;
@@ -428,7 +257,7 @@ public class ConfigGui {
     private String mask(String s) {
         if (s == null || s.isBlank()) return "(leer/empty)";
         int vis = Math.min(4, s.length());
-        return "*".repeat(Math.max(0, s.length() - vis)) + s.substring(s.length() - vis);
+        return "*".repeat(Math.max(0, s.length()-vis)) + s.substring(s.length()-vis);
     }
 
     public boolean isOurInventory(Inventory inv) {
@@ -448,8 +277,7 @@ public class ConfigGui {
         if (m == null) return null;
         String type = m.getPersistentDataContainer().get(keyMenu, PersistentDataType.STRING);
         if (type == null) return null;
-        try { return MenuType.valueOf(type); }
-        catch (Exception e) { return null; }
+        try { return MenuType.valueOf(type); } catch (Exception e) { return null; }
     }
 
     public String getAction(ItemStack it) {

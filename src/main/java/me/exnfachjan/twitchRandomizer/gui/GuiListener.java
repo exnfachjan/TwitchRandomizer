@@ -9,11 +9,11 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerEditBookEvent;
-import org.bukkit.event.EventPriority;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -24,6 +24,7 @@ import org.bukkit.persistence.PersistentDataType;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class GuiListener implements Listener {
 
@@ -48,7 +49,6 @@ public class GuiListener implements Listener {
     public void onInvClick(InventoryClickEvent e) {
         Inventory top = e.getView().getTopInventory();
         if (!gui.isOurInventory(top)) return;
-
         e.setCancelled(true);
 
         ItemStack clicked = e.getCurrentItem();
@@ -67,20 +67,16 @@ public class GuiListener implements Listener {
 
         switch (action) {
             case "noop" -> { return; }
-            case "close" -> {
-                doAutoSave();
-                p.closeInventory();
-                return;
-            }
+            case "close" -> { doAutoSave(); p.closeInventory(); return; }
         }
 
         if (!hasGUIAll && !p.hasPermission("twitchrandomizer.gui.use")) {
-            p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.gui.use");
-            return;
+            p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.gui.use"); return;
         }
 
         switch (action) {
             case "back_main" -> { doAutoSave(); gui.openMain(p); }
+            case "back_misc" -> { doAutoSave(); gui.openMisc(p); }
             case "open_trigger" -> gui.openTrigger(p);
             case "open_debug"   -> gui.openDebug(p);
             case "open_weights" -> gui.openWeights(p);
@@ -88,130 +84,87 @@ public class GuiListener implements Listener {
             case "open_lang"    -> gui.openLanguage(p);
 
             case "timer_start" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.timer.start"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.timer.start"); return;
-                }
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.timer.start"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.timer.start"); return; }
                 try { plugin.getTimerManager().start(); } catch (Throwable ignored) {}
                 refreshMenu(type, p);
             }
             case "timer_stop" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.timer.stop"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.timer.stop"); return;
-                }
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.timer.stop"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.timer.stop"); return; }
                 try { plugin.getTimerManager().stop(); } catch (Throwable ignored) {}
                 refreshMenu(type, p);
             }
             case "timer_reset" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.timer.reset"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.timer.reset"); return;
-                }
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.timer.reset"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.timer.reset"); return; }
                 try { plugin.getTimerManager().reset(); } catch (Throwable ignored) {}
                 refreshMenu(type, p);
             }
 
             case "save_reconnect" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.save"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.save"); return;
-                }
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.save"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.save"); return; }
                 try { plugin.saveConfig(); } catch (Throwable ignored) {}
                 try { plugin.applyDynamicConfig(); } catch (Throwable ignored) {}
                 p.sendMessage(plugin.getMessages().tr(p, "commands.saved_and_reconfigured"));
             }
 
             case "toggle" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.edit"); return;
-                }
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.edit"); return; }
                 FileConfiguration cfg = plugin.getConfig();
                 boolean cur = cfg.getBoolean(path, false);
                 cfg.set(path, !cur);
                 try { plugin.saveConfig(); } catch (Throwable ignored) {}
                 try { plugin.applyDynamicConfig(); } catch (Throwable ignored) {}
-                p.sendMessage(ChatColor.GREEN + "Umschalter: " + ChatColor.AQUA + path + ChatColor.GRAY + " = " + ChatColor.WHITE + !cur);
+                p.sendMessage(ChatColor.GREEN+"Umschalter: "+ChatColor.AQUA+path+ChatColor.GRAY+" = "+ChatColor.WHITE+ !cur);
                 refreshMenu(type, p);
             }
 
-            // SE toggle via DonationsManager
             case "toggle_se" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.edit"); return;
-                }
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.edit"); return; }
                 DonationsManager don = plugin.getDonations();
-                if (don != null) {
-                    boolean cur = don.getSeEnabled();
-                    don.setSeEnabled(!cur);
-                    p.sendMessage(ChatColor.GREEN + "StreamElements: " + ChatColor.WHITE + (!cur ? "aktiviert" : "deaktiviert"));
-                }
+                if (don != null) { boolean cur = don.getSeEnabled(); don.setSeEnabled(!cur); p.sendMessage(ChatColor.GREEN+"StreamElements: "+ChatColor.WHITE+(!cur?"aktiviert":"deaktiviert")); }
                 refreshMenu(type, p);
             }
 
-            // Tipeeestream toggle via DonationsManager
             case "toggle_tipeee" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.edit"); return;
-                }
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.edit"); return; }
                 DonationsManager don = plugin.getDonations();
-                if (don != null) {
-                    boolean cur = don.getTipeeeEnabled();
-                    don.setTipeeeEnabled(!cur);
-                    p.sendMessage(ChatColor.GREEN + "Tipeeestream: " + ChatColor.WHITE + (!cur ? "aktiviert" : "deaktiviert"));
-                }
+                if (don != null) { boolean cur = don.getTipeeeEnabled(); don.setTipeeeEnabled(!cur); p.sendMessage(ChatColor.GREEN+"Tipeeestream: "+ChatColor.WHITE+(!cur?"aktiviert":"deaktiviert")); }
                 refreshMenu(type, p);
             }
 
-            // Universal value button: adjust euroPerEvent
             case "adjust_euro_per_event" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.edit"); return;
-                }
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.edit"); return; }
                 DonationsManager don = plugin.getDonations();
                 if (don == null) return;
-
-                double step  = e.isShiftClick() ? 1.0 : 0.5;
+                double step = e.isShiftClick() ? 1.0 : 0.5;
                 double delta = e.isRightClick() ? +step : -step;
                 double cur = don.getEuroPerEvent();
-                // FIX: Maximum ist der Standard-Preis (SUB_VALUE_EURO = 5.0€), Minimum ist MIN_EURO_PER_EVENT (1.0€)
-                double val = Math.min(DonationsManager.MAX_EURO_PER_EVENT,
-                             Math.max(DonationsManager.MIN_EURO_PER_EVENT, Math.round((cur + delta) * 10.0) / 10.0));
-
+                double val = Math.min(DonationsManager.MAX_EURO_PER_EVENT, Math.max(DonationsManager.MIN_EURO_PER_EVENT, Math.round((cur+delta)*10.0)/10.0));
                 don.setEuroPerEvent(val);
-
-                int newBits = don.getBitsPerEvent();
-                int newSubEvents = don.getEventsPerSub();
-
-                p.sendMessage(ChatColor.GREEN + "Wert/Event: " + ChatColor.WHITE + cur + "€"
-                        + ChatColor.GRAY + " → " + ChatColor.AQUA + val + "€"
-                        + ChatColor.GRAY + " | Bits: " + ChatColor.WHITE + newBits
-                        + ChatColor.GRAY + " | Sub: " + ChatColor.WHITE + newSubEvents + " Events");
+                p.sendMessage(ChatColor.GREEN+"Wert/Event: "+ChatColor.WHITE+cur+"€"+ChatColor.GRAY+" → "+ChatColor.AQUA+val+"€");
                 refreshMenu(type, p);
             }
 
             case "adjust_double_interval" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.edit"); return;
-                }
-                double step  = e.isShiftClick() ? 1.0 : 0.5;
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.edit"); return; }
+                double step = e.isShiftClick() ? 1.0 : 0.5;
                 double delta = e.isRightClick() ? +step : -step;
                 FileConfiguration cfg = plugin.getConfig();
                 double cur = cfg.getDouble(path, 1.0);
-                double val = Math.max(0.05, cur + delta);
+                double val = Math.max(0.05, cur+delta);
                 cfg.set(path, val);
                 try { plugin.saveConfig(); } catch (Throwable ignored) {}
                 try { plugin.applyDynamicConfig(); } catch (Throwable ignored) {}
                 refreshMenu(type, p);
-                p.sendMessage(ChatColor.GREEN + "Intervall: " + ChatColor.WHITE + String.format("%.2f", cur) + "s"
-                        + ChatColor.GRAY + " → " + ChatColor.AQUA + String.format("%.2f", val) + "s");
+                p.sendMessage(ChatColor.GREEN+"Intervall: "+ChatColor.WHITE+String.format("%.2f",cur)+"s"+ChatColor.GRAY+" → "+ChatColor.AQUA+String.format("%.2f",val)+"s");
             }
 
             case "weight_adjust" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.edit"); return;
-                }
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.edit"); return; }
                 int step = e.isShiftClick() ? 10 : 1;
                 int delta = e.isRightClick() ? +step : -step;
                 FileConfiguration cfg = plugin.getConfig();
                 int cur = Math.max(0, cfg.getInt(path, 0));
-                int val = Math.max(0, cur + delta);
+                int val = Math.max(0, cur+delta);
                 cfg.set(path, val);
                 try { plugin.saveConfig(); } catch (Throwable ignored) {}
                 try { plugin.applyDynamicConfig(); } catch (Throwable ignored) {}
@@ -219,66 +172,59 @@ public class GuiListener implements Listener {
             }
 
             case "reset_weights_defaults" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.edit"); return;
-                }
-                Map<String, Integer> defaults = plugin.getDefaultWeights();
-                for (Map.Entry<String, Integer> entry : defaults.entrySet()) {
-                    plugin.getConfig().set("events.weights." + entry.getKey(), entry.getValue());
-                }
-                plugin.saveConfig();
-                plugin.applyDynamicConfig();
-                p.sendMessage(ChatColor.GREEN + "Alle Gewichte wurden auf Standardwerte zurückgesetzt!");
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.edit"); return; }
+                Map<String,Integer> defaults = plugin.getDefaultWeights();
+                for (Map.Entry<String,Integer> entry : defaults.entrySet()) plugin.getConfig().set("events.weights."+entry.getKey(), entry.getValue());
+                plugin.saveConfig(); plugin.applyDynamicConfig();
+                p.sendMessage(ChatColor.GREEN+"Alle Gewichte wurden auf Standardwerte zurückgesetzt!");
                 gui.openWeights(p);
             }
 
             case "misc_deaths_adjust" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.edit"); return;
-                }
-                if (e.isShiftClick()) {
-                    plugin.getDeathCounter().clear();
-                } else if (e.isRightClick()) {
-                    plugin.getDeathCounter().increment();
-                } else {
-                    plugin.getDeathCounter().set(plugin.getDeathCounter().get() - 1);
-                }
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.edit"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.edit"); return; }
+                if (e.isShiftClick()) plugin.getDeathCounter().clear();
+                else if (e.isRightClick()) plugin.getDeathCounter().increment();
+                else plugin.getDeathCounter().set(plugin.getDeathCounter().get()-1);
                 plugin.getDeathCounter().broadcastActionbar();
                 refreshMenu(type, p);
             }
 
-            case "misc_reset_confirm" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.reset"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.reset"); return;
-                }
+            // Öffnet Bestätigungs-Seite statt direkt /reset auszuführen
+            case "misc_open_reset_confirm" -> {
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.reset"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.reset"); return; }
+                gui.openResetConfirm(p);
+            }
+
+            case "reset_confirm_cancel" -> gui.openMisc(p);
+
+            case "reset_confirm_execute" -> {
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.reset"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.reset"); return; }
                 p.closeInventory();
-                Bukkit.getScheduler().runTask(plugin, () -> Bukkit.dispatchCommand(p, "reset"));
+                // Title sofort anzeigen
+                for (Player online : Bukkit.getOnlinePlayers()) {
+                    String title = plugin.getMessages().tr(online, "title.reset.line1");
+                    String sub   = plugin.getMessages().tr(online, "title.reset.line2");
+                    online.sendTitle(title, sub, 10, 60, 10);
+                }
+                long seed = ThreadLocalRandom.current().nextLong();
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    try { plugin.getResetManager().prepareWorldReset(p, seed); }
+                    catch (Throwable t) { plugin.getLogger().severe("[Reset] GUI-Reset failed: " + t.getMessage()); }
+                }, 2L);
             }
 
             case "lang_set" -> {
-                if (extra != null) {
-                    plugin.getMessages().setPlayerLanguage(p, extra);
-                    plugin.getMessages().savePlayerLocales();
-                }
+                if (extra != null) { plugin.getMessages().setPlayerLanguage(p, extra); plugin.getMessages().savePlayerLocales(); }
                 refreshMenu(type, p);
             }
 
             case "edit_twitch" -> {
-                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.twitch"))) {
-                    p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.twitch"); return;
-                }
-
+                if (!(hasGUIAll || p.hasPermission("twitchrandomizer.admin.twitch"))) { p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.twitch"); return; }
                 EditType edit = e.isRightClick() ? EditType.TOKEN : EditType.CHANNEL;
-
                 p.closeInventory();
                 p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.warn_sensitive"));
-
-                String chatKey = switch (edit) {
-                    case CHANNEL -> "gui.book.chat.received_channel";
-                    case TOKEN   -> "gui.book.chat.received_token";
-                };
+                String chatKey = switch (edit) { case CHANNEL -> "gui.book.chat.received_channel"; case TOKEN -> "gui.book.chat.received_token"; };
                 p.sendMessage(plugin.getMessages().tr(p, chatKey));
-
                 pending.put(p.getUniqueId(), edit);
                 pendingSince.put(p.getUniqueId(), System.currentTimeMillis());
                 giveSecureBook(p, edit);
@@ -287,9 +233,7 @@ public class GuiListener implements Listener {
     }
 
     @EventHandler
-    public void onInvClose(InventoryCloseEvent e) {
-        // No auto-save on close – only "Save & Reconnect" button saves actively.
-    }
+    public void onInvClose(InventoryCloseEvent e) {}
 
     private void doAutoSave() {
         try { plugin.saveConfig(); } catch (Throwable ignored) {}
@@ -300,80 +244,47 @@ public class GuiListener implements Listener {
     public void onPlayerEditBook(PlayerEditBookEvent e) {
         Player p = e.getPlayer();
         UUID id = p.getUniqueId();
-
         EditType mode = pending.get(id);
         if (mode == null) return;
 
         boolean guiAll = p.hasPermission("twitchrandomizer.gui");
         if (!(guiAll || p.hasPermission("twitchrandomizer.admin.twitch"))) {
-            e.setCancelled(true);
-            pending.remove(id);
-            pendingSince.remove(id);
-            p.sendMessage(ChatColor.RED + "Keine Berechtigung: twitchrandomizer.admin.twitch");
-            return;
+            e.setCancelled(true); pending.remove(id); pendingSince.remove(id);
+            p.sendMessage(ChatColor.RED+"Keine Berechtigung: twitchrandomizer.admin.twitch"); return;
         }
 
         String text = "";
         BookMeta newMeta = e.getNewBookMeta();
         if (newMeta != null) {
             StringBuilder sb = new StringBuilder();
-            for (int i = 1; i <= newMeta.getPageCount(); i++) {
-                String page = newMeta.getPage(i);
-                if (page != null) {
-                    if (sb.length() > 0) sb.append("\n");
-                    sb.append(page.trim());
-                }
-            }
+            for (int i = 1; i <= newMeta.getPageCount(); i++) { String page = newMeta.getPage(i); if (page != null) { if (sb.length()>0) sb.append("\n"); sb.append(page.trim()); } }
             text = sb.toString();
-            if ((text == null || text.isEmpty()) && newMeta.getTitle() != null) {
-                text = newMeta.getTitle().trim();
-            }
+            if ((text == null || text.isEmpty()) && newMeta.getTitle() != null) text = newMeta.getTitle().trim();
         }
 
         e.setCancelled(true);
         Bukkit.getScheduler().runTask(plugin, () -> removeSecureBooks(p));
-
-        pending.remove(id);
-        pendingSince.remove(id);
+        pending.remove(id); pendingSince.remove(id);
 
         if (text == null || text.isEmpty()) {
             p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.cancelled"));
-            Bukkit.getScheduler().runTask(plugin, () -> gui.openMain(p));
-            return;
+            Bukkit.getScheduler().runTask(plugin, () -> gui.openMain(p)); return;
         }
 
         org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
-
         switch (mode) {
             case CHANNEL -> {
-                String input = text.trim().replace(" ", "");
+                String input = text.trim().replace(" ","");
                 String[] split = input.split("[,;\\n]+");
                 java.util.List<String> channels = new java.util.ArrayList<>();
-                for (String s : split) {
-                    if (!s.isBlank()) {
-                        String ch = s;
-                        if (ch.startsWith("#")) ch = ch.substring(1);
-                        channels.add(ch);
-                    }
-                }
-                if (!channels.isEmpty()) {
-                    cfg.set("twitch.channels", channels);
-                    cfg.set("twitch.channel", null);
-                    p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.saved_channel_list", Map.of("channels", String.join(", ", channels))));
-                } else {
-                    p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.no_valid_channels"));
-                }
+                for (String s : split) { if (!s.isBlank()) { String ch = s; if (ch.startsWith("#")) ch=ch.substring(1); channels.add(ch); } }
+                if (!channels.isEmpty()) { cfg.set("twitch.channels", channels); cfg.set("twitch.channel", null); p.sendMessage(plugin.getMessages().tr(p,"gui.book.chat.saved_channel_list",Map.of("channels",String.join(", ",channels)))); }
+                else p.sendMessage(plugin.getMessages().tr(p,"gui.book.chat.no_valid_channels"));
             }
-            case TOKEN -> {
-                String token = normalizeToken(text);
-                cfg.set("twitch.oauth_token", token);
-                p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.saved_token"));
-            }
+            case TOKEN -> { String token = normalizeToken(text); cfg.set("twitch.oauth_token", token); p.sendMessage(plugin.getMessages().tr(p,"gui.book.chat.saved_token")); }
         }
-
         try { plugin.saveConfig(); } catch (Throwable ignored) {}
         try { plugin.applyDynamicConfig(); } catch (Throwable ignored) {}
-
         Bukkit.getScheduler().runTask(plugin, () -> gui.openMain(p));
     }
 
@@ -381,60 +292,39 @@ public class GuiListener implements Listener {
     public void onPlayerMove(PlayerMoveEvent e) {
         Player p = e.getPlayer();
         if (!pending.containsKey(p.getUniqueId())) return;
-
-        var from = e.getFrom();
-        var to = e.getTo();
+        var from = e.getFrom(); var to = e.getTo();
         if (to == null) return;
-
-        if (from.getBlockX() == to.getBlockX()
-                && from.getBlockY() == to.getBlockY()
-                && from.getBlockZ() == to.getBlockZ()) {
-            return;
-        }
-
+        if (from.getBlockX()==to.getBlockX() && from.getBlockY()==to.getBlockY() && from.getBlockZ()==to.getBlockZ()) return;
         boolean removed = removeSecureBooks(p);
-        pending.remove(p.getUniqueId());
-        pendingSince.remove(p.getUniqueId());
-
-        if (removed) {
-            p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.cancelled"));
-        }
+        pending.remove(p.getUniqueId()); pendingSince.remove(p.getUniqueId());
+        if (removed) p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.cancelled"));
     }
 
     private boolean removeSecureBooks(Player p) {
         boolean removed = false;
         for (int i = 0; i < p.getInventory().getSize(); i++) {
-            ItemStack it = p.getInventory().getItem(i);
-            if (it == null || !it.hasItemMeta()) continue;
-            ItemMeta im = it.getItemMeta();
-            String v = im.getPersistentDataContainer().get(keySecureBook, PersistentDataType.STRING);
+            ItemStack it = p.getInventory().getItem(i); if (it==null||!it.hasItemMeta()) continue;
+            ItemMeta im = it.getItemMeta(); String v = im.getPersistentDataContainer().get(keySecureBook, PersistentDataType.STRING);
             if (v != null) { p.getInventory().setItem(i, null); removed = true; }
         }
         ItemStack main = p.getInventory().getItemInMainHand();
-        if (main != null && main.hasItemMeta()) {
-            ItemMeta im = main.getItemMeta();
-            String v = im.getPersistentDataContainer().get(keySecureBook, PersistentDataType.STRING);
-            if (v != null) { p.getInventory().setItemInMainHand(null); removed = true; }
-        }
+        if (main!=null&&main.hasItemMeta()) { ItemMeta im=main.getItemMeta(); String v=im.getPersistentDataContainer().get(keySecureBook,PersistentDataType.STRING); if(v!=null){p.getInventory().setItemInMainHand(null);removed=true;} }
         ItemStack off = p.getInventory().getItemInOffHand();
-        if (off != null && off.hasItemMeta()) {
-            ItemMeta im = off.getItemMeta();
-            String v = im.getPersistentDataContainer().get(keySecureBook, PersistentDataType.STRING);
-            if (v != null) { p.getInventory().setItemInOffHand(null); removed = true; }
-        }
+        if (off!=null&&off.hasItemMeta()) { ItemMeta im=off.getItemMeta(); String v=im.getPersistentDataContainer().get(keySecureBook,PersistentDataType.STRING); if(v!=null){p.getInventory().setItemInOffHand(null);removed=true;} }
         return removed;
     }
 
     private void refreshMenu(ConfigGui.MenuType type, Player p) {
         if (type == null) { gui.openMain(p); return; }
         switch (type) {
-            case MAIN     -> gui.openMain(p);
-            case TRIGGER  -> gui.openTrigger(p);
-            case DEBUG    -> gui.openDebug(p);
-            case WEIGHTS  -> gui.openWeights(p);
-            case MISC     -> gui.openMisc(p);
-            case LANGUAGE -> gui.openLanguage(p);
-            default       -> gui.openMain(p);
+            case MAIN          -> gui.openMain(p);
+            case TRIGGER       -> gui.openTrigger(p);
+            case DEBUG         -> gui.openDebug(p);
+            case WEIGHTS       -> gui.openWeights(p);
+            case MISC          -> gui.openMisc(p);
+            case LANGUAGE      -> gui.openLanguage(p);
+            case RESET_CONFIRM -> gui.openResetConfirm(p);
+            default            -> gui.openMain(p);
         }
     }
 
@@ -444,36 +334,20 @@ public class GuiListener implements Listener {
         if (meta instanceof BookMeta bm) {
             String pageText = switch (edit) {
                 case CHANNEL -> plugin.getMessages().tr(p, "gui.book.page.channel");
-                case TOKEN   -> {
-                    String url = TOKEN_URL;
-                    yield plugin.getMessages().tr(p, "gui.book.page.token.text", Map.of("url", url));
-                }
+                case TOKEN   -> plugin.getMessages().tr(p, "gui.book.page.token.text", Map.of("url", TOKEN_URL));
             };
             bm.addPage(pageText);
         }
         meta.getPersistentDataContainer().set(keySecureBook, PersistentDataType.STRING, edit.name());
         book.setItemMeta(meta);
-
-        // Attempt to give book; drop if inventory is full
-        java.util.HashMap<Integer, org.bukkit.inventory.ItemStack> leftover = p.getInventory().addItem(book);
-        if (!leftover.isEmpty()) {
-            p.getWorld().dropItem(p.getLocation(), book);
-            p.sendMessage(plugin.getMessages().tr(p, "gui.book.chat.inventory_full"));
-        }
-
-        // Open the book after 1 tick
+        java.util.HashMap<Integer,org.bukkit.inventory.ItemStack> leftover = p.getInventory().addItem(book);
+        if (!leftover.isEmpty()) { p.getWorld().dropItem(p.getLocation(), book); p.sendMessage(plugin.getMessages().tr(p,"gui.book.chat.inventory_full")); }
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!p.isOnline()) return;
-            // Find the book in inventory and open it
             for (int i = 0; i < p.getInventory().getSize(); i++) {
-                ItemStack it = p.getInventory().getItem(i);
-                if (it == null || !it.hasItemMeta()) continue;
-                ItemMeta im = it.getItemMeta();
-                String v = im.getPersistentDataContainer().get(keySecureBook, PersistentDataType.STRING);
-                if (v != null) {
-                    p.getInventory().setHeldItemSlot(i < 9 ? i : 0);
-                    break;
-                }
+                ItemStack it = p.getInventory().getItem(i); if(it==null||!it.hasItemMeta()) continue;
+                ItemMeta im = it.getItemMeta(); String v = im.getPersistentDataContainer().get(keySecureBook, PersistentDataType.STRING);
+                if (v != null) { p.getInventory().setHeldItemSlot(i<9?i:0); break; }
             }
         }, 1L);
     }
@@ -481,12 +355,8 @@ public class GuiListener implements Listener {
     private String normalizeToken(String raw) {
         if (raw == null) return "";
         String t = raw.trim();
-        if (t.length() >= 2 && ((t.startsWith("\"") && t.endsWith("\"")) || (t.startsWith("'") && t.endsWith("'")))) {
-            t = t.substring(1, t.length() - 1).trim();
-        }
-        if (t.toLowerCase(java.util.Locale.ROOT).startsWith("oauth:")) {
-            t = t.substring("oauth:".length());
-        }
+        if (t.length()>=2&&((t.startsWith("\"")&&t.endsWith("\""))||(t.startsWith("'")&&t.endsWith("'")))) t=t.substring(1,t.length()-1).trim();
+        if (t.toLowerCase(java.util.Locale.ROOT).startsWith("oauth:")) t=t.substring("oauth:".length());
         return t;
     }
 }

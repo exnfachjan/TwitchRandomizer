@@ -4,6 +4,7 @@ import me.exnfachjan.twitchRandomizer.command.*;
 import me.exnfachjan.twitchRandomizer.death.*;
 import me.exnfachjan.twitchRandomizer.gui.*;
 import me.exnfachjan.twitchRandomizer.i18n.Messages;
+import me.exnfachjan.twitchRandomizer.stats.DragonKillListener;
 import me.exnfachjan.twitchRandomizer.timer.TimerManager;
 import me.exnfachjan.twitchRandomizer.twitch.TwitchIntegrationManager;
 import me.exnfachjan.twitchRandomizer.twitch.StreamElementsIntegrationManager;
@@ -23,8 +24,6 @@ public class TwitchRandomizer extends JavaPlugin {
 
     private TimerManager timerManager;
     private TwitchIntegrationManager twitch;
-    // FIX: streamElements-Feld und @Deprecated getStreamElements() entfernt.
-    // StreamElementsIntegrationManager wird intern über DonationsManager verwaltet.
     private TipeeeStreamIntegrationManager tipeeeStream;
     private DonationsManager donations;
 
@@ -61,6 +60,7 @@ public class TwitchRandomizer extends JavaPlugin {
         defaults.put("skyblock", 7);
         defaults.put("fake_totem", 5);
         defaults.put("equipment_shuffle", 8);
+        defaults.put("permanent_hearts", 10);
         return defaults;
     }
 
@@ -100,6 +100,9 @@ public class TwitchRandomizer extends JavaPlugin {
         ConfigGui configGui = new ConfigGui(this);
         getServer().getPluginManager().registerEvents(new GuiListener(this, configGui), this);
 
+        // Enderdrachen-Stats
+        getServer().getPluginManager().registerEvents(new DragonKillListener(this), this);
+
         PluginCommand randomEventCmd = getCommand("randomevent");
         if (randomEventCmd != null) {
             this.randomEventExecutor = new RandomEventCommand(this);
@@ -123,7 +126,6 @@ public class TwitchRandomizer extends JavaPlugin {
         this.twitch = new TwitchIntegrationManager(this);
         twitch.start(channels, token, enableChatTrigger);
 
-        // Donations (SE + Tipeeestream) via unified DonationsManager
         StreamElementsIntegrationManager streamElements = new StreamElementsIntegrationManager(this);
         this.tipeeeStream = new TipeeeStreamIntegrationManager(this);
         this.donations = new DonationsManager(this, streamElements, tipeeeStream);
@@ -151,7 +153,6 @@ public class TwitchRandomizer extends JavaPlugin {
         PluginCommand guiCmd = getCommand("gui");
         if (guiCmd != null) guiCmd.setExecutor(new TrGuiCommand(this, configGui));
 
-        // FIX: ZmdCommand war in plugin.yml registriert aber der Executor wurde nie gesetzt.
         PluginCommand zmdCmd = getCommand("zmd");
         if (zmdCmd != null) zmdCmd.setExecutor(new ZmdCommand(this));
     }

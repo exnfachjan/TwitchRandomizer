@@ -5,20 +5,16 @@ plugins {
 }
 
 group = 'me.exnfachjan'
-version = '1.5.1'
+version = '1.6.0'
 
 repositories {
     mavenCentral()
-    maven {
-        name = "papermc-repo"
-        url = "https://repo.papermc.io/repository/maven-public/"
-    }
+    maven { name = "papermc-repo"; url = "https://repo.papermc.io/repository/maven-public/" }
     maven { url 'https://jitpack.io' }
 }
 
 dependencies {
     compileOnly "io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT"
-
     implementation "com.github.twitch4j:twitch4j:1.25.0"
     implementation "com.github.twitch4j:twitch4j-auth:1.25.0"
     implementation "com.github.twitch4j:twitch4j-common:1.25.0"
@@ -45,23 +41,12 @@ processResources {
     def props = [version: version]
     inputs.properties props
     filteringCharset 'UTF-8'
-    filesMatching('plugin.yml') {
-        expand props
-    }
+    filesMatching('plugin.yml') { expand props }
 }
 
-tasks.named('shadowJar') {
-    archiveClassifier.set('')
-}
-
-tasks.named('jar') {
-    enabled = false
-}
-
-tasks.named('build') {
-    dependsOn tasks.named('shadowJar')
-}
-
+tasks.named('shadowJar') { archiveClassifier.set('') }
+tasks.named('jar') { enabled = false }
+tasks.named('build') { dependsOn tasks.named('shadowJar') }
 tasks.named('runServer') {
     minecraftVersion("1.21.11")
     pluginJars.from(tasks.named('shadowJar'))

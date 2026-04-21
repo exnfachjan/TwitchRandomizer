@@ -1,73 +1,29 @@
-# ══════════════════════════════════════════════════════════════════════════════
-#  TwitchRandomizer – Configuration
-#  All values can also be adjusted via the in-game GUI (/trgui).
-# ══════════════════════════════════════════════════════════════════════════════
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  TWITCH SETUP
-# ─────────────────────────────────────────────────────────────────────────────
+# TwitchRandomizer – Configuration
 twitch:
-  # Twitch channel(s) – add more lines for multiple streamers
   channels:
     - YOUR_CHANNEL_HERE
-
-  # OAuth Access Token in format "oauth:xxxxxxxx..."
-  # Required scopes:
-  #   - chat:read                  (Chat / !test)
-  #   - user:read:subscriptions    (Sub-Events)
-  #   - channel:read:subscriptions (Sub-Events)
-  #   - bits:read                  (Bits-Events)
-  # Create your token: https://twitchtokengenerator.com/quick/1KRFjxyoNE
   oauth_token: "YOUR_TOKEN_HERE"
-
-  # Cooldown between events in seconds (recommended: 30s)
   trigger_interval_seconds: 30.0
-
-  # Debug mode: Enables test triggers (!test, !gift, !giftbomb) and additional logs
   debug: false
-
-  # Active triggers
   triggers:
     subscriptions:
       enabled: true
-
     bits:
       enabled: true
       bits_per_trigger: 500
-
     chat_test:
       enabled: true
-
-    # Simulated gift subs (only active when debug: true)
     sim_gift:
-      enabled: true # !gift
-
+      enabled: true
     sim_giftbomb:
-      enabled: true # !giftbomb [N]
+      enabled: true
       default_count: 5
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  STREAMELEMENTS SETUP
-# ─────────────────────────────────────────────────────────────────────────────
-# All StreamElements settings (enabled, JWT tokens, amount_per_trigger) are
-# stored in "streamelements.yml" in the plugin folder.
-# That file is never touched by the plugin's auto-save.
-# Edit it manually or use /trgui → Trigger menu, then /trconfig se reload.
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  CHALLENGE SETTINGS
-# ─────────────────────────────────────────────────────────────────────────────
 challenge:
-  # If true: A player dies → everyone becomes spectator (challenge over)
   auto_spectator_on_death: false
-  # Pause timer and queue when a player is on the death screen
   pause_on_death: true
-  # Pause timer and queue when all players are in spectator mode
   pause_if_all_spectator: true
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  RESET SETTINGS
-# ─────────────────────────────────────────────────────────────────────────────
 reset:
   confirm_window_seconds: 30
   randomize_seed: true
@@ -75,21 +31,12 @@ reset:
   transfer_wait_ticks: 60
   title_lead_ticks: 40
 
-# Whether the server restarts or shuts down after a reset
 restart-on-reset: false
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  LANGUAGE
-# ─────────────────────────────────────────────────────────────────────────────
 language:
-  mode: auto # auto = detect client language | manual = same language for everyone
-  default: en # Fallback: de or en
+  mode: auto
+  default: en
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  EVENT WEIGHTS
-#  Do not need to add up to 100 – automatically normalized.
-#  Set to 0 to disable an event.
-# ─────────────────────────────────────────────────────────────────────────────
 events:
   weights:
     spawn_mobs: 18
@@ -112,46 +59,37 @@ events:
     fake_totem: 5
     clear_inventory: 4
     skyblock: 5
+    permanent_hearts: 10
 
   settings:
     no_crafting:
       min_seconds: 5
       max_seconds: 15
-
     hot_potato:
       duration_seconds: 10
       mode: explode
       explosion_power: 2.0
-
     safe_creepers:
       count: 3
       radius: 2
       lifetime_seconds: 8
       powered: true
-
     floor_is_lava:
       min_seconds: 10
       max_seconds: 180
-
     slippery_ground:
       min_seconds: 10
       max_seconds: 180
-
     tnt_rain:
       duration_seconds: 30
       radius: 25
       interval_ticks: 6
-
     anvil_rain:
       duration_seconds: 30
       radius: 25
       interval_ticks: 6
-
     skyblock:
       radius: 2
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  STATISTICS (managed automatically – do not edit manually)
-# ─────────────────────────────────────────────────────────────────────────────
 stats:
   deaths: 0
