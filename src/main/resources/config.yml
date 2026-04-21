@@ -59,7 +59,7 @@ events:
     fake_totem: 5
     clear_inventory: 4
     skyblock: 5
-    permanent_hearts: 10
+    permanent_hearts: 5
 
   settings:
     no_crafting:
