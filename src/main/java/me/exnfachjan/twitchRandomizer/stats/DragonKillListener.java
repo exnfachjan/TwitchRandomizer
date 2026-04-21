@@ -79,16 +79,7 @@ public class DragonKillListener implements Listener {
         broadcastGlobal("stats.dragon.donations", Map.of("euro",   String.format(Locale.US,"%.2f",euro)));
         broadcastGlobal("stats.dragon.bits",      Map.of("bits",   String.valueOf(bits)));
 
-        if (channels.size() > 1) {
-            broadcastGlobal("stats.dragon.per_channel_header", Map.of());
-            for (String ch : channels) {
-                broadcastGlobal("stats.dragon.per_channel_entry", Map.of(
-                        "channel", ch,
-                        "subs",    String.valueOf(collectSubsForChannel(ch)),
-                        "euro",    String.format(Locale.US,"%.2f",collectEuroForChannel(ch)),
-                        "bits",    String.valueOf(collectBitsForChannel(ch))));
-            }
-        }
+        // Per-Channel-Aufschlüsselung bewusst weggelassen – Gesamtübersicht reicht
 
         saveStats(channels, subs, euro, bits, time, deaths, eventsTriggered);
     }
