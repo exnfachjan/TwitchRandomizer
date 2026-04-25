@@ -400,20 +400,59 @@ public class RandomEvents implements Listener {
         int maxY = world.getMaxHeight() - 2;
         int headY = loc.getBlockY() + 2;
 
-        int scanLimit = isNether ? Math.min(maxY, 122) : maxY;
-        // Scan upward for the first 2-block clear gap directly above player (clear immediate ceiling only)
-        int launchY = -1;
-        for (int y = headY; y <= scanLimit - 1; y++) {
-            if (!world.getBlockAt(loc.getBlockX(), y, loc.getBlockZ()).getType().isSolid()
-                    && !world.getBlockAt(loc.getBlockX(), y + 1, loc.getBlockZ()).getType().isSolid()) {
-                launchY = y; break;
+        if (isNether) {
+            // Nether: scan for first 2-block clear gap, stop below bedrock ceiling
+            int netherCeiling = Math.min(maxY, 122);
+            int launchY = -1;
+            for (int y = headY; y <= netherCeiling - 1; y++) {
+                if (!world.getBlockAt(loc.getBlockX(), y, loc.getBlockZ()).getType().isSolid()
+                        && !world.getBlockAt(loc.getBlockX(), y + 1, loc.getBlockZ()).getType().isSolid()) {
+                    launchY = y; break;
+                }
             }
+            if (launchY > headY) {
+                Location launch = loc.clone(); launch.setY(launchY); p.teleport(launch);
+            }
+            p.setVelocity(p.getVelocity().setY(5.5));
+        } else {
+            // Overworld/End: clear immediate ceiling only, then launch with high velocity.
+            // A per-tick task phases through any remaining blocks below Y=300 so the full
+            // flight arc is visible without interruption.
+            for (int y = headY; y <= headY + 6; y++) {
+                if (!world.getBlockAt(loc.getBlockX(), y, loc.getBlockZ()).getType().isSolid()
+                        && !world.getBlockAt(loc.getBlockX(), y + 1, loc.getBlockZ()).getType().isSolid()) {
+                    if (y > headY) { Location l = loc.clone(); l.setY(y); p.teleport(l); }
+                    break;
+                }
+            }
+            final double launchVY = 10.0;
+            p.setVelocity(p.getVelocity().setY(launchVY));
+            new BukkitRunnable() {
+                int ticks = 0;
+                @Override
+                public void run() {
+                    ticks++;
+                    if (!p.isOnline() || p.getLocation().getY() >= 299 || ticks > 220) {
+                        cancel(); return;
+                    }
+                    // Simulate Minecraft physics: gravity 0.08/tick, drag 0.98/tick
+                    double expectedVY = (launchVY + 4.0) * Math.pow(0.98, ticks) - 4.0;
+                    if (expectedVY <= 0) { cancel(); return; }
+                    Location cur = p.getLocation();
+                    int cx = cur.getBlockX(), cy = cur.getBlockY(), cz = cur.getBlockZ();
+                    if (world.getBlockAt(cx, cy + 1, cz).getType().isSolid()
+                            || world.getBlockAt(cx, cy + 2, cz).getType().isSolid()) {
+                        int skipTo = cy + 3;
+                        while (skipTo < 302 && world.getBlockAt(cx, skipTo, cz).getType().isSolid()) {
+                            skipTo++;
+                        }
+                        Location skip = cur.clone(); skip.setY(skipTo);
+                        p.teleport(skip);
+                        p.setVelocity(p.getVelocity().setY(expectedVY));
+                    }
+                }
+            }.runTaskTimer(plugin, 1L, 1L);
         }
-        // Only teleport if there is a ceiling to clear; otherwise launch from current position
-        if (launchY > headY) {
-            Location launch = loc.clone(); launch.setY(launchY); p.teleport(launch);
-        }
-        p.setVelocity(p.getVelocity().setY(isNether ? 5.5 : 6.5));
         Map<String,String> ph=new HashMap<>(); if(byUser!=null&&!byUser.isBlank())ph.put("user",byUser);
         p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.nasa_call.by":"events.nasa_call.solo",ph));
     }
