@@ -8,21 +8,20 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: 21
-          distribution: temurin
-          cache: gradle
-
-      - name: Build
-        run: ./gradlew build
+      - name: Download JAR from Release
+        run: |
+          JAR_URL=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            | jq -r '.assets[] | select(.name | endswith(".jar")) | .browser_download_url')
+          curl -L -o plugin.jar "$JAR_URL"
 
       - uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ogCyDo14
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          # Changelog wird automatisch aus der GitHub Release-Beschreibung gezogen
-          # Version wird automatisch aus dem Release-Tag gezogen
+          files: plugin.jar
+          version: ${{ github.ref_name }}
+          version-type: release
+          loaders: paper spigot
+          game-versions: 1.21.x
+          changelog: ${{ github.event.release.body }}
