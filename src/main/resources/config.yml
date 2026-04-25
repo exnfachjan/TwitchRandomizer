@@ -61,7 +61,7 @@ events:
     skyblock: 5
     permanent_hearts: 5
     structure_teleport: 3
-    hunger_clubs: 10
+    hunger_clubs: 5
     player_size: 7
 
   settings:
