@@ -14,8 +14,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.*;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.generator.structure.Structure;
-import org.bukkit.generator.structure.StructureSearchResult;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -592,19 +590,22 @@ public class RandomEvents implements Listener {
     private volatile long lastStructureTeleportMs = 0L;
 
     // ─── StructureTeleport ────────────────────────────────────────────────────
-    // Structure keys grouped by world environment
-    private static final String[] OVERWORLD_STRUCTURES = {
-        "village", "desert_pyramid", "jungle_pyramid", "swamp_hut", "stronghold",
-        "mineshaft", "ocean_monument", "woodland_mansion", "ocean_ruin", "shipwreck",
-        "buried_treasure", "pillager_outpost", "ancient_city", "trail_ruins"
+    @SuppressWarnings("deprecation")
+    private static final StructureType[][] WORLD_STRUCTURES = {
+        // [0] Overworld
+        { StructureType.VILLAGE, StructureType.DESERT_PYRAMID, StructureType.JUNGLE_PYRAMID,
+          StructureType.SWAMP_HUT, StructureType.STRONGHOLD, StructureType.MINESHAFT,
+          StructureType.OCEAN_MONUMENT, StructureType.WOODLAND_MANSION, StructureType.OCEAN_RUIN,
+          StructureType.SHIPWRECK, StructureType.BURIED_TREASURE, StructureType.PILLAGER_OUTPOST },
+        // [1] Nether
+        { StructureType.NETHER_FORTRESS, StructureType.BASTION_REMNANT },
+        // [2] End
+        { StructureType.END_CITY }
     };
-    private static final String[] NETHER_STRUCTURES = {
-        "fortress", "bastion_remnant", "ruined_portal"
-    };
-    private static final String[] END_STRUCTURES = { "end_city" };
+    private static final String[] WORLD_NAMES = { "world", "world_nether", "world_the_end" };
 
     public void triggerStructureTeleport(Player p, String byUser) {
-        // Dedup: called per player in the event loop, but only execute once per trigger
+        // Dedup: called per player in the event loop, execute only once per trigger
         long now = System.currentTimeMillis();
         if (now - lastStructureTeleportMs < 3000L) return;
         lastStructureTeleportMs = now;
@@ -613,30 +614,27 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.structure_teleport.by":"events.structure_teleport.solo",ph));
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            World overworld = Bukkit.getWorld("world");
-            World nether    = Bukkit.getWorld("world_nether");
-            World end       = Bukkit.getWorld("world_the_end");
-
+            // Build randomised list of (world, structureType) pairs
             List<Object[]> options = new ArrayList<>();
-            if (overworld != null) for (String s : OVERWORLD_STRUCTURES) options.add(new Object[]{overworld, s});
-            if (nether    != null) for (String s : NETHER_STRUCTURES)    options.add(new Object[]{nether,    s});
-            if (end       != null) for (String s : END_STRUCTURES)        options.add(new Object[]{end,       s});
+            for (int i = 0; i < WORLD_NAMES.length; i++) {
+                World world = Bukkit.getWorld(WORLD_NAMES[i]);
+                if (world == null) continue;
+                for (@SuppressWarnings("deprecation") StructureType st : WORLD_STRUCTURES[i]) options.add(new Object[]{world, st});
+            }
             Collections.shuffle(options, rng);
 
             for (Object[] option : options) {
                 World world = (World) option[0];
-                String structKey = (String) option[1];
-                Structure struct = Registry.STRUCTURE.get(NamespacedKey.minecraft(structKey));
-                if (struct == null) continue;
+                @SuppressWarnings("deprecation") StructureType st = (StructureType) option[1];
                 Location origin = new Location(world, 0, 64, 0);
-                StructureSearchResult result = world.locateNearestStructure(origin, struct, 200, false);
-                if (result == null) continue;
-                Location found = result.getLocation();
+                @SuppressWarnings("deprecation")
+                Location found = world.locateNearestStructure(origin, st, 200, false);
+                if (found == null) continue;
                 int safeY = findSafeY(world, found.getBlockX(), found.getBlockZ());
-                Location dest = new Location(world, found.getBlockX() + 0.5, safeY, found.getBlockZ() + 0.5, found.getYaw(), found.getPitch());
+                Location dest = new Location(world, found.getBlockX() + 0.5, safeY, found.getBlockZ() + 0.5);
                 for (Player online : Bukkit.getOnlinePlayers()) online.teleport(dest);
                 Map<String,String> ph2 = new HashMap<>();
-                ph2.put("structure", pretty(structKey));
+                ph2.put("structure", pretty(st.getStructureName()));
                 ph2.put("world", pretty(world.getName()));
                 ph2.put("x", String.valueOf(found.getBlockX()));
                 ph2.put("z", String.valueOf(found.getBlockZ()));
@@ -725,7 +723,7 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p, small?"events.player_size.small":"events.player_size.large", ph));
 
         final int totalSec = seconds;
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        BukkitTask task = new BukkitRunnable() {
             int remaining = totalSec;
             @Override public void run() {
                 if (!p.isOnline() || remaining <= 0) {
@@ -741,7 +739,7 @@ public class RandomEvents implements Listener {
                 if (b != null) { b.setTitle(i18n.tr(p, bossbarKey) + " – " + remaining + "s"); b.setProgress(Math.max(0.0, Math.min(1.0, (double)remaining / totalSec))); }
                 remaining--;
             }
-        }, 0L, 20L);
+        }.runTaskTimer(plugin, 0L, 20L);
         playerSizeTasks.put(p.getUniqueId(), task);
     }
 
