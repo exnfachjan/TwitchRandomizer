@@ -602,6 +602,13 @@ public class RandomEvents implements Listener {
         // [2] End
         { StructureType.END_CITY }
     };
+    private static final String[][] WORLD_STRUCTURE_NAMES = {
+        { "Village", "Desert Pyramid", "Jungle Pyramid", "Swamp Hut", "Stronghold",
+          "Mineshaft", "Ocean Monument", "Woodland Mansion", "Ocean Ruin",
+          "Shipwreck", "Buried Treasure", "Pillager Outpost" },
+        { "Nether Fortress", "Bastion Remnant" },
+        { "End City" }
+    };
     private static final String[] WORLD_NAMES = { "world", "world_nether", "world_the_end" };
 
     public void triggerStructureTeleport(Player p, String byUser) {
@@ -614,18 +621,20 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.structure_teleport.by":"events.structure_teleport.solo",ph));
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            // Build randomised list of (world, structureType) pairs
+            // Build randomised list of (world, structureType, displayName) triples
             List<Object[]> options = new ArrayList<>();
             for (int i = 0; i < WORLD_NAMES.length; i++) {
                 World world = Bukkit.getWorld(WORLD_NAMES[i]);
                 if (world == null) continue;
-                for (@SuppressWarnings("deprecation") StructureType st : WORLD_STRUCTURES[i]) options.add(new Object[]{world, st});
+                for (int j = 0; j < WORLD_STRUCTURES[i].length; j++)
+                    options.add(new Object[]{world, WORLD_STRUCTURES[i][j], WORLD_STRUCTURE_NAMES[i][j]});
             }
             Collections.shuffle(options, rng);
 
             for (Object[] option : options) {
                 World world = (World) option[0];
                 @SuppressWarnings("deprecation") StructureType st = (StructureType) option[1];
+                String structName = (String) option[2];
                 Location origin = new Location(world, 0, 64, 0);
                 @SuppressWarnings("deprecation")
                 Location found = world.locateNearestStructure(origin, st, 200, false);
@@ -634,7 +643,7 @@ public class RandomEvents implements Listener {
                 Location dest = new Location(world, found.getBlockX() + 0.5, safeY, found.getBlockZ() + 0.5);
                 for (Player online : Bukkit.getOnlinePlayers()) online.teleport(dest);
                 Map<String,String> ph2 = new HashMap<>();
-                ph2.put("structure", pretty(st.getStructureName()));
+                ph2.put("structure", structName);
                 ph2.put("world", pretty(world.getName()));
                 ph2.put("x", String.valueOf(found.getBlockX()));
                 ph2.put("z", String.valueOf(found.getBlockZ()));
