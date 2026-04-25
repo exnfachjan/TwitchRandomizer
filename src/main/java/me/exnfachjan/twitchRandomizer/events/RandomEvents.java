@@ -400,34 +400,20 @@ public class RandomEvents implements Listener {
         int maxY = world.getMaxHeight() - 2;
         int headY = loc.getBlockY() + 2;
 
-        if (isNether) {
-            // Nether: scan upward for first 2-block gap, stop below bedrock ceiling (~Y 122)
-            int netherCeiling = Math.min(maxY, 122);
-            int launchY = -1;
-            for (int y = headY; y <= netherCeiling; y++) {
-                if (!world.getBlockAt(loc.getBlockX(), y, loc.getBlockZ()).getType().isSolid()
-                        && !world.getBlockAt(loc.getBlockX(), y + 1, loc.getBlockZ()).getType().isSolid()) {
-                    launchY = y; break;
-                }
+        int scanLimit = isNether ? Math.min(maxY, 122) : maxY;
+        // Scan upward for the first 2-block clear gap directly above player (clear immediate ceiling only)
+        int launchY = -1;
+        for (int y = headY; y <= scanLimit - 1; y++) {
+            if (!world.getBlockAt(loc.getBlockX(), y, loc.getBlockZ()).getType().isSolid()
+                    && !world.getBlockAt(loc.getBlockX(), y + 1, loc.getBlockZ()).getType().isSolid()) {
+                launchY = y; break;
             }
-            if (launchY > headY) {
-                Location launch = loc.clone(); launch.setY(launchY); p.teleport(launch);
-            }
-        } else {
-            // Overworld / End: always launch from at least Y 300
-            int targetY = Math.max(300, headY);
-            targetY = Math.min(targetY, maxY - 1);
-            // Scan from targetY upward for a clear 2-block gap (in case of extreme mountains)
-            int launchY = targetY;
-            for (int y = targetY; y <= maxY; y++) {
-                if (!world.getBlockAt(loc.getBlockX(), y, loc.getBlockZ()).getType().isSolid()
-                        && !world.getBlockAt(loc.getBlockX(), y + 1, loc.getBlockZ()).getType().isSolid()) {
-                    launchY = y; break;
-                }
-            }
+        }
+        // Only teleport if there is a ceiling to clear; otherwise launch from current position
+        if (launchY > headY) {
             Location launch = loc.clone(); launch.setY(launchY); p.teleport(launch);
         }
-        p.setVelocity(p.getVelocity().setY(5.5));
+        p.setVelocity(p.getVelocity().setY(isNether ? 5.5 : 6.5));
         Map<String,String> ph=new HashMap<>(); if(byUser!=null&&!byUser.isBlank())ph.put("user",byUser);
         p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.nasa_call.by":"events.nasa_call.solo",ph));
     }
