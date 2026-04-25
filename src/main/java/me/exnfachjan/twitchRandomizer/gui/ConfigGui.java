@@ -57,8 +57,11 @@ public class ConfigGui {
             Map.entry("anvil_rain",       Material.ANVIL),
             Map.entry("skyblock",         Material.GRASS_BLOCK),
             Map.entry("fake_totem",       Material.TOTEM_OF_UNDYING),
-            Map.entry("equipment_shuffle",Material.SMITHING_TABLE),
-            Map.entry("permanent_hearts", Material.HEART_OF_THE_SEA)
+            Map.entry("equipment_shuffle",  Material.SMITHING_TABLE),
+            Map.entry("permanent_hearts",   Material.HEART_OF_THE_SEA),
+            Map.entry("structure_teleport", Material.COMPASS),
+            Map.entry("hunger_clubs",       Material.COOKED_CHICKEN),
+            Map.entry("player_size",        Material.SLIME_BALL)
     );
 
     // ─── MAIN ────────────────────────────────────────────────────────────────

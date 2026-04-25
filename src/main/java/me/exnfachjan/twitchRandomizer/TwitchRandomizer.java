@@ -61,6 +61,9 @@ public class TwitchRandomizer extends JavaPlugin {
         defaults.put("fake_totem", 5);
         defaults.put("equipment_shuffle", 8);
         defaults.put("permanent_hearts", 10);
+        defaults.put("structure_teleport", 3);
+        defaults.put("hunger_clubs", 10);
+        defaults.put("player_size", 7);
         return defaults;
     }
 

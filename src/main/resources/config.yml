@@ -60,6 +60,9 @@ events:
     clear_inventory: 4
     skyblock: 5
     permanent_hearts: 5
+    structure_teleport: 3
+    hunger_clubs: 10
+    player_size: 7
 
   settings:
     no_crafting:
@@ -90,6 +93,11 @@ events:
       interval_ticks: 6
     skyblock:
       radius: 2
+    structure_teleport:
+      search_radius_chunks: 200
+    player_size:
+      min_seconds: 15
+      max_seconds: 60
 
 stats:
   deaths: 0

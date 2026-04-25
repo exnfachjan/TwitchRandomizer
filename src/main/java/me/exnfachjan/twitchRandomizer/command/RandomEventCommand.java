@@ -39,7 +39,10 @@ public class RandomEventCommand implements CommandExecutor {
             "skyblock",
             "fake_totem",
             "equipment_shuffle",
-            "permanent_hearts"
+            "permanent_hearts",
+            "structure_teleport",
+            "hunger_clubs",
+            "player_size"
     );
 
     private int[] weights;
@@ -151,6 +154,9 @@ public class RandomEventCommand implements CommandExecutor {
                 case 18 -> events.triggerFakeTotem(player, byUser);
                 case 19 -> events.triggerEquipmentShuffle(player, byUser, syncSeed);
                 case 20 -> events.triggerPermanentHearts(player, byUser, syncSeed);
+                case 21 -> events.triggerStructureTeleport(player, byUser);
+                case 22 -> events.triggerHungerClubs(player, byUser, syncSeed);
+                case 23 -> events.triggerPlayerSize(player, byUser, syncSeed);
             }
         }
         return true;

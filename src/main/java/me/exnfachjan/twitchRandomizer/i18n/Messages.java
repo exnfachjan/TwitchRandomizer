@@ -234,6 +234,29 @@ public class Messages {
         de.put("stats.dragon.bits", "§7💎 Bits gesamt: §f{bits}");
         de.put("stats.dragon.per_channel_header", "§e§l--- Stats pro Kanal ---");
         de.put("stats.dragon.per_channel_entry", "§e{channel}: §7Subs: §f{subs} §7| Donations: §f{euro}€ §7| Bits: §f{bits}");
+        // TNT Rain countdown
+        de.put("events.tnt_rain.countdown_subtitle", "Geh in Deckung!");
+        // Structure Teleport
+        de.put("events.structure_teleport.solo", "Zufälliger Strukturen-Teleport! Ihr werdet zu einer Struktur teleportiert ...");
+        de.put("events.structure_teleport.by", "{user} teleportiert euch zu einer zufälligen Struktur!");
+        de.put("events.structure_teleport.destination", "Ihr wurdet zur Struktur §f{structure}§r in Welt §f{world}§r teleportiert! (X:{x} Z:{z})");
+        de.put("events.structure_teleport.not_found", "§cKeine Struktur in Reichweite gefunden.");
+        de.put("event.name.structure_teleport", "Strukturen-Teleport");
+        // Hunger Clubs
+        de.put("events.hunger_clubs.solo", "§6Deine maximalen Hungerkeulen verändern sich dauerhaft!");
+        de.put("events.hunger_clubs.by", "§6{user} verändert deine maximalen Hungerkeulen dauerhaft!");
+        de.put("events.hunger_clubs.gain", "§a+{clubs} 🍗 permanent! (Gesamt: {total} 🍗)");
+        de.put("events.hunger_clubs.loss", "§c-{clubs} 🍗 permanent! (Gesamt: {total} 🍗)");
+        de.put("event.name.hunger_clubs", "Hungerkeulen");
+        // Player Size
+        de.put("events.player_size.solo", "§bDeine Größe wird zufällig verändert!");
+        de.put("events.player_size.by", "§b{user} verändert deine Größe!");
+        de.put("events.player_size.small", "§7Du wirst für {seconds}s auf Größe §f{scale}§7 geschrumpft!");
+        de.put("events.player_size.large", "§7Du wirst für {seconds}s auf Größe §f{scale}§7 vergrößert!");
+        de.put("events.player_size.end", "§bDeine Größe ist wieder normal.");
+        de.put("event.name.player_size", "Spielergröße");
+        de.put("bossbar.player_size_small", "Winzig");
+        de.put("bossbar.player_size_large", "Riesig");
 
         en.clear();
         // ===================== ENGLISCH =====================
@@ -437,6 +460,29 @@ public class Messages {
         en.put("stats.dragon.bits", "§7💎 Total Bits: §f{bits}");
         en.put("stats.dragon.per_channel_header", "§e§l--- Stats per Channel ---");
         en.put("stats.dragon.per_channel_entry", "§e{channel}: §7Subs: §f{subs} §7| Donations: §f{euro}€ §7| Bits: §f{bits}");
+        // TNT Rain countdown
+        en.put("events.tnt_rain.countdown_subtitle", "Take Cover!");
+        // Structure Teleport
+        en.put("events.structure_teleport.solo", "Random Structure Teleport! You are being teleported to a structure...");
+        en.put("events.structure_teleport.by", "{user} teleports you to a random structure!");
+        en.put("events.structure_teleport.destination", "You were teleported to structure §f{structure}§r in world §f{world}§r! (X:{x} Z:{z})");
+        en.put("events.structure_teleport.not_found", "§cNo structure found within range.");
+        en.put("event.name.structure_teleport", "Structure Teleport");
+        // Hunger Clubs
+        en.put("events.hunger_clubs.solo", "§6Your maximum hunger drumsticks change permanently!");
+        en.put("events.hunger_clubs.by", "§6{user} permanently changes your max hunger!");
+        en.put("events.hunger_clubs.gain", "§a+{clubs} 🍗 permanently! (Total: {total} 🍗)");
+        en.put("events.hunger_clubs.loss", "§c-{clubs} 🍗 permanently! (Total: {total} 🍗)");
+        en.put("event.name.hunger_clubs", "Hunger Clubs");
+        // Player Size
+        en.put("events.player_size.solo", "§bYour size is randomly changed!");
+        en.put("events.player_size.by", "§b{user} changes your size!");
+        en.put("events.player_size.small", "§7You shrink to size §f{scale}§7 for {seconds}s!");
+        en.put("events.player_size.large", "§7You grow to size §f{scale}§7 for {seconds}s!");
+        en.put("events.player_size.end", "§bYour size is back to normal.");
+        en.put("event.name.player_size", "Player Size");
+        en.put("bossbar.player_size_small", "Tiny");
+        en.put("bossbar.player_size_large", "Huge");
     }
 
     private java.io.File getLocalesFile() {

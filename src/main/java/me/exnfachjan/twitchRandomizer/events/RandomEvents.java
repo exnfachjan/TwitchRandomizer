@@ -14,6 +14,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.*;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.generator.structure.Structure;
+import org.bukkit.generator.structure.StructureSearchResult;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -43,6 +45,9 @@ public class RandomEvents implements Listener {
     private final Map<UUID, BossBar> eventBossbars = new HashMap<>();
     private final Map<UUID, BossBar> noCraftBossbars = new HashMap<>();
     private final Map<UUID, BukkitTask> noCraftTasks = new HashMap<>();
+    private final Map<UUID, BossBar> playerSizeBossbars = new HashMap<>();
+    private final Map<UUID, BukkitTask> playerSizeTasks = new HashMap<>();
+    private final Map<UUID, Integer> hungerMaxCache = new HashMap<>();
 
     public RandomEvents(TwitchRandomizer plugin) {
         this.plugin = plugin;
@@ -109,14 +114,24 @@ public class RandomEvents implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
-        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "perm_hearts_delta");
+        // Restore permanent hearts
+        org.bukkit.NamespacedKey heartKey = new org.bukkit.NamespacedKey(plugin, "perm_hearts_delta");
         try {
-            Double delta = p.getPersistentDataContainer().get(key, PersistentDataType.DOUBLE);
-            if (delta == null || delta == 0.0) return;
-            org.bukkit.attribute.AttributeInstance attr = p.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
-            if (attr == null) return;
-            double base = Math.max(2.0, 20.0 + delta);
-            attr.setBaseValue(base);
+            Double delta = p.getPersistentDataContainer().get(heartKey, PersistentDataType.DOUBLE);
+            if (delta != null && delta != 0.0) {
+                org.bukkit.attribute.AttributeInstance attr = p.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+                if (attr != null) attr.setBaseValue(Math.max(2.0, 20.0 + delta));
+            }
+        } catch (Throwable ignored) {}
+        // Restore hunger max cap
+        org.bukkit.NamespacedKey hungerKey = new org.bukkit.NamespacedKey(plugin, "hunger_max_delta");
+        try {
+            Integer hungerDelta = p.getPersistentDataContainer().get(hungerKey, PersistentDataType.INTEGER);
+            if (hungerDelta != null && hungerDelta != 0) {
+                int max = Math.max(2, Math.min(20, 20 + hungerDelta));
+                hungerMaxCache.put(p.getUniqueId(), max);
+                if (p.getFoodLevel() > max) p.setFoodLevel(max);
+            }
         } catch (Throwable ignored) {}
     }
 
@@ -253,8 +268,12 @@ public class RandomEvents implements Listener {
     public void triggerInvShuffle(Player p, String byUser) { triggerInvShuffle(p, byUser, rng.nextLong()); }
     public void triggerInvShuffle(Player p, String byUser, long seed) {
         Random r = seededRng(seed); PlayerInventory inv = p.getInventory();
-        List<ItemStack> itemList = new ArrayList<>(Arrays.asList(inv.getContents())); Collections.shuffle(itemList, r);
-        inv.setContents(itemList.toArray(new ItemStack[0])); p.updateInventory();
+        // Use getStorageContents() (main 36 slots only) to avoid corrupting armor/offhand slots
+        ItemStack[] storage = inv.getStorageContents();
+        List<ItemStack> itemList = new ArrayList<>(Arrays.asList(storage));
+        Collections.shuffle(itemList, r);
+        inv.setStorageContents(itemList.toArray(new ItemStack[0]));
+        p.updateInventory();
         Map<String,String> ph=new HashMap<>(); if(byUser!=null&&!byUser.isBlank())ph.put("user",byUser);
         p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.inv_shuffle.by":"events.inv_shuffle.solo",ph));
     }
@@ -375,21 +394,28 @@ public class RandomEvents implements Listener {
         groundTasks.put(p.getUniqueId(), task);
     }
 
-    // ─── NasaCall – durch Blöcke fliegen ────────────────────────────────────
+    // ─── NasaCall – sauber durch Blöcke starten ──────────────────────────────
     public void triggerNasaCall(Player p, String byUser) {
-        p.setVelocity(p.getVelocity().setY(5.5));
-        // Für 30 Ticks: erkennt blockierten Spieler und teleportiert 1 Block hoch
-        new BukkitRunnable() {
-            int ticks = 0;
-            @Override public void run() {
-                if (!p.isOnline() || ticks++ > 30) { cancel(); return; }
-                org.bukkit.util.Vector vel = p.getVelocity();
-                if (vel.getY() < 0.1 && ticks < 25) {
-                    p.setVelocity(vel.setY(4.0));
-                    p.teleport(p.getLocation().clone().add(0, 1, 0));
-                }
+        Location loc = p.getLocation();
+        World world = loc.getWorld();
+        int headY = loc.getBlockY() + 2; // 2 blocks above feet = above head
+        int maxY = world.getMaxHeight() - 2;
+        // Find first 2 consecutive non-solid blocks above the player's head
+        int launchY = -1;
+        for (int y = headY; y <= maxY; y++) {
+            if (!world.getBlockAt(loc.getBlockX(), y, loc.getBlockZ()).getType().isSolid()
+                    && !world.getBlockAt(loc.getBlockX(), y + 1, loc.getBlockZ()).getType().isSolid()) {
+                launchY = y;
+                break;
             }
-        }.runTaskTimer(plugin, 2L, 1L);
+        }
+        if (launchY > headY) {
+            // Teleport player feet to launchY so head is in clear air
+            Location launch = loc.clone();
+            launch.setY(launchY);
+            p.teleport(launch);
+        }
+        p.setVelocity(p.getVelocity().setY(5.5));
         Map<String,String> ph=new HashMap<>(); if(byUser!=null&&!byUser.isBlank())ph.put("user",byUser);
         p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.nasa_call.by":"events.nasa_call.solo",ph));
     }
@@ -428,15 +454,28 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.hell_is_calling.by":"events.hell_is_calling.solo",ph));
     }
 
-    // ─── TntRain ──────────────────────────────────────────────────────────────
+    // ─── TntRain (mit 5-Sekunden-Countdown) ───────────────────────────────────
     public void triggerTntRain(Player p, String byUser) {
         int duration=plugin.getConfig().getInt("events.settings.tnt_rain.duration_seconds",30);
         int radius=plugin.getConfig().getInt("events.settings.tnt_rain.radius",25);
         int intervalTicks=plugin.getConfig().getInt("events.settings.tnt_rain.interval_ticks",6);
         World world=p.getWorld(); int totalTicks=duration*20;
-        new BukkitRunnable(){int ticksRun=0;@Override public void run(){if(!p.isOnline()||p.isDead()){cancel();return;}int tntCount=8+rng.nextInt(5);Location playerLoc=p.getLocation();for(int i=0;i<tntCount;i++){double dx=rng.nextDouble()*radius*2-radius,dz=rng.nextDouble()*radius*2-radius;int ySpawn=Math.min(playerLoc.getWorld().getMaxHeight()-2,playerLoc.getBlockY()+3+rng.nextInt(5));world.spawnEntity(playerLoc.clone().add(dx,ySpawn-playerLoc.getY(),dz),EntityType.TNT_MINECART);}ticksRun+=intervalTicks;if(ticksRun>=totalTicks)cancel();}}.runTaskTimer(plugin,0L,intervalTicks);
         Map<String,String> ph=new HashMap<>(); ph.put("seconds",String.valueOf(duration)); if(byUser!=null&&!byUser.isBlank())ph.put("user",byUser);
         p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.tnt_rain.by":"events.tnt_rain.solo",ph));
+        // 5-Sekunden-Countdown als Title-Display
+        String subtitle = i18n.tr(p, "events.tnt_rain.countdown_subtitle");
+        for (int i = 5; i >= 1; i--) {
+            final int count = i;
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (p.isOnline()) p.sendTitle("§c§l" + count, "§e" + subtitle, 3, 14, 3);
+            }, (5 - i) * 20L);
+        }
+        // Regen startet nach 5 Sekunden
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!p.isOnline()) return;
+            p.sendTitle("§c§l☠", "§e" + subtitle, 5, 15, 10);
+            new BukkitRunnable(){int ticksRun=0;@Override public void run(){if(!p.isOnline()||p.isDead()){cancel();return;}int tntCount=8+rng.nextInt(5);Location playerLoc=p.getLocation();for(int i=0;i<tntCount;i++){double dx=rng.nextDouble()*radius*2-radius,dz=rng.nextDouble()*radius*2-radius;int ySpawn=Math.min(playerLoc.getWorld().getMaxHeight()-2,playerLoc.getBlockY()+3+rng.nextInt(5));world.spawnEntity(playerLoc.clone().add(dx,ySpawn-playerLoc.getY(),dz),EntityType.TNT_MINECART);}ticksRun+=intervalTicks;if(ticksRun>=totalTicks)cancel();}}.runTaskTimer(plugin,0L,intervalTicks);
+        }, 5 * 20L);
     }
 
     // ─── AnvilRain ────────────────────────────────────────────────────────────
@@ -548,6 +587,162 @@ public class RandomEvents implements Listener {
         if (byUser!=null&&!byUser.isBlank()) ph.put("user", byUser);
         p.sendMessage(i18n.tr(p, (byUser!=null&&!byUser.isBlank()) ? "events.permanent_hearts.by" : "events.permanent_hearts.solo", ph));
         p.sendMessage(i18n.tr(p, gain ? "events.permanent_hearts.gain" : "events.permanent_hearts.loss", ph));
+    }
+
+    private volatile long lastStructureTeleportMs = 0L;
+
+    // ─── StructureTeleport ────────────────────────────────────────────────────
+    // Structure keys grouped by world environment
+    private static final String[] OVERWORLD_STRUCTURES = {
+        "village", "desert_pyramid", "jungle_pyramid", "swamp_hut", "stronghold",
+        "mineshaft", "ocean_monument", "woodland_mansion", "ocean_ruin", "shipwreck",
+        "buried_treasure", "pillager_outpost", "ancient_city", "trail_ruins"
+    };
+    private static final String[] NETHER_STRUCTURES = {
+        "fortress", "bastion_remnant", "ruined_portal"
+    };
+    private static final String[] END_STRUCTURES = { "end_city" };
+
+    public void triggerStructureTeleport(Player p, String byUser) {
+        // Dedup: called per player in the event loop, but only execute once per trigger
+        long now = System.currentTimeMillis();
+        if (now - lastStructureTeleportMs < 3000L) return;
+        lastStructureTeleportMs = now;
+        Map<String,String> ph = new HashMap<>();
+        if (byUser!=null&&!byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.structure_teleport.by":"events.structure_teleport.solo",ph));
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            World overworld = Bukkit.getWorld("world");
+            World nether    = Bukkit.getWorld("world_nether");
+            World end       = Bukkit.getWorld("world_the_end");
+
+            List<Object[]> options = new ArrayList<>();
+            if (overworld != null) for (String s : OVERWORLD_STRUCTURES) options.add(new Object[]{overworld, s});
+            if (nether    != null) for (String s : NETHER_STRUCTURES)    options.add(new Object[]{nether,    s});
+            if (end       != null) for (String s : END_STRUCTURES)        options.add(new Object[]{end,       s});
+            Collections.shuffle(options, rng);
+
+            for (Object[] option : options) {
+                World world = (World) option[0];
+                String structKey = (String) option[1];
+                Structure struct = Registry.STRUCTURE.get(NamespacedKey.minecraft(structKey));
+                if (struct == null) continue;
+                Location origin = new Location(world, 0, 64, 0);
+                StructureSearchResult result = world.locateNearestStructure(origin, struct, 200, false);
+                if (result == null) continue;
+                Location found = result.getLocation();
+                int safeY = findSafeY(world, found.getBlockX(), found.getBlockZ());
+                Location dest = new Location(world, found.getBlockX() + 0.5, safeY, found.getBlockZ() + 0.5, found.getYaw(), found.getPitch());
+                for (Player online : Bukkit.getOnlinePlayers()) online.teleport(dest);
+                Map<String,String> ph2 = new HashMap<>();
+                ph2.put("structure", pretty(structKey));
+                ph2.put("world", pretty(world.getName()));
+                ph2.put("x", String.valueOf(found.getBlockX()));
+                ph2.put("z", String.valueOf(found.getBlockZ()));
+                for (Player online : Bukkit.getOnlinePlayers()) online.sendMessage(i18n.tr(online,"events.structure_teleport.destination",ph2));
+                return;
+            }
+            p.sendMessage(i18n.tr(p, "events.structure_teleport.not_found"));
+        }, 1L);
+    }
+
+    // ─── HungerClubs (Hungerkeulen) ───────────────────────────────────────────
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGH)
+    public void onFoodLevelChange(FoodLevelChangeEvent e) {
+        if (!(e.getEntity() instanceof Player p)) return;
+        int max = getEffectiveHungerMax(p);
+        if (max < 20 && e.getFoodLevel() > max) e.setFoodLevel(max);
+    }
+
+    private int getEffectiveHungerMax(Player p) {
+        Integer cached = hungerMaxCache.get(p.getUniqueId());
+        if (cached != null) return cached;
+        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "hunger_max_delta");
+        try {
+            Integer delta = p.getPersistentDataContainer().get(key, PersistentDataType.INTEGER);
+            int max = delta != null ? Math.max(2, Math.min(20, 20 + delta)) : 20;
+            hungerMaxCache.put(p.getUniqueId(), max);
+            return max;
+        } catch (Throwable ignored) { return 20; }
+    }
+
+    public void triggerHungerClubs(Player p, String byUser) { triggerHungerClubs(p, byUser, rng.nextLong()); }
+    public void triggerHungerClubs(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
+        int clubs = 1 + r.nextInt(2);           // 1 or 2 drumsticks
+        boolean gain = r.nextBoolean();
+        int delta = (gain ? 1 : -1) * clubs * 2; // 1 drumstick = 2 food points
+
+        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "hunger_max_delta");
+        int storedDelta = 0;
+        try { Integer val = p.getPersistentDataContainer().get(key, PersistentDataType.INTEGER); if (val!=null) storedDelta=val; } catch (Throwable ignored) {}
+
+        int newMax = Math.max(2, Math.min(20, 20 + storedDelta + delta));
+        int newDelta = newMax - 20;
+        p.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, newDelta);
+        hungerMaxCache.put(p.getUniqueId(), newMax);
+        if (p.getFoodLevel() > newMax) p.setFoodLevel(newMax);
+
+        Map<String,String> ph = new HashMap<>();
+        ph.put("clubs", String.valueOf(clubs)); ph.put("total", String.valueOf(newMax / 2));
+        if (byUser!=null&&!byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.hunger_clubs.by":"events.hunger_clubs.solo",ph));
+        p.sendMessage(i18n.tr(p, gain?"events.hunger_clubs.gain":"events.hunger_clubs.loss", ph));
+    }
+
+    // ─── PlayerSize ───────────────────────────────────────────────────────────
+    public void triggerPlayerSize(Player p, String byUser) { triggerPlayerSize(p, byUser, rng.nextLong()); }
+    public void triggerPlayerSize(Player p, String byUser, long seed) {
+        Random r = seededRng(seed);
+        int seconds = 15 + r.nextInt(46); // 15–60 seconds
+        boolean small = r.nextBoolean();
+        double scale = small
+            ? 0.3 + r.nextDouble() * 0.4   // 0.3 – 0.7
+            : 1.8 + r.nextDouble() * 1.7;  // 1.8 – 3.5
+        scale = Math.round(scale * 10.0) / 10.0;
+
+        // Cancel any running size event for this player
+        BukkitTask oldTask = playerSizeTasks.remove(p.getUniqueId());
+        if (oldTask != null) oldTask.cancel();
+        BossBar oldBar = playerSizeBossbars.remove(p.getUniqueId());
+        if (oldBar != null) oldBar.removeAll();
+
+        org.bukkit.attribute.AttributeInstance scaleAttr = p.getAttribute(org.bukkit.attribute.Attribute.SCALE);
+        final double originalScale = scaleAttr != null ? scaleAttr.getBaseValue() : 1.0;
+        if (scaleAttr != null) scaleAttr.setBaseValue(Math.max(0.0625, Math.min(16.0, scale)));
+
+        BarColor color = small ? BarColor.BLUE : BarColor.RED;
+        String bossbarKey = small ? "bossbar.player_size_small" : "bossbar.player_size_large";
+        BossBar bar = Bukkit.createBossBar(i18n.tr(p, bossbarKey) + " – " + seconds + "s", color, BarStyle.SEGMENTED_10);
+        bar.setProgress(1.0); bar.addPlayer(p);
+        playerSizeBossbars.put(p.getUniqueId(), bar);
+
+        Map<String,String> ph = new HashMap<>();
+        ph.put("seconds", String.valueOf(seconds)); ph.put("scale", String.format("%.1f", scale));
+        if (byUser!=null&&!byUser.isBlank()) ph.put("user", byUser);
+        p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.player_size.by":"events.player_size.solo",ph));
+        p.sendMessage(i18n.tr(p, small?"events.player_size.small":"events.player_size.large", ph));
+
+        final int totalSec = seconds;
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+            int remaining = totalSec;
+            @Override public void run() {
+                if (!p.isOnline() || remaining <= 0) {
+                    org.bukkit.attribute.AttributeInstance a = p.getAttribute(org.bukkit.attribute.Attribute.SCALE);
+                    if (a != null) a.setBaseValue(originalScale);
+                    BossBar b = playerSizeBossbars.remove(p.getUniqueId());
+                    if (b != null) b.removeAll();
+                    playerSizeTasks.remove(p.getUniqueId());
+                    if (p.isOnline()) p.sendMessage(i18n.tr(p, "events.player_size.end"));
+                    cancel(); return;
+                }
+                BossBar b = playerSizeBossbars.get(p.getUniqueId());
+                if (b != null) { b.setTitle(i18n.tr(p, bossbarKey) + " – " + remaining + "s"); b.setProgress(Math.max(0.0, Math.min(1.0, (double)remaining / totalSec))); }
+                remaining--;
+            }
+        }, 0L, 20L);
+        playerSizeTasks.put(p.getUniqueId(), task);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
