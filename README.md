@@ -2,7 +2,7 @@
 
 [![Modrinth](https://img.shields.io/badge/Modrinth-exnfachjanTTV-1bd96a?logo=modrinth&logoColor=white)](https://modrinth.com/user/exnfachjanTTV)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-1.6.0-blue)](https://github.com/exnfachjan/TwitchRandomizer)
+[![Version](https://img.shields.io/badge/version-1.7.0-blue)](https://github.com/exnfachjan/TwitchRandomizer)
 
 TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings interactive, randomized challenges to your server — all controlled by your Twitch viewers! It seamlessly integrates your Minecraft gameplay with Twitch chat, letting your audience influence and trigger in-game events in real time.
 
@@ -59,10 +59,16 @@ TwitchRandomizer is a powerful Minecraft (Paper 1.21+) plugin that brings intera
   Reset your seed after a death if you want a REAL challenge! Supports BungeeCord fallback servers.
 
 - **Ender Dragon Stats:**  
-  When the Ender Dragon is defeated, the plugin automatically broadcasts a full run summary (time, deaths, events triggered, subs, donations, bits) and saves it to `stats.yml` for review. Timer and queue are reset automatically.
+  When the Ender Dragon is defeated, the plugin automatically broadcasts a full run summary (time, deaths, events triggered, subs, donations, bits) and saves it persistently. Timer and queue are reset automatically.
 
 - **Permanent Hearts Event:**  
   A new event that permanently changes a player's maximum hearts — up or down. The change persists across disconnects and is reset when the world is reset.
+
+- **Auto Config Migration:**  
+  When you update to a new plugin version, missing `config.yml` keys are added automatically from the defaults. Just drop in the new JAR — no manual config editing needed.
+
+- **Single Data File:**  
+  All runtime data (timer, queue, player languages, session state, run stats) is stored in a single `data.db` SQLite database. The plugin folder stays clean, and the binary format prevents accidental manual edits.
 
 ---
 
@@ -82,29 +88,32 @@ Optional commands (not necessary, because you can manage everything seamlessly f
 
 ## 🎉 Events
 
-| Event                 | Description                                                                      |
-| --------------------- | -------------------------------------------------------------------------------- |
-| **spawn_mobs**        | Spawn random mobs near the player (hostile mobs chase you!)                      |
-| **potion**            | Apply a random potion effect                                                     |
-| **give_item**         | Give a random item                                                               |
-| **clear_inventory**   | Clear random slots from the player's inventory                                   |
-| **teleport**          | Teleport to a random location (safe Y-level)                                     |
-| **damage_half_heart** | Take heart damage                                                                |
-| **fire**              | Set the player on fire                                                           |
-| **inv_shuffle**       | Shuffle the entire inventory                                                     |
-| **hot_potato**        | A fast zombie (3× HP) chases you — if it catches you, it explodes!               |
-| **no_crafting**       | Block crafting for a random duration (with boss bar countdown)                   |
-| **safe_creepers**     | Creepers surround you clock-style and explode (no damage, no block destruction)  |
-| **floor_is_lava**     | The floor beneath you turns to magma blocks (with block restore)                 |
-| **nasa_call**         | Launch the player sky-high — flies through blocks!                               |
-| **slippery_ground**   | The ground turns to packed ice (with block restore)                              |
-| **hell_is_calling**   | Homing fireballs rain down on you                                                |
-| **tnt_rain**          | TNT Minecarts rain from the sky                                                  |
-| **anvil_rain**        | Anvils fall from the sky                                                         |
-| **skyblock**          | All players are teleported together — surrounding chunks get deleted!            |
-| **fake_totem**        | Receive a Totem of Undying — 50/50 chance it actually works!                     |
-| **equipment_shuffle** | All tiered tools and armor in your inventory are randomly upgraded or downgraded |
-| **permanent_hearts**  | Permanently gain or lose 1–2 maximum hearts (persists across disconnects)        |
+| Event                    | Description                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| **spawn_mobs**           | Spawn random mobs near the player (hostile mobs chase you!)                      |
+| **potion**               | Apply a random potion effect                                                     |
+| **give_item**            | Give a random item                                                               |
+| **clear_inventory**      | Clear random slots from the player's inventory                                   |
+| **teleport**             | Teleport to a random location (safe Y-level)                                     |
+| **damage_half_heart**    | Take heart damage                                                                |
+| **fire**                 | Set the player on fire                                                           |
+| **inv_shuffle**          | Shuffle the entire inventory                                                     |
+| **hot_potato**           | A fast zombie (3× HP) chases you — if it catches you, it explodes!               |
+| **no_crafting**          | Block crafting for a random duration (with boss bar countdown)                   |
+| **safe_creepers**        | Creepers surround you clock-style and explode (no damage, no block destruction)  |
+| **floor_is_lava**        | The floor beneath you turns to magma blocks (with block restore)                 |
+| **nasa_call**            | Launch the player sky-high — phases through any blocks below Y=300!              |
+| **slippery_ground**      | The ground turns to packed ice (with block restore)                              |
+| **hell_is_calling**      | Homing fireballs rain down on you                                                |
+| **tnt_rain**             | TNT Minecarts rain from the sky (5-second countdown warning!)                    |
+| **anvil_rain**           | Anvils fall from the sky                                                         |
+| **skyblock**             | All players are teleported together — surrounding chunks get deleted!            |
+| **fake_totem**           | Receive a Totem of Undying — 50/50 chance it actually works!                     |
+| **equipment_shuffle**    | All tiered tools and armor in your inventory are randomly upgraded or downgraded |
+| **permanent_hearts**     | Permanently gain or lose 1–2 maximum hearts (persists across disconnects)        |
+| **structure_teleport** ✨ | Teleport all players to a random vanilla structure in any dimension (rare!)       |
+| **hunger_clubs** ✨       | Permanently gain or lose 1–2 hunger drumsticks (persists across disconnects)     |
+| **player_size** ✨        | Randomly shrink or grow for a random duration — with boss bar countdown          |
 
 ---
 
@@ -113,7 +122,8 @@ Optional commands (not necessary, because you can manage everything seamlessly f
 You can configure the plugin through the config.yml or without OP permissions directly through the GUI in-game.
 
 1. **Install:**  
-   Place `TwitchRandomizer.jar` into your server's plugins folder.
+   Place `TwitchRandomizer.jar` into your server's plugins folder and restart.  
+   On first start, `config.yml` and `donations.yml` are created automatically. On every subsequent start, any new config keys added in a newer version are filled in automatically — no manual editing required.
 
 2. **Configure Twitch Integration:**
    - Open the GUI with `/trgui`; in the top left, you'll find the "twitch-info" book.
@@ -164,6 +174,21 @@ You can configure the plugin through the config.yml or without OP permissions di
 
 ---
 
+## 🗂 Plugin Folder
+
+After first start, your plugin folder will look like this:
+
+```
+plugins/TwitchRandomizer/
+├── config.yml      ← main configuration (Twitch, events, weights, settings)
+├── donations.yml   ← StreamElements & Tipeeestream credentials
+└── data.db         ← all runtime data (timer, queue, languages, run stats)
+```
+
+`data.db` is a SQLite binary database — it cannot be accidentally edited in a text editor. Do not delete it between sessions, as it holds your queue, timer state, and run history.
+
+---
+
 ## 🔍 Permissions for non-OP users (LuckPerms required)
 
 | Permission                    | Description                     |
@@ -191,6 +216,17 @@ The GUI uses sensible permission checks for each action.
 
 ## 📋 Changelog
 
+### v1.7.0
+
+- **New event: `structure_teleport`** — Teleports all players to a random vanilla structure in any dimension (Overworld, Nether, End). Stronghold is the rarest target. Deduplication prevents landing at the same structure twice. Weight: 3.
+- **New event: `hunger_clubs`** — Permanently gains or removes 1–2 drumsticks from the player's maximum hunger. Persists via PersistentDataContainer and resets on world reset. Weight: 5.
+- **New event: `player_size`** — Randomly shrinks or grows the player for 15–60 seconds. Boss bar shows the remaining time. Always resets to normal scale on expiry. Weight: 7.
+- **NASA Call improved** — The launch no longer teleports the player to Y=300 before applying velocity. Instead a per-tick task phases the player through any blocks below Y=300 so the full flight arc from ground level is visible and uninterrupted.
+- **TNT Rain countdown** — A 5-second title-screen warning ("Geh in Deckung!") now appears before TNT minecarts start falling.
+- **Inventory Shuffle fix** — Items in armor and offhand slots no longer vanish when the event fires.
+- **Consolidated data storage** — `timer.yml`, `queue.txt`, `player_locales.yml`, `session.yml`, and `stats.yml` are replaced by a single `data.db` SQLite database. Existing files are migrated automatically on first start after the update.
+- **Auto config migration** — On every plugin start, missing keys in `config.yml` are filled in from the bundled defaults. Updating the plugin no longer requires manual config edits.
+
 ### v1.6.0
 
 - **New event: `permanent_hearts`** — Permanently gain or lose 1–2 maximum hearts (chosen randomly). The change persists across disconnects via PersistentDataContainer and is reset on world reset.
@@ -199,7 +235,7 @@ The GUI uses sensible permission checks for each action.
 - **Hot Potato 3× HP** — The Hot Potato zombie now spawns with 60 HP (3× the normal amount), making it much harder to kill before it explodes.
 - **GUI Reset Confirmation** — The reset button in the Misc menu now opens a dedicated confirmation screen instead of running `/reset confirm` in chat.
 - **Timer not reset on world reset** — The timer is no longer zeroed when the world is reset. It can only be reset manually via the Misc menu (same behavior as Deaths).
-- **Ender Dragon Stats** — When the Ender Dragon is defeated, the plugin broadcasts a full run summary (time, deaths/tries, events triggered, total subs, donations in €, bits) and saves it to `stats.yml`. Timer is reset to 00:00:00, death counter is cleared, and the queue is emptied automatically.
+- **Ender Dragon Stats** — When the Ender Dragon is defeated, the plugin broadcasts a full run summary (time, deaths/tries, events triggered, total subs, donations in €, bits) and saves it to the database. Timer is reset to 00:00:00, death counter is cleared, and the queue is emptied automatically.
 - **Donation Stats Tracking** — StreamElements and Tipeeestream donations are now correctly tracked for the end-of-run stats. Test commands (`!test`, `!gift`, `!giftbomb`) are tracked as simulated subs.
 
 ### v1.5.1
