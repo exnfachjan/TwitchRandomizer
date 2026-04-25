@@ -18,6 +18,7 @@ dependencies {
     implementation "com.github.twitch4j:twitch4j:1.25.0"
     implementation "com.github.twitch4j:twitch4j-auth:1.25.0"
     implementation "com.github.twitch4j:twitch4j-common:1.25.0"
+    implementation 'org.xerial:sqlite-jdbc:3.47.1.0'
 }
 
 def targetJavaVersion = 21

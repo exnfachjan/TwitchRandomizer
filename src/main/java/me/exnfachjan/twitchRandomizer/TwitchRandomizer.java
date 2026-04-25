@@ -202,7 +202,7 @@ public class TwitchRandomizer extends JavaPlugin {
         if (donations != null) donations.stop();
         if (timerManager != null) timerManager.shutdown();
         if (messages != null) messages.savePlayerLocales();
-        if (dataStore != null) dataStore.save();
+        if (dataStore != null) dataStore.close();
 
         try { saveConfig(); } catch (Throwable ignored) {}
     }
