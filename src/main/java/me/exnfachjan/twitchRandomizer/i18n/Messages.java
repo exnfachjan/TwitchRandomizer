@@ -237,9 +237,9 @@ public class Messages {
         // TNT Rain countdown
         de.put("events.tnt_rain.countdown_subtitle", "Geh in Deckung!");
         // Structure Teleport
-        de.put("events.structure_teleport.solo", "Zufälliger Strukturen-Teleport! Ihr werdet zu einer Struktur teleportiert ...");
+        de.put("events.structure_teleport.solo", "Zufälliger Strukturen-Teleport! Du wirst zu einer Struktur teleportiert ...");
         de.put("events.structure_teleport.by", "{user} teleportiert euch zu einer zufälligen Struktur!");
-        de.put("events.structure_teleport.destination", "Ihr wurdet zur Struktur §f{structure}§r in Welt §f{world}§r teleportiert! (X:{x} Z:{z})");
+        de.put("events.structure_teleport.destination", "Du wurdest zur Struktur §f{structure}§r in Welt §f{world}§r teleportiert! (X:{x} Z:{z})");
         de.put("events.structure_teleport.not_found", "§cKeine Struktur in Reichweite gefunden.");
         de.put("event.name.structure_teleport", "Strukturen-Teleport");
         // Hunger Clubs
