@@ -1,0 +1,28 @@
+name: Publish to Modrinth
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+          cache: gradle
+
+      - name: Build
+        run: ./gradlew build
+
+      - uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ogCyDo14
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          # Changelog wird automatisch aus der GitHub Release-Beschreibung gezogen
+          # Version wird automatisch aus dem Release-Tag gezogen
