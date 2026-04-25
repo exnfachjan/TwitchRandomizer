@@ -392,26 +392,40 @@ public class RandomEvents implements Listener {
         groundTasks.put(p.getUniqueId(), task);
     }
 
-    // ─── NasaCall – sauber durch Blöcke starten ──────────────────────────────
+    // ─── NasaCall – sauber starten ────────────────────────────────────────────
     public void triggerNasaCall(Player p, String byUser) {
         Location loc = p.getLocation();
         World world = loc.getWorld();
-        int headY = loc.getBlockY() + 2; // 2 blocks above feet = above head
+        boolean isNether = world.getEnvironment() == World.Environment.NETHER;
         int maxY = world.getMaxHeight() - 2;
-        // Find first 2 consecutive non-solid blocks above the player's head
-        int launchY = -1;
-        for (int y = headY; y <= maxY; y++) {
-            if (!world.getBlockAt(loc.getBlockX(), y, loc.getBlockZ()).getType().isSolid()
-                    && !world.getBlockAt(loc.getBlockX(), y + 1, loc.getBlockZ()).getType().isSolid()) {
-                launchY = y;
-                break;
+        int headY = loc.getBlockY() + 2;
+
+        if (isNether) {
+            // Nether: scan upward for first 2-block gap, stop below bedrock ceiling (~Y 122)
+            int netherCeiling = Math.min(maxY, 122);
+            int launchY = -1;
+            for (int y = headY; y <= netherCeiling; y++) {
+                if (!world.getBlockAt(loc.getBlockX(), y, loc.getBlockZ()).getType().isSolid()
+                        && !world.getBlockAt(loc.getBlockX(), y + 1, loc.getBlockZ()).getType().isSolid()) {
+                    launchY = y; break;
+                }
             }
-        }
-        if (launchY > headY) {
-            // Teleport player feet to launchY so head is in clear air
-            Location launch = loc.clone();
-            launch.setY(launchY);
-            p.teleport(launch);
+            if (launchY > headY) {
+                Location launch = loc.clone(); launch.setY(launchY); p.teleport(launch);
+            }
+        } else {
+            // Overworld / End: always launch from at least Y 300
+            int targetY = Math.max(300, headY);
+            targetY = Math.min(targetY, maxY - 1);
+            // Scan from targetY upward for a clear 2-block gap (in case of extreme mountains)
+            int launchY = targetY;
+            for (int y = targetY; y <= maxY; y++) {
+                if (!world.getBlockAt(loc.getBlockX(), y, loc.getBlockZ()).getType().isSolid()
+                        && !world.getBlockAt(loc.getBlockX(), y + 1, loc.getBlockZ()).getType().isSolid()) {
+                    launchY = y; break;
+                }
+            }
+            Location launch = loc.clone(); launch.setY(launchY); p.teleport(launch);
         }
         p.setVelocity(p.getVelocity().setY(5.5));
         Map<String,String> ph=new HashMap<>(); if(byUser!=null&&!byUser.isBlank())ph.put("user",byUser);
@@ -588,6 +602,7 @@ public class RandomEvents implements Listener {
     }
 
     private volatile long lastStructureTeleportMs = 0L;
+    private final Set<String> visitedStructureLocations = new HashSet<>();
 
     // ─── StructureTeleport ────────────────────────────────────────────────────
     @SuppressWarnings("deprecation")
@@ -621,34 +636,52 @@ public class RandomEvents implements Listener {
         p.sendMessage(i18n.tr(p,(byUser!=null&&!byUser.isBlank())?"events.structure_teleport.by":"events.structure_teleport.solo",ph));
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            // Build randomised list of (world, structureType, displayName) triples
+            // Weighted list: Stronghold weight 1, all others weight 4
             List<Object[]> options = new ArrayList<>();
             for (int i = 0; i < WORLD_NAMES.length; i++) {
                 World world = Bukkit.getWorld(WORLD_NAMES[i]);
                 if (world == null) continue;
-                for (int j = 0; j < WORLD_STRUCTURES[i].length; j++)
-                    options.add(new Object[]{world, WORLD_STRUCTURES[i][j], WORLD_STRUCTURE_NAMES[i][j]});
+                for (int j = 0; j < WORLD_STRUCTURES[i].length; j++) {
+                    int weight = "Stronghold".equals(WORLD_STRUCTURE_NAMES[i][j]) ? 1 : 4;
+                    for (int w = 0; w < weight; w++)
+                        options.add(new Object[]{world, WORLD_STRUCTURES[i][j], WORLD_STRUCTURE_NAMES[i][j]});
+                }
             }
             Collections.shuffle(options, rng);
 
+            Set<String> triedPairs = new HashSet<>();
             for (Object[] option : options) {
                 World world = (World) option[0];
                 @SuppressWarnings("deprecation") StructureType st = (StructureType) option[1];
                 String structName = (String) option[2];
+                // Skip duplicate (world, struct) pairs introduced by weighting
+                if (!triedPairs.add(world.getName() + ":" + structName)) continue;
+
+                // Try up to 2 search origins to find an unvisited occurrence
                 Location origin = new Location(world, 0, 64, 0);
-                @SuppressWarnings("deprecation")
-                Location found = world.locateNearestStructure(origin, st, 200, false);
-                if (found == null) continue;
-                int safeY = findSafeY(world, found.getBlockX(), found.getBlockZ());
-                Location dest = new Location(world, found.getBlockX() + 0.5, safeY, found.getBlockZ() + 0.5);
-                for (Player online : Bukkit.getOnlinePlayers()) online.teleport(dest);
-                Map<String,String> ph2 = new HashMap<>();
-                ph2.put("structure", structName);
-                ph2.put("world", pretty(world.getName()));
-                ph2.put("x", String.valueOf(found.getBlockX()));
-                ph2.put("z", String.valueOf(found.getBlockZ()));
-                for (Player online : Bukkit.getOnlinePlayers()) online.sendMessage(i18n.tr(online,"events.structure_teleport.destination",ph2));
-                return;
+                for (int attempt = 0; attempt < 2; attempt++) {
+                    @SuppressWarnings("deprecation")
+                    Location found = world.locateNearestStructure(origin, st, 200, false);
+                    if (found == null) break;
+                    // Use chunk coords as key so nearby re-searches don't count as new
+                    String locKey = world.getName() + ":" + (found.getBlockX() >> 4) + ":" + (found.getBlockZ() >> 4);
+                    if (visitedStructureLocations.contains(locKey)) {
+                        // Already visited – try from an offset origin to find the next one
+                        origin = new Location(world, found.getBlockX() + 1500, 64, found.getBlockZ() + 1500);
+                        continue;
+                    }
+                    visitedStructureLocations.add(locKey);
+                    int safeY = findSafeY(world, found.getBlockX(), found.getBlockZ());
+                    Location dest = new Location(world, found.getBlockX() + 0.5, safeY, found.getBlockZ() + 0.5);
+                    for (Player online : Bukkit.getOnlinePlayers()) online.teleport(dest);
+                    Map<String,String> ph2 = new HashMap<>();
+                    ph2.put("structure", structName);
+                    ph2.put("world", pretty(world.getName()));
+                    ph2.put("x", String.valueOf(found.getBlockX()));
+                    ph2.put("z", String.valueOf(found.getBlockZ()));
+                    for (Player online : Bukkit.getOnlinePlayers()) online.sendMessage(i18n.tr(online,"events.structure_teleport.destination",ph2));
+                    return;
+                }
             }
             p.sendMessage(i18n.tr(p, "events.structure_teleport.not_found"));
         }, 1L);
@@ -716,7 +749,6 @@ public class RandomEvents implements Listener {
         if (oldBar != null) oldBar.removeAll();
 
         org.bukkit.attribute.AttributeInstance scaleAttr = p.getAttribute(org.bukkit.attribute.Attribute.SCALE);
-        final double originalScale = scaleAttr != null ? scaleAttr.getBaseValue() : 1.0;
         if (scaleAttr != null) scaleAttr.setBaseValue(Math.max(0.0625, Math.min(16.0, scale)));
 
         BarColor color = small ? BarColor.BLUE : BarColor.RED;
@@ -737,7 +769,7 @@ public class RandomEvents implements Listener {
             @Override public void run() {
                 if (!p.isOnline() || remaining <= 0) {
                     org.bukkit.attribute.AttributeInstance a = p.getAttribute(org.bukkit.attribute.Attribute.SCALE);
-                    if (a != null) a.setBaseValue(originalScale);
+                    if (a != null) a.setBaseValue(1.0); // always reset to vanilla default
                     BossBar b = playerSizeBossbars.remove(p.getUniqueId());
                     if (b != null) b.removeAll();
                     playerSizeTasks.remove(p.getUniqueId());
