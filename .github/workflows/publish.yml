@@ -10,16 +10,16 @@ jobs:
     steps:
       - name: Download JAR from Release
         run: |
-          JAR_URL=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} \
+          curl -s https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            | jq -r '.assets[] | select(.name | endswith(".jar")) | .browser_download_url')
-          curl -L -o plugin.jar "$JAR_URL"
+            | jq -r '.assets[] | select(.name | endswith(".jar")) | .browser_download_url' \
+            | xargs -I {} curl -L -O {}
 
       - uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ogCyDo14
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: plugin.jar
+          files: *.jar
           version: ${{ github.ref_name }}
           version-type: release
           loaders: paper spigot
