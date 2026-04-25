@@ -1,17 +1,16 @@
 package me.exnfachjan.twitchRandomizer.i18n;
 
+import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 
 import java.util.*;
 
 public class Messages {
     public enum Mode { AUTO, MANUAL }
 
-    private final Plugin plugin;
+    private final TwitchRandomizer plugin;
     private final Map<UUID, String> store = new HashMap<>();
-    private java.io.File playerLocalesFile;
 
     private final Map<String, Object> de = new LinkedHashMap<>();
     private final Map<String, Object> en = new LinkedHashMap<>();
@@ -19,7 +18,7 @@ public class Messages {
     private Mode mode = Mode.AUTO;
     private String defaultLang = "en";
 
-    public Messages(Plugin plugin) {
+    public Messages(TwitchRandomizer plugin) {
         this.plugin = plugin;
         try {
             String m = String.valueOf(plugin.getConfig().getString("language.mode", "auto")).toLowerCase(Locale.ROOT);
@@ -485,10 +484,6 @@ public class Messages {
         en.put("bossbar.player_size_large", "Huge");
     }
 
-    private java.io.File getLocalesFile() {
-        return new java.io.File(plugin.getDataFolder(), "player_locales.yml");
-    }
-
     public void load() {
         try {
             String m = String.valueOf(plugin.getConfig().getString("language.mode", "auto")).toLowerCase(java.util.Locale.ROOT);
@@ -499,17 +494,15 @@ public class Messages {
         } catch (Throwable ignored) {}
 
         try {
-            java.io.File f = getLocalesFile();
-            if (!f.exists()) { migrateLocalesFromConfig(); return; }
-            org.bukkit.configuration.file.YamlConfiguration yaml = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(f);
             store.clear();
-            for (String key : yaml.getKeys(false)) {
-                try {
-                    java.util.UUID id = java.util.UUID.fromString(key);
-                    String lang = yaml.getString(key, null);
-                    String n = normalizeLang(lang);
-                    if (n != null) store.put(id, n);
-                } catch (IllegalArgumentException ignored) {}
+            Map<UUID, String> saved = plugin.getDataStore().getPlayerLocales();
+            if (saved.isEmpty()) {
+                migrateLocalesFromConfig();
+            } else {
+                for (Map.Entry<UUID, String> e : saved.entrySet()) {
+                    String n = normalizeLang(e.getValue());
+                    if (n != null) store.put(e.getKey(), n);
+                }
             }
         } catch (Throwable ignored) {}
     }
@@ -517,7 +510,6 @@ public class Messages {
     private void migrateLocalesFromConfig() {
         try {
             org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
-            store.clear();
             if (cfg.isConfigurationSection("player_locales")) {
                 org.bukkit.configuration.ConfigurationSection sec = cfg.getConfigurationSection("player_locales");
                 for (String key : sec.getKeys(false)) {
@@ -532,7 +524,7 @@ public class Messages {
                     savePlayerLocales();
                     cfg.set("player_locales", null);
                     plugin.saveConfig();
-                    plugin.getLogger().info("[Messages] player_locales nach player_locales.yml migriert.");
+                    plugin.getLogger().info("[Messages] player_locales migriert → data.yml");
                 }
             }
         } catch (Throwable ignored) {}
@@ -540,11 +532,8 @@ public class Messages {
 
     public void savePlayerLocales() {
         try {
-            java.io.File f = getLocalesFile();
-            if (!f.getParentFile().exists()) f.getParentFile().mkdirs();
-            org.bukkit.configuration.file.YamlConfiguration yaml = new org.bukkit.configuration.file.YamlConfiguration();
-            for (var e : store.entrySet()) yaml.set(e.getKey().toString(), e.getValue());
-            yaml.save(f);
+            plugin.getDataStore().setPlayerLocales(store);
+            plugin.getDataStore().saveAsync();
         } catch (Throwable ignored) {}
     }
 

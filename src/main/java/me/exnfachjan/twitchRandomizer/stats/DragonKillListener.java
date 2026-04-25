@@ -3,15 +3,12 @@ package me.exnfachjan.twitchRandomizer.stats;
 import me.exnfachjan.twitchRandomizer.TwitchRandomizer;
 import me.exnfachjan.twitchRandomizer.i18n.Messages;
 import org.bukkit.Bukkit;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.*;
 
 public class DragonKillListener implements Listener {
@@ -101,29 +98,25 @@ public class DragonKillListener implements Listener {
         for (Player p : Bukkit.getOnlinePlayers()) p.sendMessage(i18n.tr(p, key, ph));
     }
 
-    // ── stats.yml ─────────────────────────────────────────────────────────────
-
     private void saveStats(List<String> channels, int subs, double euro, int bits, long timeSec, int deaths, int eventsTriggered) {
         try {
-            File f = new File(plugin.getDataFolder(), "stats.yml");
-            YamlConfiguration cfg = f.exists() ? YamlConfiguration.loadConfiguration(f) : new YamlConfiguration();
-            String runKey = "run_" + System.currentTimeMillis();
-            cfg.set(runKey+".timestamp",         new Date().toString());
-            cfg.set(runKey+".time_seconds",       timeSec);
-            cfg.set(runKey+".deaths",             deaths);
-            cfg.set(runKey+".total.subs",         subs);
-            cfg.set(runKey+".total.euro",         euro);
-            cfg.set(runKey+".total.bits",         bits);
-            cfg.set(runKey+".total.events_dispatched", eventsTriggered);
+            String rk = "run_" + System.currentTimeMillis();
+            plugin.getDataStore().setRunData(rk + ".timestamp",              new Date().toString());
+            plugin.getDataStore().setRunData(rk + ".time_seconds",           timeSec);
+            plugin.getDataStore().setRunData(rk + ".deaths",                 deaths);
+            plugin.getDataStore().setRunData(rk + ".total.subs",             subs);
+            plugin.getDataStore().setRunData(rk + ".total.euro",             euro);
+            plugin.getDataStore().setRunData(rk + ".total.bits",             bits);
+            plugin.getDataStore().setRunData(rk + ".total.events_dispatched", eventsTriggered);
             for (String ch : channels) {
-                cfg.set(runKey+".channels."+ch+".subs",  collectSubsForChannel(ch));
-                cfg.set(runKey+".channels."+ch+".euro",  collectEuroForChannel(ch));
-                cfg.set(runKey+".channels."+ch+".bits",  collectBitsForChannel(ch));
+                plugin.getDataStore().setRunData(rk + ".channels." + ch + ".subs", collectSubsForChannel(ch));
+                plugin.getDataStore().setRunData(rk + ".channels." + ch + ".euro", collectEuroForChannel(ch));
+                plugin.getDataStore().setRunData(rk + ".channels." + ch + ".bits", collectBitsForChannel(ch));
             }
-            cfg.save(f);
-            plugin.getLogger().info("[Stats] Run-Daten gespeichert: " + runKey);
-        } catch (IOException ex) {
-            plugin.getLogger().warning("[Stats] Konnte stats.yml nicht speichern: " + ex.getMessage());
+            plugin.getDataStore().saveAsync();
+            plugin.getLogger().info("[Stats] Run-Daten gespeichert: " + rk);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("[Stats] Konnte Run-Daten nicht speichern: " + ex.getMessage());
         }
     }
 

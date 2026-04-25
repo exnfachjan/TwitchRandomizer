@@ -10,7 +10,6 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -24,8 +23,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,7 +34,6 @@ public class TimerManager implements Listener {
     private long elapsedSeconds = 0;
     private boolean running = false;
 
-    private final File dataFile;
     private long lastAutosaveSecond = 0;
 
     private BukkitTask particleTask = null;
@@ -46,7 +42,6 @@ public class TimerManager implements Listener {
     public TimerManager(TwitchRandomizer plugin) {
         this.plugin = plugin;
         this.messages = plugin.getMessages();
-        this.dataFile = new File(plugin.getDataFolder(), "timer.yml");
         loadState();
         startActionbarLoop();
         if (!running) {
@@ -384,19 +379,11 @@ public class TimerManager implements Listener {
     private void showOnce() { broadcastActionBar(); }
 
     private void loadState() {
-        if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
-        if (!dataFile.exists()) { saveState(); return; }
-        YamlConfiguration cfg = YamlConfiguration.loadConfiguration(dataFile);
-        this.elapsedSeconds = cfg.getLong("elapsedSeconds", 0L);
+        this.elapsedSeconds = plugin.getDataStore().getTimerElapsed();
         this.running = false;
-        saveState();
     }
 
     private void saveState() {
-        YamlConfiguration cfg = new YamlConfiguration();
-        cfg.set("elapsedSeconds", elapsedSeconds);
-        cfg.set("running", running);
-        try { cfg.save(dataFile); }
-        catch (IOException e) { plugin.getLogger().warning("Konnte timer.yml nicht speichern: " + e.getMessage()); }
+        plugin.getDataStore().setTimerState(elapsedSeconds, running);
     }
 }

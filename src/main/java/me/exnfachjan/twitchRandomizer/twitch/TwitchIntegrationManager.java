@@ -53,7 +53,6 @@ public class TwitchIntegrationManager {
     private int ticksSinceLastDispatch = 0;
     private boolean cooledAndReady = true;
     private boolean debug = false;
-    private final File queueFile;
     private final Set<UUID> deathScreenPlayers = ConcurrentHashMap.newKeySet();
 
     // ── Stats-Tracking für DragonKillListener ────────────────────────────────
@@ -93,7 +92,6 @@ public class TwitchIntegrationManager {
 
     public TwitchIntegrationManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.queueFile = new File(plugin.getDataFolder(), "queue.txt");
         Bukkit.getPluginManager().registerEvents(new Listener() {
             @EventHandler public void onPlayerDeath(PlayerDeathEvent event)    { deathScreenPlayers.add(event.getEntity().getUniqueId()); }
             @EventHandler public void onPlayerRespawn(PlayerRespawnEvent event) { deathScreenPlayers.remove(event.getPlayer().getUniqueId()); }
@@ -307,10 +305,20 @@ public class TwitchIntegrationManager {
     public int getTicksUntilNextDispatch() { return Math.max(0, gapTicks-ticksSinceLastDispatch); }
 
     private void loadQueue() {
-        try{if(!plugin.getDataFolder().exists())plugin.getDataFolder().mkdirs();if(!queueFile.exists()){plugin.getLogger().info("Keine bestehende Queue-Datei gefunden (skip).");return;}int loaded=0;try(BufferedReader br=new BufferedReader(new InputStreamReader(new FileInputStream(queueFile),StandardCharsets.UTF_8))){String line;while((line=br.readLine())!=null){line=line.trim();if(!line.isEmpty()){commandQueue.offer(line);loaded++;}}}plugin.getLogger().info("Queue geladen: "+loaded+" Einträge.");}catch(Exception e){plugin.getLogger().warning("Fehler beim Laden der Queue: "+e.getMessage());}
+        try {
+            List<String> saved = ((TwitchRandomizer) plugin).getDataStore().getQueue();
+            saved.forEach(commandQueue::offer);
+            plugin.getLogger().info("Queue geladen: " + saved.size() + " Einträge.");
+        } catch (Exception e) {
+            plugin.getLogger().warning("Fehler beim Laden der Queue: " + e.getMessage());
+        }
     }
     private void saveQueueAsync() {
-        try{Bukkit.getScheduler().runTaskAsynchronously(plugin,()->{try{if(!plugin.getDataFolder().exists())plugin.getDataFolder().mkdirs();List<String> snapshot=new ArrayList<>(commandQueue);try(PrintWriter pw=new PrintWriter(new OutputStreamWriter(new FileOutputStream(queueFile),StandardCharsets.UTF_8))){for(String line:snapshot)pw.println(line);}}catch(Exception e){plugin.getLogger().warning("Fehler beim Speichern der Queue: "+e.getMessage());}});}catch(Throwable ignored){}
+        try {
+            TwitchRandomizer tr = (TwitchRandomizer) plugin;
+            tr.getDataStore().setQueue(new ArrayList<>(commandQueue));
+            tr.getDataStore().saveAsync();
+        } catch (Throwable ignored) {}
     }
     private String normalizeToken(String raw) { if(raw==null)return"";String t=raw.trim();if(t.length()>=2&&((t.startsWith("\"")&&t.endsWith("\""))||(t.startsWith("'")&&t.endsWith("'"))))t=t.substring(1,t.length()-1).trim();if(t.toLowerCase(Locale.ROOT).startsWith("oauth:"))t=t.substring("oauth:".length());return t; }
     private OAuth2Credential buildCredential(String raw) { return new OAuth2Credential("twitch", normalizeToken(raw)); }

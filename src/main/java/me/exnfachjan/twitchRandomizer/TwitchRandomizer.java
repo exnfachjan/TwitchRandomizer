@@ -1,6 +1,7 @@
 package me.exnfachjan.twitchRandomizer;
 
 import me.exnfachjan.twitchRandomizer.command.*;
+import me.exnfachjan.twitchRandomizer.data.DataStore;
 import me.exnfachjan.twitchRandomizer.death.*;
 import me.exnfachjan.twitchRandomizer.gui.*;
 import me.exnfachjan.twitchRandomizer.i18n.Messages;
@@ -14,14 +15,19 @@ import me.exnfachjan.twitchRandomizer.config.SessionConfig;
 import me.exnfachjan.twitchRandomizer.reset.ResetManager;
 import me.exnfachjan.twitchRandomizer.pause.GamePauseService;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class TwitchRandomizer extends JavaPlugin {
 
+    private DataStore dataStore;
     private TimerManager timerManager;
     private TwitchIntegrationManager twitch;
     private TipeeeStreamIntegrationManager tipeeeStream;
@@ -70,8 +76,10 @@ public class TwitchRandomizer extends JavaPlugin {
     @Override
     public void onLoad() {
         try {
-            this.sessionConfig = new SessionConfig(getDataFolder());
-            this.resetManager = new ResetManager(this, sessionConfig);
+            getDataFolder().mkdirs();
+            this.dataStore    = new DataStore(this);
+            this.sessionConfig = new SessionConfig(dataStore);
+            this.resetManager  = new ResetManager(this, sessionConfig);
             this.resetManager.executeWorldResetIfNecessary();
         } catch (Throwable t) {
             getLogger().warning("[Reset] Early reset onLoad failed: " + t.getMessage());
@@ -81,6 +89,7 @@ public class TwitchRandomizer extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        migrateConfig();
 
         try {
             getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
@@ -160,6 +169,30 @@ public class TwitchRandomizer extends JavaPlugin {
         if (zmdCmd != null) zmdCmd.setExecutor(new ZmdCommand(this));
     }
 
+    /** Adds any keys present in the bundled default config.yml that are missing
+     *  from the on-disk config.yml. Runs automatically on every plugin enable,
+     *  so updating the JAR is all that is needed to pick up new config keys. */
+    private void migrateConfig() {
+        try (InputStream stream = getResource("config.yml")) {
+            if (stream == null) return;
+            YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
+                    new InputStreamReader(stream, StandardCharsets.UTF_8));
+            boolean changed = false;
+            for (String key : defaults.getKeys(true)) {
+                if (!defaults.isConfigurationSection(key) && !getConfig().isSet(key)) {
+                    getConfig().set(key, defaults.get(key));
+                    changed = true;
+                }
+            }
+            if (changed) {
+                saveConfig();
+                getLogger().info("[Config] New default keys added to config.yml.");
+            }
+        } catch (Throwable e) {
+            getLogger().warning("[Config] Config migration failed: " + e.getMessage());
+        }
+    }
+
     @Override
     public void onDisable() {
         applyPending = false;
@@ -169,6 +202,7 @@ public class TwitchRandomizer extends JavaPlugin {
         if (donations != null) donations.stop();
         if (timerManager != null) timerManager.shutdown();
         if (messages != null) messages.savePlayerLocales();
+        if (dataStore != null) dataStore.save();
 
         try { saveConfig(); } catch (Throwable ignored) {}
     }
@@ -182,6 +216,7 @@ public class TwitchRandomizer extends JavaPlugin {
     public DeathCounterManager getDeathCounter() { return deathCounter; }
     public ResetManager getResetManager() { return resetManager; }
     public SessionConfig getSessionConfig() { return sessionConfig; }
+    public DataStore getDataStore() { return dataStore; }
 
     private volatile long lastApplyRequestMs = 0L;
     private volatile boolean applyPending = false;
