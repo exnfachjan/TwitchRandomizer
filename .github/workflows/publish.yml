@@ -19,7 +19,7 @@ jobs:
         with:
           modrinth-id: ogCyDo14
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: *.jar
+          files: "*.jar"
           version: ${{ github.ref_name }}
           version-type: release
           loaders: paper spigot
